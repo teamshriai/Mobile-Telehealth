@@ -1,0 +1,185 @@
+{
+  "meta": {
+    "name": "OncoTrace AI — Auth API",
+    "type": "collection",
+    "version": "1"
+  },
+  "vars": [
+    { "name": "base_url", "value": "http://localhost:5000" },
+    { "name": "token", "value": "" }
+  ],
+  "requests": [
+    {
+      "name": "Health Check",
+      "type": "http",
+      "url": "{{base_url}}/health",
+      "method": "GET",
+      "headers": [],
+      "body": null,
+      "docs": "Unauthenticated. Returns 200 if server is running."
+    },
+    {
+      "name": "Register — Valid Patient",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/register",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "jane.doe@example.com",
+          "password": "SecurePass123!",
+          "firstName": "Jane",
+          "lastName": "Doe",
+          "dateOfBirth": "1990-06-15",
+          "gender": "Female"
+        }
+      },
+      "docs": "Creates a user + patient profile. Returns token + sanitized user. Expected: 201."
+    },
+    {
+      "name": "Register — Duplicate Email",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/register",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "jane.doe@example.com",
+          "password": "SecurePass123!",
+          "firstName": "Jane",
+          "lastName": "Doe",
+          "dateOfBirth": "1990-06-15"
+        }
+      },
+      "docs": "Expected: 409 Conflict."
+    },
+    {
+      "name": "Register — Weak Password",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/register",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "test2@example.com",
+          "password": "password",
+          "firstName": "Test",
+          "lastName": "User",
+          "dateOfBirth": "1995-01-01"
+        }
+      },
+      "docs": "Expected: 400 with field-level validation errors."
+    },
+    {
+      "name": "Login — Valid",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/login",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "jane.doe@example.com",
+          "password": "SecurePass123!"
+        }
+      },
+      "docs": "Copy the token from the response and set it in the collection var 'token'. Expected: 200."
+    },
+    {
+      "name": "Login — Wrong Password",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/login",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "jane.doe@example.com",
+          "password": "WrongPassword999!"
+        }
+      },
+      "docs": "Expected: 401 with generic 'Invalid credentials.' — email existence is not revealed."
+    },
+    {
+      "name": "Login — Non-existent Email",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/login",
+      "method": "POST",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mode": "json",
+        "json": {
+          "email": "nobody@example.com",
+          "password": "AnyPass123!"
+        }
+      },
+      "docs": "Expected: 401 — same 'Invalid credentials.' message as wrong password. Prevents user enumeration."
+    },
+    {
+      "name": "Get Profile (Protected)",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/me",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{token}}" }
+      ],
+      "body": null,
+      "docs": "Returns authenticated user + patient profile. Expected: 200."
+    },
+    {
+      "name": "Get Profile — No Token",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/me",
+      "method": "GET",
+      "headers": [],
+      "body": null,
+      "docs": "Expected: 401 — 'Authentication required.'"
+    },
+    {
+      "name": "Get Profile — Expired Token",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/me",
+      "method": "GET",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ0ZXN0QHRlc3QuY29tIiwicm9sZSI6IlBhdGllbnQiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MX0.invalid" }
+      ],
+      "body": null,
+      "docs": "Expected: 401 — 'Session expired. Please log in again.'"
+    },
+    {
+      "name": "Logout (Protected)",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/auth/logout",
+      "method": "POST",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{token}}" }
+      ],
+      "body": null,
+      "docs": "Writes audit log, returns success. Client must discard the token. Expected: 200."
+    },
+    {
+      "name": "404 — Unknown Route",
+      "type": "http",
+      "url": "{{base_url}}/api/v1/unknown",
+      "method": "GET",
+      "headers": [],
+      "body": null,
+      "docs": "Expected: 404 with route-not-found message."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# ─── Always exclude from Docker image ────────────────────────────────────────
+node_modules/
+dist/
+build/
+
+# ─── Git ──────────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ─── Environment (NEVER bake secrets into image) ──────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Development tooling ──────────────────────────────────────────────────────
+.eslintrc*
+eslint.config.*
+.prettierrc*
+.prettierignore
+*.md
+docs/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ─── Test ─────────────────────────────────────────────────────────────────────
+coverage/
+*.test.ts
+*.spec.ts
+__tests__/
+
+# ─── TypeScript sources (use compiled dist/) ──────────────────────────────────
+src/
+tsconfig*.json

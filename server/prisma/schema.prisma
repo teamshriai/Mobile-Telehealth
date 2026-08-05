@@ -1,0 +1,453 @@
+// =============================================================================
+// OncoTrace AI — Database Schema
+// Designed for a commercial precision oncology platform.
+//
+// Design principles:
+//  - User table = authentication + identity ONLY. No medical data.
+//  - PatientProfile = demographics only. No clinical data.
+//  - AuditLog is INSERT-ONLY and immutable (HIPAA/GDPR compliance).
+//  - All FKs are explicitly indexed.
+//  - Soft delete via deletedAt on User and PatientProfile.
+//  - UUID primary keys on all tables.
+//  - DB column names: snake_case via @map / @@map.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// The fixed set of roles in the platform.
+/// New roles require a migration — intentional. Roles are a schema concern.
+enum RoleName {
+  Admin
+  Patient
+  Doctor
+  HealthcareWorker
+  LabTechnician
+
+  @@map("role_name")
+}
+
+/// Biological sex / gender identity for patient demographics.
+/// PreferNotToDisclose satisfies privacy requirements.
+enum Gender {
+  Male
+  Female
+  Other
+  PreferNotToDisclose
+
+  @@map("gender")
+}
+
+/// Blood group classification using ABO + Rh system.
+enum BloodGroup {
+  A_Positive
+  A_Negative
+  B_Positive
+  B_Negative
+  AB_Positive
+  AB_Negative
+  O_Positive
+  O_Negative
+  Unknown
+
+  @@map("blood_group")
+}
+
+/// Marital status for patient demographics.
+enum MaritalStatus {
+  Single
+  Married
+  Divorced
+  Widowed
+  Separated
+  PreferNotToDisclose
+
+  @@map("marital_status")
+}
+
+/// Smoking status for lifestyle assessment.
+enum SmokingStatus {
+  Never
+  Former
+  Current
+  Occasional
+
+  @@map("smoking_status")
+}
+
+/// Alcohol consumption status.
+enum AlcoholStatus {
+  Never
+  Occasional
+  Moderate
+  Heavy
+
+  @@map("alcohol_status")
+}
+
+/// Tobacco use status (includes smokeless tobacco).
+enum TobaccoStatus {
+  Never
+  Former
+  Current
+
+  @@map("tobacco_status")
+}
+
+/// Physical activity level for lifestyle assessment.
+enum PhysicalActivity {
+  Sedentary
+  Light
+  Moderate
+  Active
+  VeryActive
+
+  @@map("physical_activity")
+}
+
+/// Severity classification for audit events.
+/// Used for alerting thresholds in future SIEM integration.
+enum AuditSeverity {
+  Info
+  Warning
+  Critical
+
+  @@map("audit_severity")
+}
+
+/// All security-relevant actions that must be audited.
+/// Extend this enum as new modules are added — never remove values.
+enum AuditAction {
+  UserRegistered
+  UserLoginSuccess
+  UserLoginFailed
+  UserLogout
+  PasswordChanged
+  AccountLocked
+  AccountUnlocked
+  EmailVerified
+  UnauthorizedAccess
+  ProfileUpdated
+  ProfilePhotoUpdated
+  RoleChanged
+
+  @@map("audit_action")
+}
+
+// =============================================================================
+// ROLE
+//
+// Separated from User to allow RBAC expansion without touching the users table.
+// Future: add a `level` (Int) field for role hierarchy if privilege escalation
+// checks are needed.
+// =============================================================================
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        RoleName @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // ── Relations ───────────────────────────────────────────────────────────
+  users           User[]
+  rolePermissions RolePermission[]
+
+  // ── Index: isActive for filtering inactive roles ─────────────────────────
+  @@index([isActive])
+  @@map("roles")
+}
+
+// =============================================================================
+// PERMISSION
+//
+// Foundation scaffold. Currently unpopulated.
+// Module-level permissions are added here as new domains are built.
+// Example records:
+//   { name: "patient:read",   resource: "patient", action: "read"   }
+//   { name: "lab:create",     resource: "lab",     action: "create" }
+//
+// resource + action combination is the functional unique key.
+// =============================================================================
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique              // e.g. "patient:read"
+  description String?
+  resource    String                        // e.g. "patient", "lab_report"
+  action      String                        // e.g. "create", "read", "update", "delete"
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // ── Relations ───────────────────────────────────────────────────────────
+  rolePermissions RolePermission[]
+
+  // ── Composite index: most queries filter by resource + action ────────────
+  @@index([resource, action])
+  @@map("permissions")
+}
+
+// =============================================================================
+// ROLE_PERMISSION  (Join Table — Many-to-Many: Role ↔ Permission)
+//
+// Composite PK prevents duplicate role-permission assignments.
+// Cascade delete on both sides: removing a role or permission
+// automatically cleans up the assignment. No orphaned rows.
+// =============================================================================
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // ── Relations ───────────────────────────────────────────────────────────
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// =============================================================================
+// USER
+//
+// Authentication and identity ONLY.
+// No name. No phone number. No date of birth. No medical information.
+// Profile data lives in PatientProfile / DoctorProfile (future) / etc.
+//
+// Security fields explained:
+//  failedLoginAttempts — incremented on each failed login; reset on success.
+//  lockedUntil         — if set and in the future, login is rejected.
+//  lastLoginAt         — audit trail; detect stale/unused accounts.
+//  passwordChangedAt   — detect accounts that never changed default passwords.
+//  verificationToken   — one-time token for email verification flow.
+//  verificationExpires — token expiry; must be checked before accepting token.
+//  deletedAt           — soft delete; row is retained, login is rejected.
+// =============================================================================
+
+model User {
+  id    String   @id @default(uuid()) @db.Uuid
+  email String   @unique
+  passwordHash String @map("password_hash")
+
+  // ── Role FK ──────────────────────────────────────────────────────────────
+  roleId String @map("role_id") @db.Uuid
+
+  // ── Account Status ────────────────────────────────────────────────────────
+  isVerified Boolean @default(false) @map("is_verified")
+  isActive   Boolean @default(true)  @map("is_active")
+
+  // ── Security Fields ───────────────────────────────────────────────────────
+  failedLoginAttempts Int       @default(0)  @map("failed_login_attempts")
+  lockedUntil         DateTime?              @map("locked_until")
+  lastLoginAt         DateTime?              @map("last_login_at")
+  passwordChangedAt   DateTime?              @map("password_changed_at")
+
+  // ── Email Verification ────────────────────────────────────────────────────
+  // verificationToken is UNIQUE: prevents token collision across users.
+  // It is nullable: NULL when the account is already verified.
+  verificationToken   String?   @unique @map("verification_token")
+  verificationExpires DateTime?           @map("verification_expires")
+
+  // ── Soft Delete ───────────────────────────────────────────────────────────
+  deletedAt DateTime? @map("deleted_at")
+
+  // ── Timestamps ────────────────────────────────────────────────────────────
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  // ── Relations ─────────────────────────────────────────────────────────────
+  role           Role            @relation(fields: [roleId], references: [id])
+  patientProfile PatientProfile?
+  auditLogs      AuditLog[]
+
+  // ── Indexes ───────────────────────────────────────────────────────────────
+  // email: @unique creates the lookup index implicitly — not duplicated here.
+  //
+  // [roleId]: FK columns must be indexed; Prisma does NOT auto-index FKs.
+  // PostgreSQL will use this for JOIN queries against the roles table.
+  //
+  // [isActive, deletedAt]: compound index for the most common query pattern:
+  //   WHERE is_active = true AND deleted_at IS NULL
+  //
+  // [createdAt]: range queries for admin dashboards and reporting.
+  @@index([roleId])
+  @@index([isActive, deletedAt])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// =============================================================================
+// PATIENT PROFILE
+//
+// Comprehensive patient identity, demographics, contact, lifestyle, and
+// medical summary information. One-to-one with User.
+//
+// This table serves as the central source of truth for patient identity.
+// Clinical data (diagnoses, lab results, NGS) lives in future domain tables.
+//
+// onDelete: Restrict — a User with a PatientProfile cannot be hard-deleted.
+// This is a DB-level guard. The application must soft-delete via deletedAt.
+// This prevents accidental permanent loss of patient records.
+//
+// profilePhoto: stores only the filename/path — binary data NEVER goes in DB.
+// =============================================================================
+
+model PatientProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  // ── Basic Information ─────────────────────────────────────────────────────
+  firstName     String        @map("first_name")
+  middleName    String?       @map("middle_name")
+  lastName      String        @map("last_name")
+  dateOfBirth   DateTime      @map("date_of_birth") @db.Date
+  gender        Gender?
+  bloodGroup    BloodGroup?   @map("blood_group")
+  maritalStatus MaritalStatus? @map("marital_status")
+
+  // ── Profile Photo ─────────────────────────────────────────────────────────
+  // Stores only the relative filename — e.g. "uuid.jpg"
+  // Full URL is constructed at the service layer.
+  // Binary data NEVER stored in PostgreSQL.
+  profilePhoto      String?       @map("profile_photo")
+  photoMetadata     ProfilePhoto?
+
+  // ── Identification ────────────────────────────────────────────────────────
+  // aadhaarNumber: stored masked — last 4 digits plain, first 8 as XXXX XXXX.
+  // The service layer is responsible for masking before storage.
+  aadhaarNumber String? @map("aadhaar_number")
+  abhaId        String? @unique @map("abha_id")
+  passportNumber String? @map("passport_number")
+
+  // ── Contact ───────────────────────────────────────────────────────────────
+  phoneNumber     String? @map("phone_number")
+  alternatePhone  String? @map("alternate_phone")
+  addressLine1    String? @map("address_line1")
+  addressLine2    String? @map("address_line2")
+  village         String?
+  city            String?
+  district        String?
+  state           String?
+  country         String? @default("India")
+  postalCode      String? @map("postal_code")
+
+  // ── Emergency Contact ─────────────────────────────────────────────────────
+  emergencyContactName     String? @map("emergency_contact_name")
+  emergencyContactPhone    String? @map("emergency_contact_phone")
+  emergencyContactRelation String? @map("emergency_contact_relation")
+
+  // ── Lifestyle ─────────────────────────────────────────────────────────────
+  smokingStatus    SmokingStatus?  @map("smoking_status")
+  alcoholStatus    AlcoholStatus?  @map("alcohol_status")
+  tobaccoStatus    TobaccoStatus?  @map("tobacco_status")
+  physicalActivity PhysicalActivity? @map("physical_activity")
+  occupation       String?
+
+  // ── Medical Summary ───────────────────────────────────────────────────────
+  // Stored as plain text / comma-separated lists.
+  // Future: normalize to separate tables per domain requirement.
+  knownAllergies    String?   @map("known_allergies")
+  currentMedications String? @map("current_medications")
+  existingDiseases  String?  @map("existing_diseases")
+  familyHistory     String?  @map("family_history")
+  previousSurgeries String?  @map("previous_surgeries")
+
+  // ── Soft Delete ───────────────────────────────────────────────────────────
+  deletedAt DateTime? @map("deleted_at")
+
+  // ── Timestamps ────────────────────────────────────────────────────────────
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  // ── Relations ─────────────────────────────────────────────────────────────
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // ── Indexes ───────────────────────────────────────────────────────────────
+  // [lastName, firstName]: name search — clinical staff search patients by name.
+  // [abhaId]: unique identifier look-up.
+  // userId: @unique creates the index implicitly — not duplicated.
+  @@index([lastName, firstName])
+  @@map("patient_profiles")
+}
+
+// =============================================================================
+// AUDIT LOG
+//
+// Immutable append-only table. INSERT only. No UPDATE. No DELETE. Ever.
+// Retained indefinitely per HIPAA Security Rule §164.312(b) and GDPR Article 30.
+//
+// userId is nullable because:
+//  1. System-initiated events have no user context.
+//  2. onDelete: SetNull — if a user is deleted, their audit history is
+//     preserved with userId = NULL. The log must never be destroyed.
+//
+// No updatedAt field — adding one would be architecturally incorrect for
+// an immutable audit trail. Prisma's @updatedAt would allow mutation.
+//
+// metadata (Json/jsonb): flexible payload for action-specific context.
+// Example: { "ip": "1.2.3.4", "reason": "max_attempts_exceeded" }
+// =============================================================================
+
+model AuditLog {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String?       @map("user_id") @db.Uuid
+  action     AuditAction
+  resource   String?                            // e.g. "user", "patient_profile"
+  resourceId String?       @map("resource_id") // UUID of the affected row
+  severity   AuditSeverity @default(Info)
+  ipAddress  String?       @map("ip_address")
+  userAgent  String?       @map("user_agent")
+  metadata   Json?
+
+  // No updatedAt — this field's absence is intentional and enforced.
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // ── Relations ─────────────────────────────────────────────────────────────
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // ── Indexes ───────────────────────────────────────────────────────────────
+  // [userId]: look up all events for a specific user (account activity view)
+  // [action]: filter by event type (find all failed logins)
+  // [severity]: alert dashboards filter on Critical events.
+  // [createdAt]: time-range queries — the primary access pattern for audit logs.
+  // [userId, action, createdAt]: the most common security query:
+  //   "Show me all failed login attempts for user X in the last 30 days"
+  //   This compound index satisfies that query without a table scan.
+  @@index([userId])
+  @@index([action])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([userId, action, createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// PROFILE PHOTO METADATA
+//
+// Metadata for the patient's profile photo upload.
+// One-to-one with PatientProfile.
+// =============================================================================
+model ProfilePhoto {
+  id               String         @id @default(uuid()) @db.Uuid
+  patientProfileId String         @unique @map("patient_profile_id") @db.Uuid
+  filename         String
+  path             String
+  mimeType         String         @map("mime_type")
+  uploadedAt       DateTime       @default(now()) @map("uploaded_at")
+
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_photos")
+}

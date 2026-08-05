@@ -1,0 +1,38 @@
+node_modules/
+dist/
+build/
+
+# Environment — never commit secrets
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Logs
+logs/*.log
+npm-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Security — never commit keys or certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/

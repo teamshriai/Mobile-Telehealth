@@ -1,0 +1,107 @@
+
+> oncotrace-ai@1.0.0 lint
+> eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0
+
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/Button.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/Card.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/EmptyState.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/Loader.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/Modal.jsx
+  2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/common/ProgressRing.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/AIInsights.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/AppointmentCard.jsx
+  2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/LiquidBiopsyCard.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/OverviewCards.jsx
+   1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+  28:42  error  'treatment' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/PatientVitals.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/QuickActions.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/RecentReports.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/dashboard/TreatmentProgress.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/layout/AppLayout.jsx
+  3:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/layout/Sidebar.jsx
+  1:10  error  'useState' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  3:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u    no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/components/layout/Topbar.jsx
+  3:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/hooks/useLocalStorage.js
+  6:20  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/AIAssistant.jsx
+    2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   54:31  error  'query' is defined but never used                                              no-unused-vars
+  803:34  error  'patient' is defined but never used                                            no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Appointments.jsx
+    2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u            no-unused-vars
+  208:36  error  'i' is defined but never used                                                            no-unused-vars
+  233:37  error  'i' is defined but never used                                                            no-unused-vars
+  478:9   error  'dateStr' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  953:44  error  'Icon' is defined but never used                                                         no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Dashboard.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Login.jsx
+    3:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  374:30  error  'Icon' is defined but never used                                               no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/MedicalRecords.jsx
+  2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/NotFound.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Profile.jsx
+  1:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+  3:42  error  'insuranceData' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Register.jsx
+  3:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Reports.jsx
+  2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Settings.jsx
+     2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   220:9   error  'Icon' is defined but never used                                               no-unused-vars
+  1208:37  error  'Icon' is defined but never used                                               no-unused-vars
+
+/home/shri-ai/Projects/TELEHEALTH/client/src/pages/Timeline.jsx
+    2:10  error  'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  203:62  error  'isLast' is defined but never used                                             no-unused-vars
+
+✖ 42 problems (42 errors, 0 warnings)
+
