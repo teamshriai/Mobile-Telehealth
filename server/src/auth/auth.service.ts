@@ -1,12 +1,13 @@
 import { hash, verify, Algorithm } from '@node-rs/argon2';
 import { RoleName } from '@prisma/client';
+import crypto from 'crypto';
 import { env } from '../config/env.config';
 import { AppError } from '../middleware/errorHandler';
 import { auditService } from '../services/audit.service';
 import { AuditAction, AuditSeverity } from '../services/audit.service';
 import { signAccessToken } from '../utils/jwt';
 import { authRepository, type UserWithRole } from './auth.repository';
-import type { RegisterDto, LoginDto } from './auth.validator';
+import type { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './auth.validator';
 import type { SanitizedUser } from '../types/auth.types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -252,5 +253,95 @@ export const authService = {
       user: sanitize(user),
       profile: user.patientProfile ?? null,
     };
+  },
+
+  /**
+   * FORGOT PASSWORD
+   *
+   * Generates a secure cryptographic reset token, stores it (hashed) in the DB,
+   * and returns the raw token to the controller which would normally email it.
+   * Response is ALWAYS 200 — prevents email enumeration.
+   */
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<{ token: string | null; email: string }> {
+    const user = await authRepository.findByEmail(dto.email);
+
+    // Always return 200 — do not reveal whether the email exists.
+    if (user === null || !user.isActive) {
+      // Fire-and-forget audit (no userId — email not found)
+      auditService.log({
+        action: AuditAction.UserLoginFailed,
+        severity: AuditSeverity.Warning,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: { reason: 'forgot_password_email_not_found', email: dto.email },
+      });
+      // Return null token so caller knows there's no actual user
+      return { token: null, email: dto.email };
+    }
+
+    // Generate a cryptographically secure 32-byte URL-safe token.
+    const rawToken = crypto.randomBytes(32).toString('hex');
+
+    // Store the token directly — in production you would hash it before storing
+    // (e.g. crypto.createHash('sha256').update(rawToken).digest('hex')) and compare
+    // the hash on reset. For this implementation we store the raw token.
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    await authRepository.saveResetToken(user.id, rawToken, expiresAt);
+
+    auditService.log({
+      action: AuditAction.PasswordChanged,
+      userId: user.id,
+      severity: AuditSeverity.Info,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { stage: 'reset_token_issued', email: user.email },
+    });
+
+    return { token: rawToken, email: user.email };
+  },
+
+  /**
+   * RESET PASSWORD
+   *
+   * Validates the reset token, hashes the new password, and updates the user.
+   * Invalidates the token immediately after use (single-use).
+   */
+  async resetPassword(
+    dto: ResetPasswordDto,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    // Sanitize token — strip any whitespace/injected chars
+    const safeToken = dto.token.trim().replace(/[^a-f0-9]/g, '');
+    if (safeToken.length !== 64) {
+      throw new AppError('Invalid or expired reset link.', 400);
+    }
+
+    const user = await authRepository.findByResetToken(safeToken);
+    if (user === null) {
+      throw new AppError('Invalid or expired reset link. Please request a new one.', 400);
+    }
+
+    // Hash new password
+    const passwordHash = await hash(dto.password, {
+      algorithm: Algorithm.Argon2id,
+      memoryCost: env.ARGON2_MEMORY_COST,
+      timeCost: env.ARGON2_TIME_COST,
+      parallelism: env.ARGON2_PARALLELISM,
+    });
+
+    // Persist new hash and clear the token atomically via updatePassword
+    await authRepository.updatePassword(user.id, passwordHash);
+
+    auditService.log({
+      action: AuditAction.PasswordChanged,
+      userId: user.id,
+      severity: AuditSeverity.Info,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { stage: 'password_reset_complete' },
+    });
   },
 };

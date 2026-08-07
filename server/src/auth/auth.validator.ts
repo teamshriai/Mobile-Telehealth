@@ -67,8 +67,27 @@ export const loginSchema = z.object({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Forgot Password Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Please provide a valid email address.'),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reset Password Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required.').max(256),
+  password: passwordSchema,
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inferred Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type RegisterDto = z.infer<typeof registerSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;
+export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;

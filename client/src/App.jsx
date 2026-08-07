@@ -4,19 +4,21 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 /* ── Layout ── */
 import AppLayout from './components/layout/AppLayout.jsx'
 
+/* ── Auth Components (moved to components/auth/) ── */
+const Login         = lazy(() => import('./components/auth/Login.jsx'))
+const Register      = lazy(() => import('./components/auth/Register.jsx'))
+const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.jsx'))
+
 /* ── Pages ── */
-const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
-const Timeline = lazy(() => import('./pages/Timeline.jsx'))
+const Dashboard     = lazy(() => import('./pages/Dashboard.jsx'))
+const Timeline      = lazy(() => import('./pages/Timeline.jsx'))
 const MedicalRecords = lazy(() => import('./pages/MedicalRecords.jsx'))
-const Reports = lazy(() => import('./pages/Reports.jsx'))
-const Appointments = lazy(() => import('./pages/Appointments.jsx'))
-const AIAssistant = lazy(() => import('./pages/AIAssistant.jsx'))
-const Profile = lazy(() => import('./pages/Profile.jsx'))
-const Settings = lazy(() => import('./pages/Settings.jsx'))
-const Login = lazy(() => import('./pages/Login.jsx'))
-const Register = lazy(() => import('./pages/Register.jsx'))
-const Landing = lazy(() => import('./pages/Landing.jsx'))
-const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+const Reports       = lazy(() => import('./pages/Reports.jsx'))
+const Appointments  = lazy(() => import('./pages/Appointments.jsx'))
+const AIAssistant   = lazy(() => import('./pages/AIAssistant.jsx'))
+const Profile       = lazy(() => import('./pages/Profile.jsx'))
+const Settings      = lazy(() => import('./pages/Settings.jsx'))
+const NotFound      = lazy(() => import('./pages/NotFound.jsx'))
 
 /* ── Auth helpers ── */
 const isAuthenticated = () => {
@@ -39,34 +41,37 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
 
-        {/* ── Public routes ── */}
-        <Route path="/landing" element={<Landing />} />
-        <Route
-          path="/login"
-          element={<PublicRoute><Login /></PublicRoute>}
-        />
-        <Route
-          path="/register"
-          element={<PublicRoute><Register /></PublicRoute>}
-        />
+          {/* ── Public routes ── */}
+          <Route
+            path="/login"
+            element={<PublicRoute><Login /></PublicRoute>}
+          />
+          <Route
+            path="/register"
+            element={<PublicRoute><Register /></PublicRoute>}
+          />
+          <Route
+            path="/forgot-password"
+            element={<PublicRoute><ForgotPassword /></PublicRoute>}
+          />
 
-        {/* ── Protected routes ── */}
-        <Route
-          path="/"
-          element={<ProtectedRoute><AppLayout /></ProtectedRoute>}
-        >
-          <Route index                  element={<Dashboard />} />
-          <Route path="timeline"        element={<Timeline />} />
-          <Route path="medical-records" element={<MedicalRecords />} />
-          <Route path="reports"         element={<Reports />} />
-          <Route path="appointments"    element={<Appointments />} />
-          <Route path="ai"              element={<AIAssistant />} />
-          <Route path="profile"         element={<Profile />} />
-          <Route path="settings"        element={<Settings />} />
-        </Route>
+          {/* ── Protected routes ── */}
+          <Route
+            path="/"
+            element={<ProtectedRoute><AppLayout /></ProtectedRoute>}
+          >
+            <Route index                  element={<Dashboard />} />
+            <Route path="timeline"        element={<Timeline />} />
+            <Route path="medical-records" element={<MedicalRecords />} />
+            <Route path="reports"         element={<Reports />} />
+            <Route path="appointments"    element={<Appointments />} />
+            <Route path="ai"              element={<AIAssistant />} />
+            <Route path="profile"         element={<Profile />} />
+            <Route path="settings"        element={<Settings />} />
+          </Route>
 
-        {/* ── 404 ── */}
-        <Route path="*" element={<NotFound />} />
+          {/* ── 404 ── */}
+          <Route path="*" element={<NotFound />} />
 
         </Routes>
       </Suspense>

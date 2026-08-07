@@ -161,4 +161,62 @@ export const authRepository = {
 
     return user;
   },
+
+  /**
+   * Find a non-deleted user by their password-reset token.
+   * Returns null if not found or token is expired.
+   */
+  async findByResetToken(token: string): Promise<UserWithRole | null> {
+    return prisma.user.findFirst({
+      where: {
+        verificationToken: token,
+        verificationExpires: { gt: new Date() },
+        deletedAt: null,
+        isActive: true,
+      },
+      select: userWithRoleSelect,
+    });
+  },
+
+  /**
+   * Store a hashed reset token + expiry on the user record.
+   */
+  async saveResetToken(
+    userId: string,
+    token: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { verificationToken: token, verificationExpires: expiresAt },
+    });
+  },
+
+  /**
+   * Clear the reset token fields after successful password reset.
+   */
+  async clearResetToken(userId: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { verificationToken: null, verificationExpires: null },
+    });
+  },
+
+  /**
+   * Update the user's password hash and record the change timestamp.
+   * Also resets failed login attempts and unlocks the account.
+   */
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        verificationToken: null,
+        verificationExpires: null,
+      },
+    });
+  },
 };

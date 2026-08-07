@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema } from './auth.validator';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.validator';
 import { authService } from './auth.service';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -93,3 +93,49 @@ export const me = asyncHandler(async (req: Request, res: Response): Promise<void
 // No try/catch needed here — asyncHandler forwards all errors.
 // ─────────────────────────────────────────────────────────────────────────────
 export type { ZodError };
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Public. Always returns 200 — never reveals whether email exists.
+ */
+export const forgotPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = forgotPasswordSchema.parse(req.body);
+  const meta = {
+    ipAddress:
+      ((req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+        req.socket.remoteAddress ??
+        'unknown'),
+    userAgent: req.headers['user-agent'],
+  };
+
+  // Service always returns 200 — result.token is null when email not found
+  await authService.forgotPassword(dto, meta);
+
+  // Generic response — identical whether email exists or not (prevents enumeration)
+  res.status(200).json(
+    ApiResponseBuilder.success(
+      'If that email is registered, a reset link has been sent. Please check your inbox.',
+    ),
+  );
+});
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Public. Accepts token + new password.
+ */
+export const resetPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = resetPasswordSchema.parse(req.body);
+  const meta = {
+    ipAddress:
+      ((req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+        req.socket.remoteAddress ??
+        'unknown'),
+    userAgent: req.headers['user-agent'],
+  };
+
+  await authService.resetPassword(dto, meta);
+
+  res.status(200).json(
+    ApiResponseBuilder.success('Password reset successfully. Please sign in with your new password.'),
+  );
+});

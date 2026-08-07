@@ -128,3 +128,23 @@ export function getStoredUser() {
     return null
   }
 }
+
+/**
+ * Request a password reset link for the given email.
+ * Server always returns 200 regardless of whether the email is registered
+ * (prevents email enumeration). Throws only on network/rate-limit errors.
+ *
+ * @param {string} email
+ */
+export async function forgotPassword(email) {
+  return apiClient.post('/auth/forgot-password', { email: email.trim().toLowerCase() })
+}
+
+/**
+ * Reset the user's password using a valid reset token.
+ *
+ * @param {{ token: string, password: string }} payload
+ */
+export async function resetPassword(payload) {
+  return apiClient.post('/auth/reset-password', payload)
+}

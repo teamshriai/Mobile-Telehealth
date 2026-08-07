@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { register, login, logout, me } from './auth.controller';
+import { register, login, logout, me, forgotPassword, resetPassword } from './auth.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authLimiter, authSlowDown } from '../middleware/rateLimiter';
 
@@ -15,6 +15,10 @@ const router = Router();
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/register', authSlowDown, authLimiter, register);
 router.post('/login', authSlowDown, authLimiter, login);
+
+// Forgot/reset password — rate-limited to prevent abuse
+router.post('/forgot-password', authSlowDown, authLimiter, forgotPassword);
+router.post('/reset-password', authSlowDown, authLimiter, resetPassword);
 
 // ── Protected ────────────────────────────────────────────────────────────────
 router.post('/logout', authenticate, logout);
