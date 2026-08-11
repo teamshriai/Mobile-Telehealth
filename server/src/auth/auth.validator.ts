@@ -50,6 +50,15 @@ export const registerSchema = z.object({
     return date <= now && date.getFullYear() >= 1900;
   }, 'Please provide a valid date of birth.'),
 
+  phoneNumber: z
+    .string()
+    .trim()
+    .min(1, 'Mobile number is required.')
+    .regex(
+      /^(\+91[\s-]?)?[6-9]\d{9}$/,
+      'Please enter a valid 10-digit Indian mobile number (e.g. +91 9876543210 or 9876543210).'
+    ),
+
   gender: z.nativeEnum(Gender).optional(),
 });
 
@@ -75,11 +84,27 @@ export const forgotPasswordSchema = z.object({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Verify Reset Token Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const verifyResetTokenSchema = z.object({
+  token: z
+    .string()
+    .trim()
+    .length(64, 'Invalid reset token format.')
+    .regex(/^[a-f0-9]{64}$/i, 'Invalid reset token format.'),
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Reset Password Schema
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Reset token is required.').max(256),
+  token: z
+    .string()
+    .trim()
+    .length(64, 'Invalid reset token format.')
+    .regex(/^[a-f0-9]{64}$/i, 'Invalid reset token format.'),
   password: passwordSchema,
 });
 
@@ -90,4 +115,5 @@ export const resetPasswordSchema = z.object({
 export type RegisterDto = z.infer<typeof registerSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
+export type VerifyResetTokenDto = z.infer<typeof verifyResetTokenSchema>;
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;

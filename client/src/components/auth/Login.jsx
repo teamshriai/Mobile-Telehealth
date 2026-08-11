@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Eye, EyeOff, Mail, Lock, Shield } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Mail, Lock, Shield, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const fadeIn = {
@@ -29,7 +29,7 @@ function DotGrid() {
           height="24"
           patternUnits="userSpaceOnUse"
         >
-          <circle cx="1.5" cy="1.5" r="1.2" fill="#b0bec5" fillOpacity="0.55" />
+          <circle cx="1.5" cy="1.5" r="1.2" fill="#b0bec5" fillOpacity="0.4" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#dots)" />
@@ -39,6 +39,8 @@ function DotGrid() {
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const successMessage = location.state?.message || ''
   const { login, loading, error: authError } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -65,7 +67,7 @@ export default function Login() {
 
   return (
     <main
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden font-sans p-4"
+      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden font-sans p-3 sm:p-4 lg:p-6"
       style={{ background: '#f0f4f8' }}
     >
       {/* ── Dot-grid background ── */}
@@ -73,133 +75,160 @@ export default function Login() {
 
       {/* ── Gradient blobs ── */}
       <motion.div
-        className="absolute rounded-full blur-3xl opacity-50 pointer-events-none
-                   w-72 h-72 sm:w-96 sm:h-96 lg:w-[460px] lg:h-[460px]
-                   -top-24 -left-24"
+        className="absolute rounded-full blur-3xl opacity-40 pointer-events-none
+                   w-64 h-64 sm:w-80 sm:h-80 lg:w-[420px] lg:h-[420px]
+                   -top-20 -left-20"
         style={{
           background: 'radial-gradient(circle, #a78bfa 0%, #818cf8 40%, #6366f1 100%)',
         }}
-        animate={{ scale: [1, 1.1, 1], x: [0, 12, 0], y: [0, -8, 0] }}
+        animate={{ scale: [1, 1.08, 1], x: [0, 10, 0], y: [0, -6, 0] }}
         transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       <motion.div
-        className="absolute rounded-full blur-3xl opacity-45 pointer-events-none
-                   w-56 h-56 sm:w-72 sm:h-72 lg:w-[380px] lg:h-[380px]
-                   -bottom-16 -right-16"
+        className="absolute rounded-full blur-3xl opacity-35 pointer-events-none
+                   w-52 h-52 sm:w-64 sm:h-64 lg:w-[340px] lg:h-[340px]
+                   -bottom-14 -right-14"
         style={{
           background: 'radial-gradient(circle, #2dd4bf 0%, #38bdf8 50%, #6366f1 100%)',
         }}
-        animate={{ scale: [1, 1.15, 1], x: [0, -14, 0], y: [0, 10, 0] }}
+        animate={{ scale: [1, 1.12, 1], x: [0, -12, 0], y: [0, 8, 0] }}
         transition={{ duration: 10, delay: 1, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       <motion.div
-        className="absolute rounded-full blur-3xl opacity-30 pointer-events-none
-                   w-40 h-40 sm:w-56 sm:h-56 lg:w-72 lg:h-72
-                   top-1/2 -right-10"
+        className="absolute rounded-full blur-3xl opacity-25 pointer-events-none
+                   w-36 h-36 sm:w-48 sm:h-48 lg:w-64 lg:h-64
+                   top-1/2 -right-8"
         style={{
           background: 'radial-gradient(circle, #f9a8d4 0%, #fbcfe8 100%)',
         }}
-        animate={{ scale: [1, 1.08, 1], y: [0, -12, 0] }}
+        animate={{ scale: [1, 1.06, 1], y: [0, -10, 0] }}
         transition={{ duration: 7, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-25 pointer-events-none
-                   w-36 h-36 sm:w-48 sm:h-48
-                   bottom-10 left-10"
-        style={{
-          background: 'radial-gradient(circle, #86efac 0%, #34d399 100%)',
-        }}
-        animate={{ scale: [1, 1.12, 1], x: [0, 10, 0] }}
-        transition={{ duration: 8, delay: 3, repeat: Infinity, ease: 'easeInOut' }}
       />
 
       {/* ── Main login card (two-column layout) ── */}
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[1000px]
-                   bg-white rounded-2xl shadow-2xl border border-white/80
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-[950px]
+                   bg-white rounded-lg shadow-2xl border border-white/80
                    overflow-hidden"
         style={{
           boxShadow:
-            '0 8px 40px 0 rgba(99,102,241,0.10), 0 2px 8px 0 rgba(0,0,0,0.06)',
+            '0 6px 32px 0 rgba(99,102,241,0.08), 0 2px 6px 0 rgba(0,0,0,0.04)',
         }}
       >
         {/* Card top accent bar */}
         <div
-          className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
+          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg"
           style={{
             background: 'linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #2dd4bf 100%)',
           }}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
-          {/* ── LEFT SECTION (Info Panel) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          {/* ── LEFT SECTION (Info Panel) - Hidden on mobile ── */}
           <div
-            className="relative px-8 py-10 sm:px-12 sm:py-14 lg:px-14 lg:py-16 
-                        flex flex-col justify-between overflow-hidden"
+            className="hidden lg:flex relative px-10 py-12 xl:px-12 xl:py-14
+                        flex-col justify-between overflow-hidden"
             style={{
               background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%)',
             }}
           >
-            {/* Decorative overlay pattern */}
-            <div 
-              className="absolute inset-0 opacity-10"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }}
-            />
-
             <div className="relative z-10">
               {/* Brand */}
-              <div className="flex items-center gap-3 mb-12">
+              <div className="flex items-center gap-3 mb-10">
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 bg-white"
+                  className="w-11 h-11 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0 bg-white"
                 >
                   <img
                     src="/oncotraceai.webp"
                     alt="CareFlow"
-                    className="h-8 w-8 object-contain"
+                    className="h-7 w-7 object-contain"
                     onError={(e) => {
                       e.target.style.display = 'none'
                     }}
                   />
                 </div>
-                <span className="text-2xl font-bold tracking-tight text-white">
+                <span className="text-xl font-bold tracking-tight text-white">
                   CareFlow
                 </span>
               </div>
 
               {/* Main content */}
-              <div className="space-y-6">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
+              <div className="space-y-5">
+                <h1 className="text-3xl xl:text-4xl font-bold text-white leading-tight">
                   Healthcare Management Platform
                 </h1>
-                <p className="text-lg text-indigo-100 leading-relaxed">
+                <p className="text-base text-indigo-100 leading-relaxed max-w-md">
                   Secure access to patient records, analytics, and care coordination tools.
-                </p>                
+                </p>
+                
+                {/* Feature list */}
+                <div className="pt-6 space-y-3">
+                  {[
+                    'Advanced patient data analytics',
+                    'Real-time care coordination',
+                    'HIPAA-compliant security',
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-2.5 text-indigo-50">
+                      <Shield size={16} strokeWidth={2} className="flex-shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
           {/* ── RIGHT SECTION (Login Form) ── */}
-          <div className="px-8 py-10 sm:px-12 sm:py-14 lg:px-14 lg:py-16 flex flex-col justify-center">
+          <div className="px-6 py-8 sm:px-10 sm:py-10 lg:px-10 lg:py-12 xl:px-12 xl:py-14 flex flex-col justify-center">
+            {/* Mobile logo - only visible on mobile */}
+            <div className="lg:hidden flex items-center justify-center mb-6">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-md flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
+                  <img
+                    src="/oncotraceai.webp"
+                    alt="CareFlow"
+                    className="h-6 w-6 object-contain"
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                    }}
+                  />
+                </div>
+                <span className="text-lg font-bold tracking-tight text-gray-900">
+                  CareFlow
+                </span>
+              </div>
+            </div>
+
             {/* Heading */}
-            <div className="mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 leading-tight">
+            <div className="mb-6 lg:mb-7">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
                 Welcome back
               </h2>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-1.5 text-xs sm:text-sm text-gray-600">
                 Sign in to access your healthcare portal
               </p>
             </div>
 
+            {/* Success notification banner from registration */}
+            {successMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-emerald-50 border border-emerald-200 rounded-md px-3.5 py-2.5 text-xs sm:text-sm text-emerald-800 flex items-center gap-2 mb-5 shadow-sm font-medium"
+                role="status"
+              >
+                <CheckCircle size={16} className="text-emerald-600 flex-shrink-0" strokeWidth={2} />
+                <span>{successMessage}</span>
+              </motion.div>
+            )}
+
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <form onSubmit={handleSubmit} className="space-y-3.5 lg:space-y-4" noValidate>
               <InputField
                 index={0}
                 label="Email address"
@@ -227,7 +256,7 @@ export default function Login() {
                     to="/forgot-password"
                     className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
                   >
-                    Forgot password?
+                    Forgot?
                   </Link>
                 }
                 rightElement={
@@ -235,12 +264,12 @@ export default function Login() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   >
                     {showPassword ? (
-                      <EyeOff size={17} strokeWidth={2} />
+                      <EyeOff size={16} strokeWidth={2} />
                     ) : (
-                      <Eye size={17} strokeWidth={2} />
+                      <Eye size={16} strokeWidth={2} />
                     )}
                   </button>
                 }
@@ -250,7 +279,7 @@ export default function Login() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700"
+                  className="bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs sm:text-sm text-red-700"
                   role="alert"
                 >
                   {error}
@@ -265,15 +294,16 @@ export default function Login() {
                 animate="animate"
                 type="submit"
                 disabled={loading}
-                whileHover={{ scale: loading ? 1 : 1.015 }}
-                whileTap={{ scale: loading ? 1 : 0.985 }}
-                className="group relative w-full text-white px-4 py-3.5 text-sm font-semibold rounded-xl
+                whileHover={{ scale: loading ? 1 : 1.01 }}
+                whileTap={{ scale: loading ? 1 : 0.99 }}
+                className="group relative w-full text-white px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-lg
                            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
-                           flex items-center justify-center gap-2 shadow-md"
+                           flex items-center justify-center gap-2 shadow-md hover:shadow-lg
+                           mt-2"
                 style={{
                   background: loading
                     ? '#818cf8'
-                    : 'linear-gradient(90deg, #6366f1 0%, #38bdf8 100%)',
+                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
                 }}
               >
                 {loading ? (
@@ -284,7 +314,7 @@ export default function Login() {
                     <ArrowRight
                       size={16}
                       strokeWidth={2.5}
-                      className="transition-transform group-hover:translate-x-1"
+                      className="transition-transform group-hover:translate-x-0.5"
                     />
                   </>
                 )}
@@ -292,7 +322,7 @@ export default function Login() {
             </form>
 
             {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
+            <div className="flex items-center gap-3 my-5 lg:my-6">
               <div className="flex-1 h-px bg-gray-200" />
               <span className="text-xs text-gray-400 font-medium">or</span>
               <div className="flex-1 h-px bg-gray-200" />
@@ -304,16 +334,24 @@ export default function Login() {
               variants={fadeIn}
               initial="initial"
               animate="animate"
-              className="mt-6 text-center text-sm text-gray-500"
+              className="text-center text-xs sm:text-sm text-gray-600"
             >
               Don't have an account?{' '}
               <Link
                 to="/register"
-                className="font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
               >
                 Create account
               </Link>
             </motion.p>
+
+            {/* Mobile footer info */}
+            <div className="lg:hidden mt-5 pt-5 border-t border-gray-100">
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                <Shield size={13} strokeWidth={2} />
+                <span>HIPAA-compliant and secure</span>
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -326,22 +364,22 @@ function InputField({ index, label, icon: Icon, action, rightElement, ...inputPr
   return (
     <motion.div custom={index} variants={fadeIn} initial="initial" animate="animate">
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-sm font-medium text-gray-800">{label}</label>
+        <label className="text-xs sm:text-sm font-medium text-gray-700">{label}</label>
         {action}
       </div>
       <div className="relative group">
         <Icon
-          size={17}
+          size={16}
           strokeWidth={2}
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+          className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
                      transition-colors group-focus-within:text-indigo-500 pointer-events-none"
         />
         <input
           {...inputProps}
-          className="w-full border border-gray-200 bg-gray-50 rounded-xl pl-11 pr-11 py-3
+          className="w-full border border-gray-200 bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
                      text-sm text-gray-900 placeholder:text-gray-400
                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                     focus:bg-white transition-all duration-200"
+                     focus:bg-white transition-all duration-200 hover:border-gray-300"
         />
         {rightElement}
       </div>

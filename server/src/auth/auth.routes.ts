@@ -1,7 +1,21 @@
 import { Router } from 'express';
-import { register, login, logout, me, forgotPassword, resetPassword } from './auth.controller';
+import {
+  register,
+  login,
+  logout,
+  me,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
+} from './auth.controller';
 import { authenticate } from '../middleware/authenticate';
-import { authLimiter, authSlowDown } from '../middleware/rateLimiter';
+import {
+  authLimiter,
+  authSlowDown,
+  forgotPasswordLimiter,
+  verifyTokenLimiter,
+  resetPasswordLimiter,
+} from '../middleware/rateLimiter';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Router
@@ -16,9 +30,10 @@ const router = Router();
 router.post('/register', authSlowDown, authLimiter, register);
 router.post('/login', authSlowDown, authLimiter, login);
 
-// Forgot/reset password — rate-limited to prevent abuse
-router.post('/forgot-password', authSlowDown, authLimiter, forgotPassword);
-router.post('/reset-password', authSlowDown, authLimiter, resetPassword);
+// Forgot / verify token / reset password — rate-limited to prevent abuse
+router.post('/forgot-password', authSlowDown, forgotPasswordLimiter, forgotPassword);
+router.post('/verify-reset-token', verifyTokenLimiter, verifyResetToken);
+router.post('/reset-password', authSlowDown, resetPasswordLimiter, resetPassword);
 
 // ── Protected ────────────────────────────────────────────────────────────────
 router.post('/logout', authenticate, logout);

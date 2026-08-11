@@ -15,6 +15,7 @@ const Timeline      = lazy(() => import('./pages/Timeline.jsx'))
 const MedicalRecords = lazy(() => import('./pages/MedicalRecords.jsx'))
 const Reports       = lazy(() => import('./pages/Reports.jsx'))
 const Appointments  = lazy(() => import('./pages/Appointments.jsx'))
+const Meetings      = lazy(() => import('./pages/Meetings.jsx'))
 const AIAssistant   = lazy(() => import('./pages/AIAssistant.jsx'))
 const Profile       = lazy(() => import('./pages/Profile.jsx'))
 const Settings      = lazy(() => import('./pages/Settings.jsx'))
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="medical-records" element={<MedicalRecords />} />
             <Route path="reports"         element={<Reports />} />
             <Route path="appointments"    element={<Appointments />} />
+            <Route path="meetings"        element={<Meetings />} />
             <Route path="ai"              element={<AIAssistant />} />
             <Route path="profile"         element={<Profile />} />
             <Route path="settings"        element={<Settings />} />

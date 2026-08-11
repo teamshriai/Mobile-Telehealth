@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import {
   Calendar,
   HeartPulse,
@@ -10,169 +9,97 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-const cardVariants = {
-  initial: { opacity: 0, y: 16 },
-  animate: (i) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.45,
-      delay: i * 0.07,
-      ease: [0.16, 1, 0.3, 1],
-    },
-  }),
-}
-
 export default function OverviewCards({ patient }) {
   const navigate   = useNavigate()
   const { healthScore } = patient
 
-  /* ── Card definitions ── */
   const cards = [
     {
       id:      'appointment',
-      label:   'Next visit',
+      label:   'Next Visit',
       value:   'Oct 28',
       sub:     'Dr. Priya Nair — 10:30 AM',
       icon:    Calendar,
-      iconBg:  '#EFF6FF',
-      iconColor:'#2563EB',
-      trend:   null,
       badge:   '3 days away',
-      badgeBg: '#FEF3C7',
-      badgeColor:'#D97706',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
       action:  () => navigate('/appointments'),
     },
     {
       id:      'wellbeing',
-      label:   'Wellbeing trend',
+      label:   'Wellbeing Trend',
       value:   'Stable',
-      sub:     'Your recent check-ins',
+      sub:     'Recent health check-ins',
       icon:    HeartPulse,
-      iconBg:  '#EFF6FF',
-      iconColor:'#2563EB',
-      trend:   'down',
-      trendLabel: '47% from peak',
-      trendColor: '#16A34A',
       badge:   'On track',
-      badgeBg: '#EFF6FF',
-      badgeColor:'#2563EB',
+      badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
       action:  () => navigate('/medical-records'),
     },
     {
       id:      'risk',
-      label:   'Care tasks',
-      value:   '03',
-      sub:     'Small actions this week',
+      label:   'Care Tasks',
+      value:   '03 Pending',
+      sub:     'Routine tasks for this week',
       icon:    TrendingDown,
-      iconBg:  '#FEF3C7',
-      iconColor:'#D97706',
-      trend:   'down',
-      trendLabel: 'All manageable',
-      trendColor: '#16A34A',
       badge:   'This week',
-      badgeBg: '#FEF3C7',
-      badgeColor:'#D97706',
+      badgeBg: 'bg-gray-100 text-gray-700 border-gray-200',
       action:  () => navigate('/medical-records'),
     },
     {
       id:      'health',
-      label:   'Health overview',
-      value:   `${healthScore.current}`,
-      sub:     'Updated from your care plan',
+      label:   'Health Overview',
+      value:   `${healthScore.current} / 100`,
+      sub:     'Overall wellness score',
       icon:    Activity,
-      iconBg:  '#EFF6FF',
-      iconColor:'#2563EB',
-      trend:   'up',
-      trendLabel: `+${healthScore.current - healthScore.previous} from last`,
-      trendColor: '#16A34A',
       badge:   'Improving',
-      badgeBg: '#DCFCE7',
-      badgeColor:'#16A34A',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       action:  () => navigate('/profile'),
     },
   ]
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card, i) => (
-        <OverviewCard key={card.id} card={card} index={i} />
+      {cards.map((card) => (
+        <OverviewCard key={card.id} card={card} />
       ))}
     </div>
   )
 }
 
-function OverviewCard({ card, index }) {
-  const {
-    label, value, sub, icon: Icon,
-    iconBg, iconColor, trend, trendLabel,
-    trendColor, badge, badgeBg, badgeColor, action,
-  } = card
-
-  const TrendIcon =
-    trend === 'up'   ? ArrowUpRight :
-    trend === 'down' ? ArrowDownRight : Minus
+function OverviewCard({ card }) {
+  const { label, value, sub, icon: Icon, badge, badgeBg, action } = card
 
   return (
-    <motion.div
-      custom={index}
-      variants={cardVariants}
-      initial="initial"
-      animate="animate"
-      whileHover={{ y: -2, transition: { duration: 0.2 } }}
+    <div
       onClick={action}
-      className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
-      style={{
-        boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04), 0 4px 16px 0 rgba(15,23,42,0.06)',
-      }}
+      className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-blue-500"
     >
-      {/* Top row */}
       <div className="mb-3 flex items-start justify-between">
-        {/* Icon */}
-        <div
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: iconBg }}
-        >
-          <Icon size={15} strokeWidth={1.7} style={{ color: iconColor }} />
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-700">
+          <Icon size={18} strokeWidth={1.8} />
         </div>
 
-        {/* Badge */}
         {badge && (
-          <span
-            className="px-2 py-1 rounded-lg text-[10px] font-semibold"
-            style={{ backgroundColor: badgeBg, color: badgeColor }}
-          >
+          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${badgeBg}`}>
             {badge}
           </span>
         )}
       </div>
 
-      {/* Value */}
-      <div className="space-y-0.5 mb-3">
-        <p className="text-xl font-semibold leading-none text-slate-900">
+      <div className="space-y-1 mb-2">
+        <p className="text-lg font-bold text-gray-900 leading-none">
           {value}
         </p>
-        <p className="text-xs text-[#64748B]">{sub}</p>
+        <p className="text-xs text-gray-500">{sub}</p>
       </div>
 
-      {/* Divider */}
-      <div className="h-px bg-[#F1F5F9] mb-3" />
-
-      {/* Bottom row */}
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">
+      <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
           {label}
-        </p>
-
-        {trend && (
-          <div className="flex items-center gap-1">
-            <TrendIcon size={12} style={{ color: trendColor }} />
-            <span className="text-[10px] font-semibold" style={{ color: trendColor }}>
-              {trendLabel}
-            </span>
-          </div>
-        )}
+        </span>
+        <span className="text-xs font-semibold text-blue-600 group-hover:underline">
+          View details →
+        </span>
       </div>
-    </motion.div>
+    </div>
   )
-}   
+}

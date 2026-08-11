@@ -39,7 +39,7 @@ function clearSession() {
 /**
  * Register a new patient account.
  *
- * Field transformation: the frontend form has `aadhaar`, `confirmPassword`, and
+ * Field transformation: the frontend form has `confirmPassword` and
  * `agreed` which are client-only and not in the backend RegisterDto schema.
  * We strip them here rather than touching the form.
  *
@@ -47,12 +47,17 @@ function clearSession() {
  * @returns {{ token: string, user: object }}
  */
 export async function register(formData) {
+  // Extract 10 digits and prepends +91 for backend compatibility
+  const rawDigits = formData.phoneNumber ? formData.phoneNumber.replace(/\D/g, '') : ''
+  const formattedPhone = rawDigits ? `+91 ${rawDigits}` : ''
+
   // Build the backend-compatible payload (strips frontend-only fields).
   const payload = {
     firstName: formData.firstName,
     lastName: formData.lastName,
     email: formData.email,
     dateOfBirth: formData.dateOfBirth,
+    phoneNumber: formattedPhone,
     password: formData.password,
     // gender is optional in the schema; skip if not collected.
   }
@@ -60,7 +65,6 @@ export async function register(formData) {
   // apiClient response interceptor unwraps the envelope → returns { token, user }
   const { token, user } = await apiClient.post('/auth/register', payload)
   user.name = `${formData.firstName} ${formData.lastName}`
-  persistSession(token, user)
   return { token, user }
 }
 

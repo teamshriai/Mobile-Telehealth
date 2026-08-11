@@ -40,3 +40,27 @@ export const authSlowDown = slowDown({
   delayMs: 500,
   maxDelayMs: 20_000,
 });
+
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per IP
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: ApiResponseBuilder.error('Too many password reset requests. Please try again in 15 minutes.'),
+});
+
+export const verifyTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per IP
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: ApiResponseBuilder.error('Too many token verification requests. Please try again later.'),
+});
+
+export const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per IP
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: ApiResponseBuilder.error('Too many password reset attempts. Please try again in 15 minutes.'),
+});

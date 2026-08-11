@@ -37,8 +37,7 @@ export function useAuth() {
     setError(null)
     try {
       const { user: u } = await authService.register(formData)
-      setUser(u)
-      return { success: true }
+      return { success: true, user: u }
     } catch (err) {
       const fieldErrors = err.fieldErrors ?? null
       setError({ message: err.message, fieldErrors })

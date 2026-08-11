@@ -93,6 +93,7 @@ export const authRepository = {
       lastName: string;
       dateOfBirth: Date;
       gender?: Gender;
+      phoneNumber?: string;
     };
   }): Promise<UserWithRole> {
     return prisma.$transaction(async (tx) => {
@@ -108,6 +109,7 @@ export const authRepository = {
               lastName: data.profile.lastName,
               dateOfBirth: data.profile.dateOfBirth,
               gender: data.profile.gender,
+              phoneNumber: data.profile.phoneNumber,
             },
           },
         },
@@ -163,60 +165,80 @@ export const authRepository = {
   },
 
   /**
-   * Find a non-deleted user by their password-reset token.
-   * Returns null if not found or token is expired.
+   * Save a SHA-256 token hash to the PasswordResetToken table.
+   * Atomically invalidates any active unused reset tokens for the user.
    */
-  async findByResetToken(token: string): Promise<UserWithRole | null> {
-    return prisma.user.findFirst({
-      where: {
-        verificationToken: token,
-        verificationExpires: { gt: new Date() },
-        deletedAt: null,
-        isActive: true,
-      },
-      select: userWithRoleSelect,
-    });
-  },
-
-  /**
-   * Store a hashed reset token + expiry on the user record.
-   */
-  async saveResetToken(
+  async savePasswordResetToken(
     userId: string,
-    token: string,
+    tokenHash: string,
     expiresAt: Date,
   ): Promise<void> {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { verificationToken: token, verificationExpires: expiresAt },
+    await prisma.$transaction(async (tx) => {
+      // Invalidate all existing unused reset tokens for this user
+      await tx.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+
+      // Insert new password reset token hash record
+      await tx.passwordResetToken.create({
+        data: {
+          userId,
+          tokenHash,
+          expiresAt,
+        },
+      });
     });
   },
 
   /**
-   * Clear the reset token fields after successful password reset.
+   * Find a valid PasswordResetToken by its SHA-256 hash including associated User.
    */
-  async clearResetToken(userId: string): Promise<void> {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { verificationToken: null, verificationExpires: null },
-    });
-  },
-
-  /**
-   * Update the user's password hash and record the change timestamp.
-   * Also resets failed login attempts and unlocks the account.
-   */
-  async updatePassword(userId: string, passwordHash: string): Promise<void> {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        passwordHash,
-        passwordChangedAt: new Date(),
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        verificationToken: null,
-        verificationExpires: null,
+  async findPasswordResetToken(tokenHash: string) {
+    return prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          select: userWithRoleSelect,
+        },
       },
+    });
+  },
+
+  /**
+   * Complete password reset in an atomic transaction:
+   * 1. Update user's passwordHash & set passwordChangedAt timestamp
+   * 2. Reset failedLoginAttempts and unlock user
+   * 3. Mark the PasswordResetToken as used (usedAt = now)
+   */
+  async resetPasswordWithToken(
+    tokenId: string,
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      // 1. Update User security state & password hash
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash,
+          passwordChangedAt: new Date(),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+
+      // 2. Mark current reset token as used
+      await tx.passwordResetToken.update({
+        where: { id: tokenId },
+        data: { usedAt: new Date() },
+      });
+
+      // 3. Invalidate any other active reset tokens for this user
+      await tx.passwordResetToken.updateMany({
+        where: { userId, usedAt: null },
+        data: { usedAt: new Date() },
+      });
     });
   },
 };

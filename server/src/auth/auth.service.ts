@@ -106,6 +106,7 @@ export const authService = {
         lastName: dto.lastName,
         dateOfBirth: new Date(dto.dateOfBirth),
         gender: dto.gender,
+        phoneNumber: dto.phoneNumber,
       },
     });
 
@@ -258,9 +259,11 @@ export const authService = {
   /**
    * FORGOT PASSWORD
    *
-   * Generates a secure cryptographic reset token, stores it (hashed) in the DB,
-   * and returns the raw token to the controller which would normally email it.
-   * Response is ALWAYS 200 — prevents email enumeration.
+   * 1. Generates 32 bytes of cryptographically secure random data (`crypto.randomBytes(32)`).
+   * 2. Computes SHA-256 hash of raw token (`crypto.createHash('sha256')`).
+   * 3. Stores token hash in PasswordResetToken model with 15-minute expiration.
+   * 4. Raw token is NEVER stored in database or logged.
+   * 5. Returns generic response regardless of user existence (anti-enumeration).
    */
   async forgotPassword(
     dto: ForgotPasswordDto,
@@ -268,9 +271,7 @@ export const authService = {
   ): Promise<{ token: string | null; email: string }> {
     const user = await authRepository.findByEmail(dto.email);
 
-    // Always return 200 — do not reveal whether the email exists.
     if (user === null || !user.isActive) {
-      // Fire-and-forget audit (no userId — email not found)
       auditService.log({
         action: AuditAction.UserLoginFailed,
         severity: AuditSeverity.Warning,
@@ -278,18 +279,20 @@ export const authService = {
         userAgent: meta.userAgent,
         metadata: { reason: 'forgot_password_email_not_found', email: dto.email },
       });
-      // Return null token so caller knows there's no actual user
       return { token: null, email: dto.email };
     }
 
-    // Generate a cryptographically secure 32-byte URL-safe token.
+    // 1. Generate 32 bytes cryptographically secure random raw token (64 hex characters)
     const rawToken = crypto.randomBytes(32).toString('hex');
 
-    // Store the token directly — in production you would hash it before storing
-    // (e.g. crypto.createHash('sha256').update(rawToken).digest('hex')) and compare
-    // the hash on reset. For this implementation we store the raw token.
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-    await authRepository.saveResetToken(user.id, rawToken, expiresAt);
+    // 2. Compute SHA-256 hash for database storage
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // 3. Set expiry to exactly 15 minutes
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    // 4. Save SHA-256 token hash to database atomically (invalidating prior tokens)
+    await authRepository.savePasswordResetToken(user.id, tokenHash, expiresAt);
 
     auditService.log({
       action: AuditAction.PasswordChanged,
@@ -304,27 +307,60 @@ export const authService = {
   },
 
   /**
+   * VERIFY RESET TOKEN
+   *
+   * Validates raw token format, computes SHA-256 hash, and verifies existence,
+   * expiration, used status, and associated user status.
+   */
+  async verifyResetToken(dto: { token: string }): Promise<{ valid: boolean }> {
+    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const resetRecord = await authRepository.findPasswordResetToken(tokenHash);
+
+    if (!resetRecord) {
+      return { valid: false };
+    }
+
+    if (
+      resetRecord.usedAt !== null ||
+      resetRecord.expiresAt < new Date() ||
+      !resetRecord.user ||
+      !resetRecord.user.isActive ||
+      resetRecord.user.deletedAt !== null
+    ) {
+      return { valid: false };
+    }
+
+    return { valid: true };
+  },
+
+  /**
    * RESET PASSWORD
    *
-   * Validates the reset token, hashes the new password, and updates the user.
-   * Invalidates the token immediately after use (single-use).
+   * 1. Computes SHA-256 hash of incoming raw reset token.
+   * 2. Finds PasswordResetToken record and verifies expiry, used status, user state.
+   * 3. Hashes new password with Argon2id using existing configuration.
+   * 4. Updates user password & marks token as used atomically in a transaction.
+   * 5. Invalidation timestamp passwordChangedAt invalidates all existing JWT sessions.
    */
   async resetPassword(
     dto: ResetPasswordDto,
     meta: { ipAddress?: string; userAgent?: string },
   ): Promise<void> {
-    // Sanitize token — strip any whitespace/injected chars
-    const safeToken = dto.token.trim().replace(/[^a-f0-9]/g, '');
-    if (safeToken.length !== 64) {
-      throw new AppError('Invalid or expired reset link.', 400);
+    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const resetRecord = await authRepository.findPasswordResetToken(tokenHash);
+
+    if (
+      !resetRecord ||
+      resetRecord.usedAt !== null ||
+      resetRecord.expiresAt < new Date() ||
+      !resetRecord.user ||
+      !resetRecord.user.isActive ||
+      resetRecord.user.deletedAt !== null
+    ) {
+      throw new AppError('Invalid or expired reset token. Please request a new link.', 400);
     }
 
-    const user = await authRepository.findByResetToken(safeToken);
-    if (user === null) {
-      throw new AppError('Invalid or expired reset link. Please request a new one.', 400);
-    }
-
-    // Hash new password
+    // Hash new password using Argon2id
     const passwordHash = await hash(dto.password, {
       algorithm: Algorithm.Argon2id,
       memoryCost: env.ARGON2_MEMORY_COST,
@@ -332,12 +368,16 @@ export const authService = {
       parallelism: env.ARGON2_PARALLELISM,
     });
 
-    // Persist new hash and clear the token atomically via updatePassword
-    await authRepository.updatePassword(user.id, passwordHash);
+    // Execute atomic reset transaction
+    await authRepository.resetPasswordWithToken(
+      resetRecord.id,
+      resetRecord.user.id,
+      passwordHash,
+    );
 
     auditService.log({
       action: AuditAction.PasswordChanged,
-      userId: user.id,
+      userId: resetRecord.user.id,
       severity: AuditSeverity.Info,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,

@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronRight,
   Activity,
+  Video,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
       { label: 'Health Records', path: '/medical-records', icon: Activity },
       { label: 'Reports',         path: '/reports',         icon: FileText },
       { label: 'Appointments',    path: '/appointments',    icon: Calendar },
+      { label: 'Online Meetings', path: '/meetings',        icon: Video },
     ],
   },
   {

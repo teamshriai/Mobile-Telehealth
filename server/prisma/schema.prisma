@@ -268,9 +268,10 @@ model User {
   updatedAt DateTime @updatedAt      @map("updated_at")
 
   // ── Relations ─────────────────────────────────────────────────────────────
-  role           Role            @relation(fields: [roleId], references: [id])
-  patientProfile PatientProfile?
-  auditLogs      AuditLog[]
+  role               Role                 @relation(fields: [roleId], references: [id])
+  patientProfile     PatientProfile?
+  auditLogs          AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // email: @unique creates the lookup index implicitly — not duplicated here.
@@ -325,9 +326,6 @@ model PatientProfile {
   photoMetadata     ProfilePhoto?
 
   // ── Identification ────────────────────────────────────────────────────────
-  // aadhaarNumber: stored masked — last 4 digits plain, first 8 as XXXX XXXX.
-  // The service layer is responsible for masking before storage.
-  aadhaarNumber String? @map("aadhaar_number")
   abhaId        String? @unique @map("abha_id")
   passportNumber String? @map("passport_number")
 
@@ -450,4 +448,26 @@ model ProfilePhoto {
   patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
 
   @@map("profile_photos")
+}
+
+// =============================================================================
+// PASSWORD RESET TOKEN
+//
+// Dedicated single-use password reset token store.
+// Raw tokens are NEVER stored — only SHA-256 token hashes are persisted.
+// Expired or used tokens are rejected.
+// =============================================================================
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

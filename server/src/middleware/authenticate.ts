@@ -50,6 +50,14 @@ export const authenticate = asyncHandler(
       throw new AppError('Account has been deactivated.', 401);
     }
 
+    // Invalidate sessions issued before the latest password change
+    if (user.passwordChangedAt && payload.iat) {
+      const passwordChangedTime = Math.floor(user.passwordChangedAt.getTime() / 1000);
+      if (payload.iat < passwordChangedTime) {
+        throw new AppError('Session invalidated due to password change. Please sign in again.', 401);
+      }
+    }
+
     // Attach typed user context to request
     req.user = {
       id: user.id,

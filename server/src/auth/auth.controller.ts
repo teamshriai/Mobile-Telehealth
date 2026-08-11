@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.validator';
+import { registerSchema, loginSchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema } from './auth.validator';
 import { authService } from './auth.service';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -100,38 +100,40 @@ export type { ZodError };
  */
 export const forgotPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const dto = forgotPasswordSchema.parse(req.body);
-  const meta = {
-    ipAddress:
-      ((req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
-        req.socket.remoteAddress ??
-        'unknown'),
-    userAgent: req.headers['user-agent'],
-  };
+  const meta = getRequestMeta(req);
 
-  // Service always returns 200 — result.token is null when email not found
   await authService.forgotPassword(dto, meta);
 
-  // Generic response — identical whether email exists or not (prevents enumeration)
   res.status(200).json(
     ApiResponseBuilder.success(
-      'If that email is registered, a reset link has been sent. Please check your inbox.',
+      'If an account exists, password reset instructions have been sent.',
     ),
   );
 });
 
 /**
+ * POST /api/v1/auth/verify-reset-token
+ * Public. Accepts token and checks validity without revealing account details.
+ */
+export const verifyResetToken = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = verifyResetTokenSchema.parse(req.body);
+  const result = await authService.verifyResetToken(dto);
+
+  if (!result.valid) {
+    res.status(400).json(ApiResponseBuilder.error('Invalid or expired reset token.'));
+    return;
+  }
+
+  res.status(200).json(ApiResponseBuilder.success('Reset token is valid.', { valid: true }));
+});
+
+/**
  * POST /api/v1/auth/reset-password
- * Public. Accepts token + new password.
+ * Public. Accepts 64-char token + new password.
  */
 export const resetPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const dto = resetPasswordSchema.parse(req.body);
-  const meta = {
-    ipAddress:
-      ((req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
-        req.socket.remoteAddress ??
-        'unknown'),
-    userAgent: req.headers['user-agent'],
-  };
+  const meta = getRequestMeta(req);
 
   await authService.resetPassword(dto, meta);
 
