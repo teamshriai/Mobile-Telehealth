@@ -14,15 +14,15 @@ import {
 
 /* ── Breadcrumb label map ── */
 const BREADCRUMB_MAP = {
-  '/':               ['Dashboard'],
-  '/timeline':       ['Dashboard', 'Timeline'],
-  '/medical-records':['Dashboard', 'Health Records'],
-  '/reports':        ['Dashboard', 'Reports'],
-  '/appointments':   ['Dashboard', 'Appointments'],
-  '/meetings':       ['Dashboard', 'Online Meetings'],
-  '/ai':             ['Dashboard', 'Care Guide'],
-  '/profile':        ['Dashboard', 'Profile'],
-  '/settings':       ['Dashboard', 'Settings'],
+  '/dashboard':                 ['Dashboard'],
+  '/dashboard/timeline':        ['Dashboard', 'Timeline'],
+  '/dashboard/medical-records': ['Dashboard', 'Health Records'],
+  '/dashboard/reports':         ['Dashboard', 'Reports'],
+  '/dashboard/appointments':    ['Dashboard', 'Appointments'],
+  '/dashboard/meetings':        ['Dashboard', 'Online Meetings'],
+  '/dashboard/ai':              ['Dashboard', 'Care Guide'],
+  '/dashboard/profile':         ['Dashboard', 'Profile'],
+  '/dashboard/settings':        ['Dashboard', 'Settings'],
 }
 
 /* ── Mock notifications ── */
@@ -143,7 +143,7 @@ export default function Topbar({ onOpenSidebar }) {
                   ? 'text-[#0F172A]'
                   : 'text-[#94A3B8] hover:text-[#64748B] cursor-pointer'
                 }`}
-              onClick={() => i === 0 && navigate('/')}
+              onClick={() => i === 0 && navigate('/dashboard')}
             >
               {crumb}
             </span>
@@ -263,7 +263,7 @@ export default function Topbar({ onOpenSidebar }) {
 
         {/* Patient avatar */}
         <button
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate('/dashboard/profile')}
           className="flex items-center gap-2.5 pl-1 pr-3 py-1.5 rounded-full
                      hover:bg-[#F1F5F9] transition-all duration-200 group"
         >
@@ -346,15 +346,15 @@ function SearchOverlay({ query, onQueryChange, onClose }) {
   const navigate = useNavigate()
 
   const QUICK_LINKS = [
-    { label: 'Dashboard',       path: '/' },
-    { label: 'Timeline',        path: '/timeline' },
-    { label: 'Medical Records', path: '/medical-records' },
-    { label: 'Reports',         path: '/reports' },
-    { label: 'Appointments',    path: '/appointments' },
-    { label: 'Online Meetings', path: '/meetings' },
-    { label: 'AI Assistant',    path: '/ai' },
-    { label: 'Profile',         path: '/profile' },
-    { label: 'Settings',        path: '/settings' },
+    { label: 'Dashboard',       path: '/dashboard' },
+    { label: 'Timeline',        path: '/dashboard/timeline' },
+    { label: 'Medical Records', path: '/dashboard/medical-records' },
+    { label: 'Reports',         path: '/dashboard/reports' },
+    { label: 'Appointments',    path: '/dashboard/appointments' },
+    { label: 'Online Meetings', path: '/dashboard/meetings' },
+    { label: 'AI Assistant',    path: '/dashboard/ai' },
+    { label: 'Profile',         path: '/dashboard/profile' },
+    { label: 'Settings',        path: '/dashboard/settings' },
   ]
 
   const filtered = query.length > 0

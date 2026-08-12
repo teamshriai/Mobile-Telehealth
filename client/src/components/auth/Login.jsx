@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Eye, EyeOff, Mail, Lock, Shield, CheckCircle } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Eye, EyeOff, Mail, Lock, Shield, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 
 const fadeIn = {
@@ -61,7 +61,7 @@ export default function Login() {
     }
     const result = await login({ email: form.email, password: form.password })
     if (result.success) {
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     }
   }
 
@@ -202,6 +202,17 @@ export default function Login() {
                   CareFlow
                 </span>
               </div>
+            </div>
+
+            {/* Back to landing button */}
+            <div className="mb-4">
+              <Link
+                to="/landing"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-indigo-600 transition-colors"
+              >
+                <ArrowLeft size={14} />
+                <span>Back to Home</span>
+              </Link>
             </div>
 
             {/* Heading */}

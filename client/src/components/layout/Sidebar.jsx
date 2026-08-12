@@ -22,30 +22,30 @@ const NAV_ITEMS = [
   {
     section: 'Overview',
     items: [
-      { label: 'Dashboard',       path: '/',               icon: LayoutDashboard },
-      { label: 'Timeline',        path: '/timeline',       icon: GitBranch },
+      { label: 'Dashboard',       path: '/dashboard',      icon: LayoutDashboard },
+      { label: 'Timeline',        path: '/dashboard/timeline', icon: GitBranch },
     ],
   },
   {
     section: 'Medical',
     items: [
-      { label: 'Health Records', path: '/medical-records', icon: Activity },
-      { label: 'Reports',         path: '/reports',         icon: FileText },
-      { label: 'Appointments',    path: '/appointments',    icon: Calendar },
-      { label: 'Online Meetings', path: '/meetings',        icon: Video },
+      { label: 'Health Records', path: '/dashboard/medical-records', icon: Activity },
+      { label: 'Reports',         path: '/dashboard/reports',         icon: FileText },
+      { label: 'Appointments',    path: '/dashboard/appointments',    icon: Calendar },
+      { label: 'Online Meetings', path: '/dashboard/meetings',        icon: Video },
     ],
   },
   {
     section: 'Support',
     items: [
-      { label: 'Care Guide',      path: '/ai',             icon: Sparkles },
+      { label: 'Care Guide',      path: '/dashboard/ai',             icon: Sparkles },
     ],
   },
 ]
 
 const BOTTOM_ITEMS = [
-  { label: 'Profile',  path: '/profile',  icon: User },
-  { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Profile',  path: '/dashboard/profile',  icon: User },
+  { label: 'Settings', path: '/dashboard/settings', icon: Settings },
 ]
 
 /* ── Sidebar widths ── */
@@ -289,8 +289,8 @@ function NavGroup({ section, items, expanded, currentPath, onNavigate }) {
           item={item}
           expanded={expanded}
           isActive={
-            item.path === '/'
-              ? currentPath === '/'
+            item.path === '/dashboard'
+              ? currentPath === '/dashboard'
               : currentPath.startsWith(item.path)
           }
           onNavigate={onNavigate}
@@ -307,7 +307,7 @@ function SidebarNavItem({ item, expanded, isActive, onNavigate }) {
   return (
     <NavLink
       to={path}
-      end={path === '/'}
+      end={path === '/dashboard'}
       className="block"
       onClick={() => onNavigate?.()}
     >

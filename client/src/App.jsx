@@ -10,6 +10,7 @@ const Register      = lazy(() => import('./components/auth/Register.jsx'))
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.jsx'))
 
 /* ── Pages ── */
+const LandingPage   = lazy(() => import('./components/landing/LandingPage.jsx'))
 const Dashboard     = lazy(() => import('./pages/Dashboard.jsx'))
 const Timeline      = lazy(() => import('./pages/Timeline.jsx'))
 const MedicalRecords = lazy(() => import('./pages/MedicalRecords.jsx'))
@@ -31,10 +32,10 @@ const isAuthenticated = () => {
 }
 
 const ProtectedRoute = ({ children }) =>
-  isAuthenticated() ? children : <Navigate to="/login" replace />
+  isAuthenticated() ? children : <Navigate to="/landing" replace />
 
 const PublicRoute = ({ children }) =>
-  isAuthenticated() ? <Navigate to="/" replace /> : children
+  isAuthenticated() ? <Navigate to="/dashboard" replace /> : children
 
 export default function App() {
   return (
@@ -43,6 +44,14 @@ export default function App() {
         <Routes>
 
           {/* ── Public routes ── */}
+          <Route
+            path="/"
+            element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+          />
+          <Route
+            path="/landing"
+            element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+          />
           <Route
             path="/login"
             element={<PublicRoute><Login /></PublicRoute>}
@@ -58,7 +67,7 @@ export default function App() {
 
           {/* ── Protected routes ── */}
           <Route
-            path="/"
+            path="/dashboard"
             element={<ProtectedRoute><AppLayout /></ProtectedRoute>}
           >
             <Route index                  element={<Dashboard />} />

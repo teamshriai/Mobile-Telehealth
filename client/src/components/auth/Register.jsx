@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
+  ArrowLeft,
   Eye,
   EyeOff,
   Mail,
@@ -322,6 +323,17 @@ export default function Register() {
                   CareFlow
                 </span>
               </div>
+            </div>
+
+            {/* Back to landing button */}
+            <div className="mb-3">
+              <Link
+                to="/landing"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-indigo-600 transition-colors"
+              >
+                <ArrowLeft size={14} />
+                <span>Back to Home</span>
+              </Link>
             </div>
 
             {/* Heading */}
