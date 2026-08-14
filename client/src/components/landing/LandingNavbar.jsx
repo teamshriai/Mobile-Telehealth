@@ -1,140 +1,133 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Video, Menu, X, Shield, ArrowRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 
+/**
+ * LandingNavbar — transparent overlay nav with pill center menu.
+ * Matches reference: top-left brand mark, center pill links, top-right text link.
+ * Font: Aether for brand, Helvetica Light (300) for all nav links.
+ * Font-synthesis: none is set globally; no bold/semibold classes used here.
+ */
 export default function LandingNavbar() {
-  const [scrolled, setScrolled] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const navigate = useNavigate()
+  const [scrolled, setScrolled]         = useState(false)
+  const [mobileOpen, setMobileOpen]     = useState(false)
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 20) {
-        setScrolled(true)
-      } else {
-        setScrolled(false)
-      }
-    }
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    const onScroll = () => setScrolled(window.scrollY > 16)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  const pillLinkClass =
+    'transition-opacity duration-200 opacity-75 hover:opacity-100 whitespace-nowrap'
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 font-sans ${
-        scrolled
-          ? 'bg-white/95 backdrop-blur-md border-b border-gray-200 py-3 shadow-xs'
-          : 'bg-white border-b border-gray-100 py-4'
-      }`}
+      style={{ fontSynthesis: 'none' }}
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300
+        ${scrolled ? 'bg-black/45 backdrop-blur-md py-4' : 'bg-transparent py-7 sm:py-9'}`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-700 to-indigo-800 flex items-center justify-center text-white shadow-xs group-hover:bg-blue-800 transition-colors">
-              <Video size={18} strokeWidth={2.2} />
-            </div>
-            <div>
-              <span className="text-base font-bold text-gray-900 tracking-tight block leading-none">
-                CareFlow
-              </span>
-              <span className="text-[10px] font-semibold text-blue-700 tracking-wider uppercase block mt-0.5">
-                Telehealth Portal
-              </span>
+      <div className="max-w-[1380px] mx-auto px-5 sm:px-10 lg:px-14">
+        <div className="flex items-center justify-between gap-6">
+
+          {/* ── Brand ── */}
+          <Link
+            to="/"
+            style={{ fontFamily: 'Aether, sans-serif', fontWeight: 400, fontSynthesis: 'none' }}
+            className="flex items-center gap-2.5 text-white opacity-90 hover:opacity-100 transition-opacity shrink-0"
+          >
+            {/* Starburst mark (matches Nimbus-style icon in screenshot) */}
+            <svg
+              width="20" height="20" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor"
+              strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/>
+            </svg>
+            <div
+              className="flex flex-col leading-[1.15]"
+              style={{ fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase' }}
+            >
+              <span>CareFlow</span>
+              <span>Telehealth</span>
             </div>
           </Link>
 
-          {/* Navigation Links (Desktop) */}
-          <nav className="hidden md:flex items-center gap-8 text-xs font-medium text-gray-600">
-            <a href="#services" className="hover:text-blue-700 transition-colors">
-              Services
-            </a>
-            <a href="#how-it-works" className="hover:text-blue-700 transition-colors">
-              How It Works
-            </a>
-            <a href="#doctors" className="hover:text-blue-700 transition-colors">
-              Our Specialists
-            </a>
-            <a href="#faq" className="hover:text-blue-700 transition-colors">
-              Patient FAQ
-            </a>
+          {/* ── Pill Navigation – Desktop ── */}
+          <nav
+            aria-label="Primary navigation"
+            style={{
+              fontFamily: 'Helvetica, sans-serif',
+              fontWeight: 300,
+              fontSize: '12.5px',
+              letterSpacing: '0.06em',
+              fontSynthesis: 'none',
+            }}
+            className="hidden md:flex items-center gap-7 text-white
+                       bg-white/10 backdrop-blur-md
+                       border border-white/15
+                       rounded-full px-6 py-2"
+          >
+            <a href="#services"    className={pillLinkClass}>Features</a>
+            <a href="#how-it-works" className={pillLinkClass}>Benefits</a>
+            <Link to="/register"   className={pillLinkClass}>Signup Form</Link>
           </nav>
 
-          {/* Action Buttons (Sign In / Sign Up) */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link
-              to="/login"
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:text-blue-700 hover:bg-gray-50 transition-all border border-gray-200"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/register"
-              className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <span>Patient Portal Registration</span>
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-            aria-label="Toggle navigation"
+          {/* ── Contacts link – Desktop ── */}
+          <Link
+            to="/login"
+            style={{
+              fontFamily: 'Helvetica, sans-serif',
+              fontWeight: 300,
+              fontSize: '12.5px',
+              letterSpacing: '0.06em',
+              fontSynthesis: 'none',
+            }}
+            className="hidden md:block text-white opacity-75 hover:opacity-100
+                       transition-opacity duration-200 shrink-0"
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            Contacts
+          </Link>
+
+          {/* ── Hamburger – Mobile ── */}
+          <button
+            onClick={() => setMobileOpen(v => !v)}
+            className="md:hidden p-1.5 text-white/85 hover:text-white
+                       hover:bg-white/10 rounded-full transition-colors"
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          >
+            {mobileOpen
+              ? <X     size={19} strokeWidth={1.25} />
+              : <Menu  size={19} strokeWidth={1.25} />
+            }
           </button>
+
         </div>
       </div>
 
-      {/* Mobile Navigation Dropdown */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-b border-gray-200 bg-white px-4 pt-3 pb-6 space-y-4 shadow-lg">
-          <nav className="flex flex-col space-y-3 text-sm font-medium text-gray-700">
-            <a
-              href="#services"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-1 hover:text-blue-700"
-            >
-              Services
-            </a>
-            <a
-              href="#how-it-works"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-1 hover:text-blue-700"
-            >
-              How It Works
-            </a>
-            <a
-              href="#doctors"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-1 hover:text-blue-700"
-            >
-              Our Specialists
-            </a>
-            <a
-              href="#faq"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-1 hover:text-blue-700"
-            >
-              Patient FAQ
-            </a>
+      {/* ── Mobile Drawer ── */}
+      {mobileOpen && (
+        <div
+          style={{ fontSynthesis: 'none' }}
+          className="md:hidden absolute top-full inset-x-0
+                     bg-black/90 backdrop-blur-2xl
+                     border-b border-white/10 px-6 py-7"
+        >
+          <nav
+            style={{
+              fontFamily: 'Helvetica, sans-serif',
+              fontWeight: 300,
+              fontSize: '13px',
+              letterSpacing: '0.08em',
+            }}
+            className="flex flex-col gap-5 text-white/80"
+          >
+            <a href="#services"     onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Features</a>
+            <a href="#how-it-works" onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Benefits</a>
+            <Link to="/register"    onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Signup Form</Link>
+            <Link to="/login"       onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Contacts</Link>
           </nav>
-          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2.5">
-            <Link
-              to="/login"
-              className="w-full text-center py-2.5 rounded-lg text-xs font-semibold text-gray-800 border border-gray-300 hover:bg-gray-50"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/register"
-              className="w-full text-center py-2.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Patient Portal Registration
-            </Link>
-          </div>
         </div>
       )}
     </header>

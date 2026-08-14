@@ -1,8 +1,59 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Google Font  —  Plus Jakarta Sans
+   Closest publicly available match to the reference screenshot font.
+   Characteristics: monolinear stroke, humanist grotesque, open forms,
+   slightly rounded terminals — matching the "Your care connected" text.
+──────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500&display=swap');
+
 @import "tailwindcss";
+
+@theme {
+  --font-display:   'Plus Jakarta Sans', sans-serif;
+  --font-helvetica: 'Helvetica', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans:      var(--font-helvetica);
+  --font-aether:    'Aether', sans-serif;
+}
 
 @variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  /* ── Local: Aether display face (used for section labels) ── */
+  @font-face {
+    font-family: 'Aether';
+    src: url('/fonts/aether/aether-sans.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* ── Local: Helvetica Light — body/ui copy ── */
+  @font-face {
+    font-family: 'Helvetica';
+    src: url('/fonts/helvetica/helvetica-light-587ebe5a59211.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* ── Local: Helvetica Regular ── */
+  @font-face {
+    font-family: 'Helvetica';
+    src: url('/fonts/helvetica/Helvetica.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  /* ── Local: Helvetica Bold ── */
+  @font-face {
+    font-family: 'Helvetica';
+    src: url('/fonts/helvetica/Helvetica-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
   html {
     min-width: 320px;
     scroll-behavior: smooth;
@@ -14,31 +65,38 @@
     overflow-x: hidden;
     background: #f8fafc;
     color: #111827;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Helvetica Light for all body copy */
+    font-family: 'Helvetica', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    /* Prevent browser from synthesising heavier strokes */
+    font-synthesis: none;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  h1, h2, h3, h4 { letter-spacing: -0.025em; }
+  /* Global headings → Plus Jakarta Sans (matches reference) */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 400;
+    font-synthesis: none;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
 
-  button,
-  a {
+  button, a {
     -webkit-tap-highlight-color: transparent;
   }
 
   @media (max-width: 767px) {
-    input,
-    select,
-    textarea {
+    input, select, textarea {
       font-size: max(16px, 1em);
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       scroll-behavior: auto !important;
