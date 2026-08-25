@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Shield } from 'lucide-react'
 import apiClient from '../../lib/apiClient'
+import BrandMark from '../common/BrandMark.jsx'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -144,7 +145,7 @@ export default function ForgotPassword() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 w-full max-w-[1000px]
-                   bg-white rounded-2xl shadow-2xl border border-white/80
+                   bg-white rounded-xl shadow-2xl border border-white/80
                    overflow-hidden"
         style={{
           boxShadow: '0 8px 40px 0 rgba(99,102,241,0.10), 0 2px 8px 0 rgba(0,0,0,0.06)',
@@ -152,7 +153,7 @@ export default function ForgotPassword() {
       >
         {/* Top accent bar */}
         <div
-          className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
+          className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
           style={{ background: 'linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #2dd4bf 100%)' }}
         />
 
@@ -174,15 +175,10 @@ export default function ForgotPassword() {
             <div className="relative z-10">
               {/* Brand */}
               <div className="flex items-center gap-3 mb-12">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0 bg-white">
-                  <img
-                    src="/oncotraceai.webp"
-                    alt="CareFlow"
-                    className="h-8 w-8 object-contain"
-                    onError={(e) => { e.target.style.display = 'none' }}
-                  />
+                <div className="shadow-lg rounded-xl">
+                  <BrandMark size={26} />
                 </div>
-                <span className="text-2xl font-bold tracking-tight text-white">CareFlow</span>
+                <span className="text-2xl font-bold tracking-tight text-white">Stroke AI</span>
               </div>
 
               {/* Content */}

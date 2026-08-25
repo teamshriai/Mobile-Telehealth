@@ -5,8 +5,8 @@ import {
   Search,
   Filter,
   FileText,
-  Image,
-  Dna,
+  Brain,
+  Activity,
   FlaskConical,
   ChevronDown,
   X,
@@ -35,35 +35,25 @@ const pageVariants = {
 }
 
 /* ── Upload accepted formats ── */
-const ACCEPTED_FORMATS = [
-  { label: 'PDF',   ext: '.pdf',  color: '#DC2626', bg: '#FEE2E2' },
-  { label: 'DICOM', ext: '.dcm',  color: '#7C3AED', bg: '#EDE9FE' },
-  { label: 'Image', ext: '.jpg',  color: '#0EA5E9', bg: '#E0F2FE' },
-  { label: 'CSV',   ext: '.csv',  color: '#16A34A', bg: '#DCFCE7' },
-  { label: 'VCF',   ext: '.vcf',  color: '#D97706', bg: '#FEF3C7' },
-]
+const ACCEPTED_FORMATS = ['PDF', 'DICOM', 'Image', 'CSV', 'VCF']
 
 /* ── Type icon map ── */
 const TYPE_ICONS = {
-  imaging:       Image,
-  liquid_biopsy: FlaskConical,
-  genomics:      Dna,
-  lab:           FlaskConical,
-  pathology:     FileText,
-  clinical_note: FileText,
-  cardiology:    FileText,
+  imaging:          Brain,
+  lab:              FlaskConical,
+  nihss_assessment: Activity,
+  clinical_note:    FileText,
+  cardiology:       FileText,
 }
 
 /* ── Filter options ── */
 const TYPE_FILTERS = [
-  { label: 'All Types',     value: 'all' },
-  { label: 'Liquid Biopsy', value: 'liquid_biopsy' },
-  { label: 'Imaging',       value: 'imaging' },
-  { label: 'Lab Results',   value: 'lab' },
-  { label: 'Genomics',      value: 'genomics' },
-  { label: 'Pathology',     value: 'pathology' },
-  { label: 'Clinical Note', value: 'clinical_note' },
-  { label: 'Cardiology',    value: 'cardiology' },
+  { label: 'All Types',        value: 'all' },
+  { label: 'Imaging',          value: 'imaging' },
+  { label: 'Lab Results',      value: 'lab' },
+  { label: 'NIHSS Assessment', value: 'nihss_assessment' },
+  { label: 'Clinical Note',    value: 'clinical_note' },
+  { label: 'Cardiology',       value: 'cardiology' },
 ]
 
 const STATUS_FILTERS = [
@@ -71,6 +61,36 @@ const STATUS_FILTERS = [
   { label: 'Reviewed',   value: 'reviewed' },
   { label: 'Pending',    value: 'pending' },
 ]
+
+/**
+ * There's no real file-storage backend behind these reports (mock data —
+ * see architecture audit), so there is no actual document to download.
+ * Rather than a dead button or a fabricated "here's your PDF", this saves
+ * a plain-text summary built only from the report's own real fields —
+ * genuinely downloadable, honestly labeled, nothing invented.
+ */
+function downloadReportSummary(report) {
+  const lines = [
+    report.name,
+    `Type: ${reportTypes[report.type]?.label ?? report.type}`,
+    `Report date: ${report.reportDate}`,
+    `Source: ${report.source}`,
+    `Status: ${report.status}`,
+    report.reviewedBy ? `Reviewed by: ${report.reviewedBy}` : null,
+    '',
+    report.summary || 'No summary available.',
+  ].filter(Boolean)
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${report.name.replace(/[^\w.-]+/g, '_')}-summary.txt`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
 export default function Reports() {
   const [reports,      setReports]      = useState(mockReports)
@@ -167,7 +187,7 @@ export default function Reports() {
       className="max-w-[1200px] mx-auto space-y-8"
     >
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionTitle
           title="Medical Reports"
           subtitle="Upload, view and manage all your medical documents"
@@ -202,7 +222,7 @@ export default function Reports() {
           { label: 'Total Reports',   value: reports.length,                               color: '#2563EB' },
           { label: 'Reviewed',        value: reports.filter(r => r.status === 'reviewed').length, color: '#16A34A' },
           { label: 'Pending Review',  value: reports.filter(r => r.status === 'pending').length,  color: '#F59E0B' },
-          { label: 'This Month',      value: reports.filter(r => r.uploadDate?.startsWith('2024-10')).length, color: '#7C3AED' },
+          { label: 'This Month',      value: reports.filter(r => r.uploadDate?.startsWith('2024-10')).length, color: '#64748B' },
         ].map((stat) => (
           <ReportStat key={stat.label} {...stat} />
         ))}
@@ -216,7 +236,7 @@ export default function Reports() {
           placeholder="Search reports, sources, tags..."
           className="flex-1"
         />
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 flex-wrap sm:flex-shrink-0">
           <SelectFilter
             value={typeFilter}
             onChange={setTypeFilter}
@@ -265,7 +285,7 @@ export default function Reports() {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20"
           >
-            <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] border border-[#E8EDF2]
+            <div className="w-14 h-14 rounded-xl bg-[#F1F5F9] border border-[#E8EDF2]
                             flex items-center justify-center mb-4">
               <FileText size={22} className="text-[#94A3B8]" />
             </div>
@@ -341,7 +361,7 @@ function UploadZone({
       onDrop={onDrop}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
-      className="relative rounded-3xl border-2 border-dashed
+      className="relative rounded-xl border-2 border-dashed
                  transition-colors duration-200 overflow-hidden"
     >
       {/* Hidden file input */}
@@ -368,7 +388,7 @@ function UploadZone({
                 : { scale: 1, y: 0 }
               }
               transition={{ duration: 0.2 }}
-              className="w-16 h-16 rounded-2xl bg-white border border-[#E8EDF2]
+              className="w-16 h-16 rounded-xl bg-white border border-[#E8EDF2]
                          flex items-center justify-center mb-5"
               style={{ boxShadow: '0 4px 16px 0 rgba(15,23,42,0.08)' }}
             >
@@ -391,17 +411,13 @@ function UploadZone({
 
             {/* Format pills */}
             <div className="flex gap-2 flex-wrap justify-center mb-6">
-              {ACCEPTED_FORMATS.map((fmt) => (
+              {ACCEPTED_FORMATS.map((label) => (
                 <span
-                  key={fmt.label}
-                  className="px-3 py-1 rounded-full text-xs font-semibold border"
-                  style={{
-                    backgroundColor: fmt.bg,
-                    color: fmt.color,
-                    borderColor: `${fmt.color}30`,
-                  }}
+                  key={label}
+                  className="px-3 py-1 rounded-full text-xs font-semibold border
+                             bg-[#F1F5F9] text-[#64748B] border-[#E8EDF2]"
                 >
-                  {fmt.label}
+                  {label}
                 </span>
               ))}
             </div>
@@ -492,7 +508,7 @@ function ReportCard({ report, index, onPreview, onDelete }) {
         ease:     [0.16, 1, 0.3, 1],
       }}
       whileHover={{ y: -3 }}
-      className="bg-white rounded-2xl border border-[#E8EDF2] overflow-hidden
+      className="bg-white rounded-xl border border-[#E8EDF2] overflow-hidden
                  group cursor-pointer"
       style={{
         boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04), 0 4px 16px 0 rgba(15,23,42,0.06)',
@@ -596,7 +612,9 @@ function ReportCard({ report, index, onPreview, onDelete }) {
             className="flex items-center justify-center w-8 h-8 rounded-xl
                        bg-[#F1F5F9] text-[#64748B] hover:bg-[#E8EDF2]
                        transition-colors duration-200"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); downloadReportSummary(report) }}
+            aria-label="Download report summary"
+            title="Download report summary"
           >
             <Download size={13} />
           </button>
@@ -639,6 +657,7 @@ function PreviewModal({ report, onClose }) {
             variant="primary"
             size="sm"
             icon={<Download size={13} />}
+            onClick={() => downloadReportSummary(report)}
           >
             Download
           </Button>
@@ -649,8 +668,8 @@ function PreviewModal({ report, onClose }) {
 
         {/* ── Mock document preview area ── */}
         <div
-          className="relative rounded-2xl overflow-hidden"
-          style={{ height: '280px', background: 'linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)' }}
+          className="relative rounded-xl overflow-hidden border border-[#E8EDF2] bg-[#F8FAFC]"
+          style={{ height: '280px' }}
         >
           {/* Mock document lines */}
           <div className="absolute inset-6 space-y-3">
@@ -670,24 +689,10 @@ function PreviewModal({ report, onClose }) {
             {[100, 85, 90, 70, 95, 60, 80].map((w, i) => (
               <div
                 key={i}
-                className="h-2.5 bg-[#E8EDF2] rounded-full"
+                className="h-2.5 skeleton"
                 style={{ width: `${w}%` }}
               />
             ))}
-
-            {/* Simulated data block */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {['0.18% MAF', 'EGFR Ex19del', 'Responding'].map((v, i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-xl p-2 border border-[#E8EDF2]"
-                >
-                  <div className="h-2 bg-[#F1F5F9] rounded-full w-10 mb-1.5" />
-                  <div className="h-3 bg-[#DBEAFE] rounded-full" />
-                  <p className="text-[9px] text-[#64748B] mt-1 font-medium">{v}</p>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Overlay label */}
@@ -727,7 +732,7 @@ function PreviewModal({ report, onClose }) {
         </div>
 
         {/* ── Summary ── */}
-        <div className="bg-[#F8FAFC] rounded-2xl p-4 border border-[#E8EDF2]">
+        <div className="bg-[#F8FAFC] rounded-xl p-4 border border-[#E8EDF2]">
           <p className="text-[10px] font-bold text-[#94A3B8] uppercase
                         tracking-widest mb-2">
             Clinical Summary
@@ -766,7 +771,7 @@ function PreviewModal({ report, onClose }) {
 function ReportStat({ label, value, color }) {
   return (
     <div
-      className="bg-white rounded-2xl border border-[#E8EDF2] p-4"
+      className="bg-white rounded-xl border border-[#E8EDF2] p-4"
       style={{ boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)' }}
     >
       <p
@@ -814,7 +819,7 @@ function SelectFilter({ value, onChange, options, icon }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute right-0 top-11 w-48 bg-white rounded-2xl
+              className="absolute right-0 top-11 w-48 bg-white rounded-xl
                          border border-[#E8EDF2] z-20 overflow-hidden py-1"
               style={{ boxShadow: '0 8px 30px 0 rgba(15,23,42,0.12)' }}
             >

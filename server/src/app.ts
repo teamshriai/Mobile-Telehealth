@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { env } from './config/env.config';
 import { ApiResponseBuilder } from './utils/apiResponse';
 import { authRouter } from './auth/auth.routes';
+import { profileRouter } from './profile/profile.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Factory
@@ -99,6 +100,7 @@ export function createApp(): Application {
 
   // ── API Routes ────────────────────────────────────────────────────────────
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/profile', profileRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

@@ -109,6 +109,15 @@ export const resetPasswordSchema = z.object({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Change Password Schema (authenticated user changing their own password)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required.').max(128),
+  newPassword: passwordSchema,
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inferred Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -117,3 +126,14 @@ export type LoginDto = z.infer<typeof loginSchema>;
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
 export type VerifyResetTokenDto = z.infer<typeof verifyResetTokenSchema>;
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Account Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Enter your password to confirm.').max(128),
+});
+
+export type DeleteAccountDto = z.infer<typeof deleteAccountSchema>;

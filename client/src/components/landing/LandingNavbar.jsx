@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
+import BrandMark from '../common/BrandMark.jsx'
 
 /**
  * LandingNavbar — transparent overlay nav with pill center menu.
@@ -11,6 +12,7 @@ import { Menu, X } from 'lucide-react'
 export default function LandingNavbar() {
   const [scrolled, setScrolled]         = useState(false)
   const [mobileOpen, setMobileOpen]     = useState(false)
+  const navRef = useRef(null)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16)
@@ -18,11 +20,30 @@ export default function LandingNavbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    const onClickOutside = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target)) setMobileOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', onClickOutside)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mousedown', onClickOutside)
+    }
+  }, [mobileOpen])
+
   const pillLinkClass =
     'transition-opacity duration-200 opacity-75 hover:opacity-100 whitespace-nowrap'
 
   return (
     <header
+      ref={navRef}
       style={{ fontSynthesis: 'none' }}
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300
         ${scrolled ? 'bg-black/45 backdrop-blur-md py-4' : 'bg-transparent py-7 sm:py-9'}`}
@@ -36,21 +57,13 @@ export default function LandingNavbar() {
             style={{ fontFamily: 'Aether, sans-serif', fontWeight: 400, fontSynthesis: 'none' }}
             className="flex items-center gap-2.5 text-white opacity-90 hover:opacity-100 transition-opacity shrink-0"
           >
-            {/* Starburst mark (matches Nimbus-style icon in screenshot) */}
-            <svg
-              width="20" height="20" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor"
-              strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93"/>
-            </svg>
+            <BrandMark size={14} rounded="rounded-full" />
             <div
               className="flex flex-col leading-[1.15]"
               style={{ fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase' }}
             >
-              <span>CareFlow</span>
-              <span>Telehealth</span>
+              <span>Stroke</span>
+              <span>AI</span>
             </div>
           </Link>
 
@@ -71,6 +84,7 @@ export default function LandingNavbar() {
           >
             <a href="#services"    className={pillLinkClass}>Features</a>
             <a href="#how-it-works" className={pillLinkClass}>Benefits</a>
+            <Link to="/demo"       className={pillLinkClass}>Platform</Link>
             <Link to="/register"   className={pillLinkClass}>Signup Form</Link>
           </nav>
 
@@ -96,6 +110,8 @@ export default function LandingNavbar() {
             className="md:hidden p-1.5 text-white/85 hover:text-white
                        hover:bg-white/10 rounded-full transition-colors"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+            aria-controls="landing-mobile-menu"
           >
             {mobileOpen
               ? <X     size={19} strokeWidth={1.25} />
@@ -109,6 +125,7 @@ export default function LandingNavbar() {
       {/* ── Mobile Drawer ── */}
       {mobileOpen && (
         <div
+          id="landing-mobile-menu"
           style={{ fontSynthesis: 'none' }}
           className="md:hidden absolute top-full inset-x-0
                      bg-black/90 backdrop-blur-2xl
@@ -125,6 +142,7 @@ export default function LandingNavbar() {
           >
             <a href="#services"     onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Features</a>
             <a href="#how-it-works" onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Benefits</a>
+            <Link to="/demo"        onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Platform</Link>
             <Link to="/register"    onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Signup Form</Link>
             <Link to="/login"       onClick={() => setMobileOpen(false)} className="hover:text-white transition-colors">Contacts</Link>
           </nav>

@@ -1,4 +1,4 @@
-// OncoTrace AI — Mock Patient Data
+// Stroke AI — Mock Patient Data
 
 export const mockPatient = {
   id: 'PAT-2024-00147',
@@ -10,7 +10,7 @@ export const mockPatient = {
     dateOfBirth: '1978-03-15',
     age:         46,
     gender:      'Male',
-    email:       'anand.k@oncotrace.ai',
+    email:       'anand.k@strokeai.health',
     phone:       '+1 (415) 882-4471',
     address:     '2847 Pacific Heights Blvd, San Francisco, CA 94115',
     nationality: 'Indian-American',
@@ -24,22 +24,22 @@ export const mockPatient = {
     height:           "5'10\"",
     weight:           '74 kg',
     bmi:              23.6,
-    primaryDiagnosis: 'Non-Small Cell Lung Cancer (NSCLC)',
-    diagnosisCode:    'C34.10',
-    stage:            'Stage IIIA',
+    primaryDiagnosis: 'Acute Ischemic Stroke — Large Vessel Occlusion',
+    diagnosisCode:    'I63.412',
+    stage:            'Left MCA Territory Infarct',
     diagnosisDate:    '2023-09-04',
-    primarySite:      'Right Upper Lobe',
-    histology:        'Adenocarcinoma',
-    grade:            'Grade 2 — Moderately Differentiated',
+    primarySite:      'Left Cerebral Hemisphere — Frontoparietal Region',
+    histology:        'Cardioembolic',
+    grade:            'Moderate Severity — NIHSS 6 at Admission',
     smokingHistory:   'Never smoker',
-    ecogStatus:       1,
-    ecogLabel:        'Restricted in physically strenuous activity',
+    ecogStatus:       2,
+    ecogLabel:        'Slight disability (mRS 2) — able to look after own affairs without assistance',
   },
 
   oncologist: {
     name:      'Dr. Priya Nair',
-    specialty: 'Medical Oncologist',
-    hospital:  'UCSF Helen Diller Cancer Center',
+    specialty: 'Vascular Neurologist',
+    hospital:  'UCSF Stroke & Cerebrovascular Center',
     phone:     '+1 (415) 353-9888',
     email:     'priya.nair@ucsf.edu',
     nextVisit: '2024-10-28',
@@ -49,25 +49,25 @@ export const mockPatient = {
   care_team: [
     {
       name:     'Dr. James Okafor',
-      role:     'Radiation Oncologist',
+      role:     'Neurosurgeon',
       hospital: 'UCSF Medical Center',
       avatar:   'JO',
     },
     {
       name:     'Dr. Sarah Chen',
-      role:     'Pulmonologist',
+      role:     'ED Physician',
       hospital: 'UCSF Medical Center',
       avatar:   'SC',
     },
     {
       name:     'Meera Pillai, NP',
-      role:     'Oncology Nurse Practitioner',
-      hospital: 'UCSF Helen Diller Cancer Center',
+      role:     'Care Coordinator',
+      hospital: 'UCSF Stroke & Cerebrovascular Center',
       avatar:   'MP',
     },
     {
       name:     'Dr. Rajan Mehta',
-      role:     'Radiologist',
+      role:     'Neuroradiologist',
       hospital: 'UCSF Imaging Center',
       avatar:   'RM',
     },
@@ -160,11 +160,11 @@ export const mockPatient = {
   },
 
   treatment: {
-    currentRegimen: 'Osimertinib (Tagrisso) 80mg QD',
+    currentRegimen: 'Physical + Speech Therapy (Post-Stroke Rehabilitation)',
     startDate:      '2023-11-01',
     cycle:          12,
     totalCycles:    18,
-    response:       'Partial Response',
+    response:       'Good Recovery Progress',
     responseDate:   '2024-04-15',
     nextReview:     '2024-11-15',
   },

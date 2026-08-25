@@ -33,13 +33,13 @@ export default function AIInsights({ summary }) {
             <p className="text-xs text-[#64748B]">
               Generated {new Date(summary.generated).toLocaleDateString('en-US', {
                 month: 'short', day: 'numeric', year: 'numeric',
-              })} by OncoTrace AI
+              })} by Stroke AI
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => navigate('/ai')}
+          onClick={() => navigate('/dashboard/ai')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl
                      bg-[#EDE9FE] text-[#7C3AED] text-xs font-semibold
                      hover:bg-[#DDD6FE] transition-colors"
@@ -51,7 +51,7 @@ export default function AIInsights({ summary }) {
 
       {/* Status headline */}
       <div
-        className="rounded-2xl p-4 mb-6"
+        className="rounded-xl p-4 mb-6"
         style={{ background: 'linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%)' }}
       >
         <div className="flex items-start gap-3">

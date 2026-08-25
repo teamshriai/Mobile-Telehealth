@@ -1,5 +1,6 @@
 import { type Gender, type Prisma, RoleName } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { encryptFieldOptional } from '../utils/encryption';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Repository
@@ -109,7 +110,7 @@ export const authRepository = {
               lastName: data.profile.lastName,
               dateOfBirth: data.profile.dateOfBirth,
               gender: data.profile.gender,
-              phoneNumber: data.profile.phoneNumber,
+              phoneNumber: encryptFieldOptional(data.profile.phoneNumber),
             },
           },
         },
@@ -240,5 +241,44 @@ export const authRepository = {
         data: { usedAt: new Date() },
       });
     });
+  },
+
+  /**
+   * Update a user's password directly (the "change password while logged
+   * in" flow — as opposed to the token-based forgot/reset flow above).
+   * Bumping passwordChangedAt invalidates every JWT issued before this
+   * moment via the existing check in authenticate.ts — a real security
+   * benefit that falls out of reusing the same field, not new logic.
+   */
+  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordChangedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+  },
+
+  /**
+   * Soft-delete a user's own account: marks both User and (if present)
+   * PatientProfile as deleted/inactive. The row is retained (never a hard
+   * DELETE) — findByEmail/findById already filter deletedAt: null, so a
+   * soft-deleted account can no longer log in or be found.
+   */
+  async softDeleteAccount(userId: string): Promise<void> {
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { deletedAt: now, isActive: false },
+      }),
+      prisma.patientProfile.updateMany({
+        where: { userId },
+        data: { deletedAt: now },
+      }),
+    ]);
   },
 };

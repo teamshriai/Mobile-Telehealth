@@ -51,7 +51,7 @@ export default function NotFound() {
             className="absolute inset-0 flex items-center justify-center"
           >
             <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center"
+              className="w-20 h-20 rounded-xl flex items-center justify-center"
               style={{
                 background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
                 boxShadow: '0 20px 60px 0 rgba(37,99,235,0.3)',
@@ -141,7 +141,7 @@ export default function NotFound() {
           transition={{ duration: 0.5, delay: 0.5 }}
           className="mt-10 text-xs text-[#CBD5E1] font-medium"
         >
-          OncoTrace AI — Patient Portal
+          Stroke AI — Patient Portal
         </motion.p>
       </motion.div>
     </div>

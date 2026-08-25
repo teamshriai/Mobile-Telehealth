@@ -1,9 +1,12 @@
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema } from './auth.validator';
+import { registerSchema, loginSchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema, changePasswordSchema, deleteAccountSchema } from './auth.validator';
 import { authService } from './auth.service';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
+import { env } from '../config/env.config';
+import { emailService } from '../services/email.service';
+import { getRequestMeta } from '../utils/requestMeta';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Controller
@@ -11,25 +14,6 @@ import { asyncHandler } from '../utils/asyncHandler';
 // HTTP layer only: parse → validate → delegate to service → respond.
 // No business logic. No DB access. No JWT operations.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Extract client IP safely — trusts X-Forwarded-For only when
- * app.set('trust proxy', 1) is configured (production behind Nginx/LB).
- */
-function getClientIp(req: Request): string {
-  return (
-    (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
-    req.socket.remoteAddress ??
-    'unknown'
-  );
-}
-
-function getRequestMeta(req: Request): { ipAddress: string; userAgent: string | undefined } {
-  return {
-    ipAddress: getClientIp(req),
-    userAgent: req.headers['user-agent'],
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -102,7 +86,27 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
   const dto = forgotPasswordSchema.parse(req.body);
   const meta = getRequestMeta(req);
 
-  await authService.forgotPassword(dto, meta);
+  const result = await authService.forgotPassword(dto, meta);
+
+  if (result.token) {
+    const resetLink = `${env.CLIENT_URL}/reset-password?token=${result.token}`;
+
+    if (emailService.isConfigured) {
+      // Fire-and-forget: awaiting the SMTP round-trip here would make this
+      // response measurably slower than the "account doesn't exist" branch
+      // above, which is itself a (smaller) enumeration side-channel. Failures
+      // are still logged inside the service — just never surfaced to the
+      // caller, since the public response must stay identical either way.
+      emailService.sendPasswordResetEmail(result.email, resetLink).catch(() => {
+        // sendPasswordResetEmail already catches internally; this is a
+        // last-resort guard so an unexpected rejection can never crash the process.
+      });
+    } else {
+      // Development-only fallback: no EMAIL_* vars configured (required in
+      // production — see env.config.ts). Never logged once real SMTP is set up.
+      console.warn(`[auth] DEV MODE — email not configured. Reset link: ${resetLink}`);
+    }
+  }
 
   res.status(200).json(
     ApiResponseBuilder.success(
@@ -140,4 +144,30 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response): P
   res.status(200).json(
     ApiResponseBuilder.success('Password reset successfully. Please sign in with your new password.'),
   );
+});
+
+/**
+ * PATCH /api/v1/auth/password
+ * Protected: authenticated user changing their own password (Settings page).
+ */
+export const changePassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = changePasswordSchema.parse(req.body);
+  const meta = getRequestMeta(req);
+
+  await authService.changePassword(req.user!.id, dto, meta);
+
+  res.status(200).json(ApiResponseBuilder.success('Password changed successfully.'));
+});
+
+/**
+ * DELETE /api/v1/auth/account
+ * Protected: authenticated user permanently (soft-)deleting their own account.
+ */
+export const deleteAccount = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = deleteAccountSchema.parse(req.body);
+  const meta = getRequestMeta(req);
+
+  await authService.deleteAccount(req.user!.id, dto.password, meta);
+
+  res.status(200).json(ApiResponseBuilder.success('Account deleted successfully.'));
 });

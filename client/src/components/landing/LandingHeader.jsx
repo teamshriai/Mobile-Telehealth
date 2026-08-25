@@ -25,10 +25,10 @@ const HELV = {
 const FEATURES = [
   {
     num: '01',
-    title: 'Video\nConsultations',
+    title: 'Instant\nAlert',
     bg: '#c9e156',
     photo: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=700&q=75',
-    desc: 'Connect with specialist doctors face-to-face from the comfort of your home, on any device',
+    desc: 'A single action connects you to the stroke care network the moment symptoms appear — no searching, no delay',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
@@ -37,10 +37,10 @@ const FEATURES = [
   },
   {
     num: '02',
-    title: 'Smart\nScheduling',
+    title: 'AI-Assisted\nTriage',
     bg: '#afd5ef',
     photo: null,
-    desc: 'Book and manage appointments in seconds — no waiting rooms, no phone calls, no stress',
+    desc: 'Symptom checks and case details reach your care team instantly — so the right help is already on the way',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -52,10 +52,10 @@ const FEATURES = [
   },
   {
     num: '03',
-    title: 'Expert\nSpecialists',
+    title: 'Connected\nCare Network',
     bg: '#b4c5bc',
     photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=700&q=75',
-    desc: 'Access top oncologists and specialists without leaving home or waiting months for a slot',
+    desc: 'Access vascular neurologists and stroke specialists without leaving home or waiting for a slot',
     icon: (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <line x1="12" y1="2" x2="12" y2="22"/>
@@ -65,6 +65,13 @@ const FEATURES = [
       </svg>
     ),
   },
+]
+
+/* ── "3 Steps" card data ── */
+const STEPS = [
+  { num: '01', title: 'Recognize the Signs',      desc: 'Learn the FAST/BEFAST warning signs so you can act the moment symptoms appear.' },
+  { num: '02', title: 'Alert & Connect',          desc: 'One tap connects you to the stroke care network — no searching, no phone tree.' },
+  { num: '03', title: 'Track Care in Real Time',  desc: 'Follow your case status from your dashboard as care is coordinated around you.' },
 ]
 
 /* ── Scroll-reveal ── */
@@ -168,6 +175,52 @@ function FeatureCard({ card, delay }) {
   )
 }
 
+/* ── Hub-and-spoke diagram ── */
+function DiagramNode({ label, filled = false }) {
+  return (
+    <span style={{
+      ...HELV, fontSize: 'clamp(10.5px, 0.95vw, 12.5px)', letterSpacing: '0.01em',
+      color: filled ? '#fff' : '#111',
+      background: filled ? '#0f172a' : '#fff',
+      border: filled ? 'none' : '1px solid rgba(0,0,0,.12)',
+      borderRadius: '10px', padding: '9px 14px',
+      display: 'inline-block', whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  )
+}
+
+function HubSpokeDiagram() {
+  const downArrow = (
+    <svg width="14" height="22" viewBox="0 0 14 22" fill="none">
+      <path d="M7 1V19M7 19L1 13M7 19L13 13" stroke="#c7d2e0" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+
+  return (
+    <div style={{
+      background: '#f8fafc', borderRadius: '18px', border: '1px solid rgba(0,0,0,.07)',
+      padding: 'clamp(20px, 3vw, 36px) clamp(14px, 3vw, 28px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+    }}>
+      <DiagramNode label="Patient / Bystander" />
+      {downArrow}
+      <DiagramNode label="Command Centre — the Hub" filled />
+      {downArrow}
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
+        <DiagramNode label="Ambulance + GPS" />
+        <DiagramNode label="Scan Lab" />
+        <DiagramNode label="Mobile AI Doctor" />
+      </div>
+      {downArrow}
+      <DiagramNode label="AI Inference + Radiologist (in parallel)" />
+      {downArrow}
+      <DiagramNode label="Hospital Hub" filled />
+    </div>
+  )
+}
+
 /* ── Bento line-chart SVG ── */
 function BentoLineChart() {
   const points = [
@@ -216,7 +269,7 @@ export default function LandingHeader() {
           aria-hidden="true"
           style={{
             position: 'absolute', inset: 0,
-            backgroundImage: "url('/doctor1.png')",
+            backgroundImage: "url('/doctor1.jpg')",
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             filter: 'brightness(0.80) contrast(1.1)',
@@ -242,7 +295,7 @@ export default function LandingHeader() {
             color: '#fff',
             marginBottom: 'clamp(0.85rem, 2vw, 1.4rem)',
           }}>
-            Your healthcare<br />connected
+            Every second counts.<br />Stroke care, connected.
           </h1>
           <p style={{
             ...HELV,
@@ -255,9 +308,9 @@ export default function LandingHeader() {
             width: '100%',
             marginBottom: 'clamp(1.5rem, 3vw, 2.25rem)',
           }}>
-            Specialist doctors, real-time appointments and
-            secure health records — all in one place,
-            accessible from anywhere on any device.
+            Instant alerts, AI-assisted triage and a connected
+            care network — built to move as fast as a stroke
+            demands, from anywhere on any device.
           </p>
           <Link
             to="/register"
@@ -282,7 +335,7 @@ export default function LandingHeader() {
       </section>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━ FEATURES ━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="services" style={{ background: '#ddeaf2', position: 'relative', zIndex: 10 }}>
+      <section id="services" style={{ background: '#ddeaf2', position: 'relative', zIndex: 10, scrollMarginTop: '100px' }}>
         <div style={{
           maxWidth: '1320px', margin: '0 auto',
           padding: 'clamp(2.5rem, 5vw, 4rem) clamp(1rem, 3vw, 2.5rem)',
@@ -304,7 +357,7 @@ export default function LandingHeader() {
               color: '#111', textAlign: 'center',
               maxWidth: '520px', margin: '0 auto clamp(2.5rem, 5vw, 4rem)',
             }}>
-              Built for the Modern Patient
+              Built for the Golden Hour
             </h2>
           </Reveal>
           <div className="hidden md:grid" style={{
@@ -330,6 +383,7 @@ export default function LandingHeader() {
           background: '#f8fafc',
           borderTop: '1px solid rgba(0,0,0,.06)',
           zIndex: 10, position: 'relative',
+          scrollMarginTop: '100px',
         }}
       >
         <div style={{
@@ -351,20 +405,36 @@ export default function LandingHeader() {
                 lineHeight: 1.08, letterSpacing: '-0.025em',
                 color: '#111', maxWidth: '480px', margin: '0 auto',
               }}>
-                3 Steps to Your First Consultation
+                3 Steps When Every Second Matters
               </h2>
             </div>
           </Reveal>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          {/* Desktop + Tablet: explicit 3-column grid (matches the "One Platform" three-beat
+              cards below at the same breakpoint) — `auto-fit` previously left card 03 stranded
+              alone on a second row at tablet widths (~768px), where two 260px+ cards fit per
+              row but not three. */}
+          <div className="hidden md:grid" style={{
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: 'clamp(10px, 2vw, 18px)',
           }}>
-            {[
-              { num: '01', title: 'Create Your Account',     desc: 'Sign up in under 2 minutes with your name and contact details — no paperwork.' },
-              { num: '02', title: 'Schedule a Consultation', desc: 'Choose your specialist and a time slot that fits your schedule perfectly.' },
-              { num: '03', title: 'Join the Online Meeting', desc: 'Click "Join" from your dashboard at your appointment time — no downloads needed.' },
-            ].map(({ num, title, desc }, i) => (
+            {STEPS.map(({ num, title, desc }, i) => (
+              <Reveal key={num} delay={i * 90}>
+                <div style={{
+                  background: '#fff', borderRadius: '18px',
+                  border: '1px solid rgba(0,0,0,.07)',
+                  padding: 'clamp(20px, 2.8vw, 32px)',
+                  height: '100%', boxSizing: 'border-box',
+                  display: 'flex', flexDirection: 'column', gap: '14px',
+                }}>
+                  <span style={{ ...HELV, fontSize: '18px', letterSpacing: '0.12em', color: '#d1d5db' }}>{num}</span>
+                  <h3 style={{ ...DISPLAY, fontSize: 'clamp(16px, 1.8vw, 21px)', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
+                  <p style={{ ...HELV, fontSize: 'clamp(11.5px, 1vw, 13px)', letterSpacing: '0.02em', lineHeight: 1.75, color: '#9ca3af', margin: 0 }}>{desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3 md:hidden">
+            {STEPS.map(({ num, title, desc }, i) => (
               <Reveal key={num} delay={i * 90}>
                 <div style={{
                   background: '#fff', borderRadius: '18px',
@@ -379,6 +449,111 @@ export default function LandingHeader() {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ ONE PLATFORM. ONE GOLDEN HOUR. ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="platform" style={{ background: '#fff', position: 'relative', zIndex: 10, scrollMarginTop: '100px' }}>
+        <div style={{
+          maxWidth: '1320px', margin: '0 auto',
+          padding: 'clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2.5rem)',
+        }}>
+          <Reveal>
+            <div style={{ textAlign: 'center', marginBottom: 'clamp(2rem, 4vw, 3rem)' }}>
+              <span style={{
+                ...HELV, display: 'block', fontSize: '10px',
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'rgba(0,0,0,0.35)', marginBottom: '1rem',
+              }}>
+                The Platform
+              </span>
+              <h2 style={{
+                ...DISPLAY,
+                fontSize: 'clamp(1.8rem, 4vw, 3rem)',
+                lineHeight: 1.08, letterSpacing: '-0.025em',
+                color: '#111', maxWidth: '560px', margin: '0 auto 0.9rem',
+              }}>
+                One Platform. One Golden Hour.
+              </h2>
+              <p style={{
+                ...HELV, fontSize: 'clamp(12px, 1.1vw, 14px)', lineHeight: 1.7,
+                color: '#6b7280', maxWidth: '540px', margin: '0 auto',
+              }}>
+                From the patient's first alert to treatment, every step is engineered to run in parallel —
+                not in sequence.
+              </p>
+            </div>
+          </Reveal>
+
+          {/* Three-beat framing: Instant Alert / Parallel Action / AI-Powered Readiness */}
+          <div className="hidden md:grid" style={{
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 'clamp(10px, 1.4vw, 18px)',
+            marginBottom: 'clamp(2.5rem, 5vw, 3.5rem)',
+          }}>
+            {[
+              { num: '01', title: 'Instant Alert', desc: 'A patient or bystander triggers the mobile app. The Command Centre is notified in the same instant.' },
+              { num: '02', title: 'Parallel Action', desc: 'Ambulances, the scan lab, and the Mobile AI Doctor are alerted together — nothing waits in a queue.' },
+              { num: '03', title: 'AI-Powered Readiness', desc: "AI inference and the radiologist's report arrive before the patient leaves the scan centre." },
+            ].map(({ num, title, desc }, i) => (
+              <Reveal key={num} delay={i * 90}>
+                <div style={{
+                  background: '#f8fafc', borderRadius: '18px',
+                  border: '1px solid rgba(0,0,0,.07)',
+                  padding: 'clamp(20px, 2.4vw, 28px)',
+                  height: '100%', boxSizing: 'border-box',
+                  display: 'flex', flexDirection: 'column', gap: '12px',
+                }}>
+                  <span style={{ ...HELV, fontSize: '16px', letterSpacing: '0.12em', color: '#c7d2e0' }}>{num}</span>
+                  <h3 style={{ ...DISPLAY, fontSize: 'clamp(15px, 1.6vw, 19px)', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
+                  <p style={{ ...HELV, fontSize: 'clamp(11px, 0.95vw, 12.5px)', letterSpacing: '0.01em', lineHeight: 1.7, color: '#6b7280', margin: 0 }}>{desc}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3 md:hidden" style={{ marginBottom: '2.5rem' }}>
+            {[
+              { num: '01', title: 'Instant Alert', desc: 'A patient or bystander triggers the mobile app. The Command Centre is notified in the same instant.' },
+              { num: '02', title: 'Parallel Action', desc: 'Ambulances, the scan lab, and the Mobile AI Doctor are alerted together — nothing waits in a queue.' },
+              { num: '03', title: 'AI-Powered Readiness', desc: "AI inference and the radiologist's report arrive before the patient leaves the scan centre." },
+            ].map(({ num, title, desc }) => (
+              <div key={num} style={{
+                background: '#f8fafc', borderRadius: '18px',
+                border: '1px solid rgba(0,0,0,.07)', padding: '20px',
+                display: 'flex', flexDirection: 'column', gap: '10px',
+              }}>
+                <span style={{ ...HELV, fontSize: '14px', letterSpacing: '0.12em', color: '#c7d2e0' }}>{num}</span>
+                <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
+                <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: '#6b7280', margin: 0 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Hub-and-spoke diagram */}
+          <Reveal delay={120}>
+            <HubSpokeDiagram />
+          </Reveal>
+
+          {/* CTA */}
+          <Reveal delay={160}>
+            <div style={{ textAlign: 'center', marginTop: 'clamp(2rem, 4vw, 2.75rem)' }}>
+              <Link
+                to="/demo"
+                style={{
+                  ...DISPLAY, fontWeight: 500,
+                  fontSize: 'clamp(12px, 1vw, 13.5px)',
+                  color: '#fff', background: '#0f172a',
+                  padding: '13px 30px', borderRadius: '999px',
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  textDecoration: 'none', transition: 'opacity .2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+              >
+                Explore the Platform
+              </Link>
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -399,6 +574,7 @@ export default function LandingHeader() {
           minHeight: '100svh',
           overflow: 'hidden',
           zIndex: 10,
+          scrollMarginTop: '100px',
           /* Flex column so label sits top and cards sit bottom */
           display: 'flex',
           flexDirection: 'column',
@@ -445,7 +621,7 @@ export default function LandingHeader() {
               color: 'rgba(255,255,255,0.88)',
               fontWeight: 400,
             }}>
-              Why Ride with Us
+              Why Stroke AI
             </span>
           </Reveal>
         </div>
@@ -508,7 +684,7 @@ export default function LandingHeader() {
                         color: '#0f172a',
                         margin: '0 0 5px',
                       }}>
-                        Healthier Routine
+                        Golden Hour Focus
                       </h3>
                       <p style={{
                         ...HELV,
@@ -518,7 +694,7 @@ export default function LandingHeader() {
                         color: '#c45a1a',
                         margin: 0,
                       }}>
-                        Build active habits seamlessly into your weekday
+                        Every workflow is built around getting treatment within the critical first hours
                       </p>
                     </div>
                   </div>
@@ -555,7 +731,7 @@ export default function LandingHeader() {
                         color: '#ffffff',
                         margin: '0 0 5px',
                       }}>
-                        Lower Emissions
+                        Verified Care Network
                       </h3>
                       <p style={{
                         ...HELV,
@@ -565,7 +741,7 @@ export default function LandingHeader() {
                         color: 'rgba(255,255,255,0.50)',
                         margin: 0,
                       }}>
-                        Contribute directly to cleaner air in your immediate neighborhood
+                        Connect only with vetted hospitals and stroke specialists in your area
                       </p>
                     </div>
                   </div>
@@ -612,7 +788,7 @@ export default function LandingHeader() {
                       color: '#0f172a',
                       margin: '0 0 5px',
                     }}>
-                      Community Connection
+                      24/7 Support
                     </h3>
                     <p style={{
                       ...HELV,
@@ -622,7 +798,7 @@ export default function LandingHeader() {
                       color: 'rgba(0,0,0,0.52)',
                       margin: 0,
                     }}>
-                      Join thousands of locals committed to better urban mobility
+                      Round-the-clock monitoring means help is always ready, day or night
                     </p>
                   </div>
                 </div>
@@ -646,8 +822,8 @@ export default function LandingHeader() {
                 }}>
                   <span style={{ ...HELV, fontSize: '11px', letterSpacing: '0.04em', color: 'rgba(0,0,0,0.36)' }}>(01)</span>
                   <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>Healthier Routine</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: '#c45a1a', margin: 0 }}>Build active habits seamlessly into your weekday</p>
+                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>Golden Hour Focus</h3>
+                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: '#c45a1a', margin: 0 }}>Every workflow is built around getting treatment within the critical first hours</p>
                   </div>
                 </div>
               </Reveal>
@@ -667,8 +843,8 @@ export default function LandingHeader() {
                 }}>
                   <span style={{ ...HELV, fontSize: '11px', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.30)' }}>(02)</span>
                   <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#ffffff', margin: '0 0 5px' }}>Lower Emissions</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(255,255,255,0.50)', margin: 0 }}>Contribute directly to cleaner air in your immediate neighborhood</p>
+                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#ffffff', margin: '0 0 5px' }}>Verified Care Network</h3>
+                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(255,255,255,0.50)', margin: 0 }}>Connect only with vetted hospitals and stroke specialists in your area</p>
                   </div>
                 </div>
               </Reveal>
@@ -688,8 +864,8 @@ export default function LandingHeader() {
                     <BentoLineChart />
                   </div>
                   <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>Community Connection</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(0,0,0,0.52)', margin: 0 }}>Join thousands of locals committed to better urban mobility</p>
+                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>24/7 Support</h3>
+                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(0,0,0,0.52)', margin: 0 }}>Round-the-clock monitoring means help is always ready, day or night</p>
                   </div>
                 </div>
               </Reveal>

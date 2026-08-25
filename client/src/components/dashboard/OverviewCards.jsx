@@ -22,7 +22,7 @@ export default function OverviewCards({ patient }) {
       icon:    Calendar,
       badge:   '3 days away',
       badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
-      action:  () => navigate('/appointments'),
+      action:  () => navigate('/dashboard/appointments'),
     },
     {
       id:      'wellbeing',
@@ -32,7 +32,7 @@ export default function OverviewCards({ patient }) {
       icon:    HeartPulse,
       badge:   'On track',
       badgeBg: 'bg-blue-50 text-blue-700 border-blue-200',
-      action:  () => navigate('/medical-records'),
+      action:  () => navigate('/dashboard/medical-records'),
     },
     {
       id:      'risk',
@@ -42,7 +42,7 @@ export default function OverviewCards({ patient }) {
       icon:    TrendingDown,
       badge:   'This week',
       badgeBg: 'bg-gray-100 text-gray-700 border-gray-200',
-      action:  () => navigate('/medical-records'),
+      action:  () => navigate('/dashboard/medical-records'),
     },
     {
       id:      'health',
@@ -52,7 +52,7 @@ export default function OverviewCards({ patient }) {
       icon:    Activity,
       badge:   'Improving',
       badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      action:  () => navigate('/profile'),
+      action:  () => navigate('/dashboard/profile'),
     },
   ]
 

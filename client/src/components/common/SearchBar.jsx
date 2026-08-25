@@ -34,7 +34,7 @@ export default function SearchBar({
   const SIZES = {
     sm: 'px-3 py-2 pl-8 text-xs rounded-xl',
     md: 'px-4 py-2.5 pl-9 text-sm rounded-xl',
-    lg: 'px-4 py-3 pl-10 text-sm rounded-2xl',
+    lg: 'px-4 py-3 pl-10 text-sm rounded-xl',
   }
 
   const ICON_SIZES = {

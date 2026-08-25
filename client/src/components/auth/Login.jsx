@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, ArrowLeft, Eye, EyeOff, Mail, Lock, Shield, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import BrandMark from '../common/BrandMark.jsx'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -12,6 +13,15 @@ const fadeIn = {
     transition: { delay: index * 0.1, duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   }),
 }
+
+/* ─── Landing-page design tokens (see LandingHeader.jsx / LandingFooter.jsx) ───
+   Card content is retheme'd to match the landing page's palette + typography;
+   the page background (dot-grid + blobs) is left exactly as-is. ─── */
+const DISPLAY = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
+const INK = '#1a2e3b'
+const LINK = '#1a6fa8'
+const MUTED = '#4a6a7a'
+const ACCENT_BAR = 'linear-gradient(90deg, #4f7fb8 0%, #e8935a 50%, #7fbf6a 100%)'
 
 /* ─── Dot-grid SVG background ─── */
 function DotGrid() {
@@ -107,124 +117,62 @@ export default function Login() {
         transition={{ duration: 7, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      {/* ── Main login card (two-column layout) ── */}
+      {/* ── Main login card — horizontal rectangle: identity left, form right ── */}
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 w-full max-w-[950px]
+        className="relative z-10 w-full max-w-[860px]
                    bg-white rounded-lg shadow-2xl border border-white/80
                    overflow-hidden"
         style={{
           boxShadow:
-            '0 6px 32px 0 rgba(99,102,241,0.08), 0 2px 6px 0 rgba(0,0,0,0.04)',
+            '0 6px 32px 0 rgba(26,46,59,0.08), 0 2px 6px 0 rgba(0,0,0,0.04)',
         }}
       >
         {/* Card top accent bar */}
         <div
           className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg"
-          style={{
-            background: 'linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #2dd4bf 100%)',
-          }}
+          style={{ background: ACCENT_BAR }}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          {/* ── LEFT SECTION (Info Panel) - Hidden on mobile ── */}
-          <div
-            className="hidden lg:flex relative px-10 py-12 xl:px-12 xl:py-14
-                        flex-col justify-between overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%)',
-            }}
-          >
-            <div className="relative z-10">
-              {/* Brand */}
-              <div className="flex items-center gap-3 mb-10">
-                <div
-                  className="w-11 h-11 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0 bg-white"
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr]">
+          {/* ── LEFT: identity / heading ── */}
+          <div className="px-6 py-8 sm:px-10 sm:py-10 md:py-12 md:border-r md:border-gray-100 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-8">
+                <BrandMark size={18} />
+                <span className="text-lg font-bold tracking-tight" style={{ ...DISPLAY, color: INK }}>
+                  Stroke AI
+                </span>
+              </div>
+
+              <div className="mb-5">
+                <Link
+                  to="/landing"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#1a6fa8] transition-colors"
                 >
-                  <img
-                    src="/oncotraceai.webp"
-                    alt="CareFlow"
-                    className="h-7 w-7 object-contain"
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                </div>
-                <span className="text-xl font-bold tracking-tight text-white">
-                  CareFlow
-                </span>
+                  <ArrowLeft size={14} />
+                  <span>Back to Home</span>
+                </Link>
               </div>
 
-              {/* Main content */}
-              <div className="space-y-5">
-                <h1 className="text-3xl xl:text-4xl font-bold text-white leading-tight">
-                  Healthcare Management Platform
-                </h1>
-                <p className="text-base text-indigo-100 leading-relaxed max-w-md">
-                  Secure access to patient records, analytics, and care coordination tools.
-                </p>
-                
-                {/* Feature list */}
-                <div className="pt-6 space-y-3">
-                  {[
-                    'Advanced patient data analytics',
-                    'Real-time care coordination',
-                    'HIPAA-compliant security',
-                  ].map((feature, i) => (
-                    <div key={i} className="flex items-center gap-2.5 text-indigo-50">
-                      <Shield size={16} strokeWidth={2} className="flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── RIGHT SECTION (Login Form) ── */}
-          <div className="px-6 py-8 sm:px-10 sm:py-10 lg:px-10 lg:py-12 xl:px-12 xl:py-14 flex flex-col justify-center">
-            {/* Mobile logo - only visible on mobile */}
-            <div className="lg:hidden flex items-center justify-center mb-6">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-md flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-600">
-                  <img
-                    src="/oncotraceai.webp"
-                    alt="CareFlow"
-                    className="h-6 w-6 object-contain"
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                </div>
-                <span className="text-lg font-bold tracking-tight text-gray-900">
-                  CareFlow
-                </span>
-              </div>
-            </div>
-
-            {/* Back to landing button */}
-            <div className="mb-4">
-              <Link
-                to="/landing"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-indigo-600 transition-colors"
-              >
-                <ArrowLeft size={14} />
-                <span>Back to Home</span>
-              </Link>
-            </div>
-
-            {/* Heading */}
-            <div className="mb-6 lg:mb-7">
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
+              <h2 className="text-2xl md:text-[28px] font-bold tracking-tight" style={{ ...DISPLAY, color: INK }}>
                 Welcome back
               </h2>
-              <p className="mt-1.5 text-xs sm:text-sm text-gray-600">
+              <p className="mt-1.5 text-sm" style={{ color: MUTED }}>
                 Sign in to access your healthcare portal
               </p>
             </div>
 
+            <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 mt-10">
+              <Shield size={13} strokeWidth={2} />
+              <span>HIPAA-compliant and secure</span>
+            </div>
+          </div>
+
+          {/* ── RIGHT: form ── */}
+          <div className="px-6 py-8 sm:px-10 sm:py-10 md:py-12 flex flex-col justify-center">
             {/* Success notification banner from registration */}
             {successMessage && (
               <motion.div
@@ -265,7 +213,8 @@ export default function Login() {
                 action={
                   <Link
                     to="/forgot-password"
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                    className="text-xs font-medium hover:opacity-80 transition-opacity"
+                    style={{ color: LINK }}
                   >
                     Forgot?
                   </Link>
@@ -307,15 +256,11 @@ export default function Login() {
                 disabled={loading}
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
-                className="group relative w-full text-white px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-lg
+                className="group relative w-full text-white px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-full
                            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
-                           flex items-center justify-center gap-2 shadow-md hover:shadow-lg
+                           flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:opacity-90
                            mt-2"
-                style={{
-                  background: loading
-                    ? '#818cf8'
-                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
-                }}
+                style={{ background: loading ? MUTED : INK }}
               >
                 {loading ? (
                   <Spinner />
@@ -350,14 +295,15 @@ export default function Login() {
               Don't have an account?{' '}
               <Link
                 to="/register"
-                className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                className="font-semibold hover:opacity-80 transition-opacity"
+                style={{ color: LINK }}
               >
                 Create account
               </Link>
             </motion.p>
 
-            {/* Mobile footer info */}
-            <div className="lg:hidden mt-5 pt-5 border-t border-gray-100">
+            {/* Footer info — mobile only; desktop shows it in the left column */}
+            <div className="md:hidden mt-5 pt-5 border-t border-gray-100">
               <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                 <Shield size={13} strokeWidth={2} />
                 <span>HIPAA-compliant and secure</span>
@@ -383,13 +329,13 @@ function InputField({ index, label, icon: Icon, action, rightElement, ...inputPr
           size={16}
           strokeWidth={2}
           className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
-                     transition-colors group-focus-within:text-indigo-500 pointer-events-none"
+                     transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
         />
         <input
           {...inputProps}
           className="w-full border border-gray-200 bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
                      text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
+                     focus:outline-none focus:ring-2 focus:ring-[#1a6fa8]/35 focus:border-transparent
                      focus:bg-white transition-all duration-200 hover:border-gray-300"
         />
         {rightElement}

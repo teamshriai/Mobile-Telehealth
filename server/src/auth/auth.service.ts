@@ -7,7 +7,14 @@ import { auditService } from '../services/audit.service';
 import { AuditAction, AuditSeverity } from '../services/audit.service';
 import { signAccessToken } from '../utils/jwt';
 import { authRepository, type UserWithRole } from './auth.repository';
-import type { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto } from './auth.validator';
+import { decryptProfile } from '../profile/profile.repository';
+import type {
+  RegisterDto,
+  LoginDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+} from './auth.validator';
 import type { SanitizedUser } from '../types/auth.types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -252,7 +259,7 @@ export const authService = {
 
     return {
       user: sanitize(user),
-      profile: user.patientProfile ?? null,
+      profile: user.patientProfile ? decryptProfile(user.patientProfile) : null,
     };
   },
 
@@ -382,6 +389,88 @@ export const authService = {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       metadata: { stage: 'password_reset_complete' },
+    });
+  },
+
+  /**
+   * CHANGE PASSWORD (authenticated user, Settings page)
+   *
+   * Unlike resetPassword, this requires proving knowledge of the CURRENT
+   * password rather than a mailed token. Same Argon2id verify/hash as
+   * login/reset. Bumping passwordChangedAt invalidates old JWTs for free.
+   */
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const user = await authRepository.findById(userId);
+    if (user === null) {
+      throw new AppError('User not found.', 404);
+    }
+
+    const isCurrentPasswordValid = await verify(user.passwordHash, dto.currentPassword);
+    if (!isCurrentPasswordValid) {
+      auditService.log({
+        action: AuditAction.UserLoginFailed,
+        userId,
+        severity: AuditSeverity.Warning,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        metadata: { reason: 'change_password_wrong_current_password' },
+      });
+      throw new AppError('Current password is incorrect.', 401);
+    }
+
+    const passwordHash = await hash(dto.newPassword, {
+      algorithm: Algorithm.Argon2id,
+      memoryCost: env.ARGON2_MEMORY_COST,
+      timeCost: env.ARGON2_TIME_COST,
+      parallelism: env.ARGON2_PARALLELISM,
+    });
+
+    await authRepository.updatePassword(userId, passwordHash);
+
+    auditService.log({
+      action: AuditAction.PasswordChanged,
+      userId,
+      severity: AuditSeverity.Info,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { stage: 'password_changed_by_user' },
+    });
+  },
+
+  /**
+   * DELETE ACCOUNT (self-service, Settings page)
+   *
+   * Requires the current password — this is permanent-from-the-user's-
+   * perspective and irreversible without support intervention, so it gets
+   * the same proof-of-identity bar as changing the password.
+   */
+  async deleteAccount(
+    userId: string,
+    currentPassword: string,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    const user = await authRepository.findById(userId);
+    if (user === null) {
+      throw new AppError('User not found.', 404);
+    }
+
+    const isPasswordValid = await verify(user.passwordHash, currentPassword);
+    if (!isPasswordValid) {
+      throw new AppError('Current password is incorrect.', 401);
+    }
+
+    await authRepository.softDeleteAccount(userId);
+
+    auditService.log({
+      action: AuditAction.AccountDeleted,
+      userId,
+      severity: AuditSeverity.Critical,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
     });
   },
 };

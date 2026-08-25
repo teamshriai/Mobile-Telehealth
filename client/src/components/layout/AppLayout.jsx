@@ -89,7 +89,7 @@ export default function AppLayout() {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="mx-auto min-h-full w-full max-w-[1440px] px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6"
+              className="mx-auto min-h-full w-full max-w-[1440px] px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 2xl:max-w-[1680px]"
             >
               <Outlet />
             </motion.div>

@@ -27,6 +27,7 @@ export enum AuditAction {
   ProfileUpdated = 'ProfileUpdated',
   ProfilePhotoUpdated = 'ProfilePhotoUpdated',
   RoleChanged = 'RoleChanged',
+  AccountDeleted = 'AccountDeleted',
 }
 
 export enum AuditSeverity {

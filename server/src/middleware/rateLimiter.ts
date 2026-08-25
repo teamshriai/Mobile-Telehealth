@@ -34,10 +34,16 @@ export const authLimiter = rateLimit({
   ),
 });
 
+const AUTH_SLOWDOWN_DELAY_AFTER = 3;
+
 export const authSlowDown = slowDown({
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
-  delayAfter: 3,
-  delayMs: 500,
+  delayAfter: AUTH_SLOWDOWN_DELAY_AFTER,
+  // express-slow-down v2 replaced the flat `delayMs: number` (deprecated,
+  // logs a warning on every boot) with a function so callers explicitly
+  // choose the curve. This reproduces the original v1 behavior exactly:
+  // request 4 waits 500ms, request 5 waits 1000ms, etc.
+  delayMs: (used) => (used - AUTH_SLOWDOWN_DELAY_AFTER) * 500,
   maxDelayMs: 20_000,
 });
 

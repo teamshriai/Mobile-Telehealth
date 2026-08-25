@@ -28,6 +28,13 @@ const VARIANTS = {
     border border-[#BFDBFE]
     shadow-[0_1px_3px_0_rgba(37,99,235,0.08),0_4px_16px_0_rgba(37,99,235,0.08)]
   `,
+  /* Level 3 of the material hierarchy — selective, elevated, translucent.
+     Reach for this deliberately (AI-insight surfaces, floating panels),
+     not as a default replacement for `default`. */
+  glass: `
+    backdrop-blur-xl border border-white/60
+    shadow-[0_20px_60px_0_rgba(15,23,42,0.10)]
+  `,
 }
 
 const PADDINGS = {
@@ -48,7 +55,7 @@ export default function Card({
   children,
   variant  = 'default',
   padding  = 'lg',
-  radius   = 'lg',
+  radius   = 'md',
   hover    = false,
   animate  = false,
   delay    = 0,
@@ -61,6 +68,8 @@ export default function Card({
     ? { background: 'linear-gradient(160deg, #FFFFFF 0%, #EFF6FF 100%)' }
     : variant === 'primary'
     ? { background: 'linear-gradient(160deg, #EFF6FF 0%, #DBEAFE 100%)' }
+    : variant === 'glass'
+    ? { background: 'rgba(255,255,255,0.72)' }
     : {}
 
   const baseClasses = `

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { FileText, Image, Dna, FlaskConical, ChevronRight, Clock } from 'lucide-react'
+import { FileText, Brain, Activity, FlaskConical, ChevronRight, Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import SectionTitle from '../common/SectionTitle.jsx'
 import Card from '../common/Card.jsx'
@@ -7,13 +7,11 @@ import StatusBadge from '../common/StatusBadge.jsx'
 import { mockReports, reportTypes } from '../../data/mockReports.js'
 
 const TYPE_ICONS = {
-  imaging:       Image,
-  liquid_biopsy: FlaskConical,
-  genomics:      Dna,
-  lab:           FlaskConical,
-  pathology:     FileText,
-  clinical_note: FileText,
-  cardiology:    FileText,
+  imaging:          Brain,
+  lab:              FlaskConical,
+  nihss_assessment: Activity,
+  clinical_note:    FileText,
+  cardiology:       FileText,
 }
 
 export default function RecentReports() {
@@ -27,7 +25,7 @@ export default function RecentReports() {
         subtitle="Latest uploaded and reviewed documents"
         action={
           <button
-            onClick={() => navigate('/reports')}
+            onClick={() => navigate('/dashboard/reports')}
             className="flex items-center gap-1 text-xs text-[#2563EB] font-semibold
                        hover:text-[#1D4ED8] transition-colors"
           >

@@ -152,3 +152,33 @@ export async function forgotPassword(email) {
 export async function resetPassword(payload) {
   return apiClient.post('/auth/reset-password', payload)
 }
+
+/**
+ * Change the current user's password (Settings page — requires knowing the
+ * current password, unlike the token-based reset flow above).
+ *
+ * Changing the password bumps the server-side passwordChangedAt timestamp,
+ * which invalidates the JWT used to make THIS request (by design — the same
+ * mechanism that already invalidates old sessions after a reset). The
+ * caller must treat success as "now logged out" and redirect to /login.
+ *
+ * @param {{ currentPassword: string, newPassword: string }} payload
+ */
+export async function changePassword(payload) {
+  const result = await apiClient.patch('/auth/password', payload)
+  clearSession()
+  return result
+}
+
+/**
+ * Permanently (soft-)delete the current user's account. Requires the
+ * current password. Clears the local session on success — there is no
+ * account left to be logged into.
+ *
+ * @param {string} password
+ */
+export async function deleteAccount(password) {
+  const result = await apiClient.delete('/auth/account', { data: { password } })
+  clearSession()
+  return result
+}

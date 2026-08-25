@@ -11,7 +11,7 @@ const ACTIONS = [
     icon:     Upload,
     color:    '#2563EB',
     bg:       '#EFF6FF',
-    path:     '/reports',
+    path:     '/dashboard/reports',
   },
   {
     label:    'Plan a visit',
@@ -19,7 +19,7 @@ const ACTIONS = [
     icon:     Calendar,
     color:    '#16A34A',
     bg:       '#DCFCE7',
-    path:     '/appointments',
+    path:     '/dashboard/appointments',
   },
   {
     label:    'Care guide',
@@ -27,7 +27,7 @@ const ACTIONS = [
     icon:     Sparkles,
     color:    '#7C3AED',
     bg:       '#EDE9FE',
-    path:     '/ai',
+    path:     '/dashboard/ai',
   },
   {
     label:    'Care timeline',
@@ -35,7 +35,7 @@ const ACTIONS = [
     icon:     GitBranch,
     color:    '#D97706',
     bg:       '#FEF3C7',
-    path:     '/timeline',
+    path:     '/dashboard/timeline',
   },
 ]
 

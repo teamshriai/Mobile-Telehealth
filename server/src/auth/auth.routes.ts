@@ -7,6 +7,8 @@ import {
   forgotPassword,
   verifyResetToken,
   resetPassword,
+  changePassword,
+  deleteAccount,
 } from './auth.controller';
 import { authenticate } from '../middleware/authenticate';
 import {
@@ -38,5 +40,9 @@ router.post('/reset-password', authSlowDown, resetPasswordLimiter, resetPassword
 // ── Protected ────────────────────────────────────────────────────────────────
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, me);
+// Reuses the auth rate limiters — this is exactly the kind of credential
+// operation they exist to slow down.
+router.patch('/password', authSlowDown, authLimiter, authenticate, changePassword);
+router.delete('/account', authSlowDown, authLimiter, authenticate, deleteAccount);
 
 export { router as authRouter };

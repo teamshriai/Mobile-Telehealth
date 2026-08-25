@@ -6,14 +6,14 @@ import {
 import { TrendingDown, Pill } from 'lucide-react'
 import SectionTitle from '../common/SectionTitle.jsx'
 import Card from '../common/Card.jsx'
-import { ctDNATrend } from '../../data/mockGenes.js'
+import { ctDNATrend as nihssTrend } from '../../data/mockGenes.js'
 
 /* ── Custom tooltip for the chart ── */
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
 
   return (
-    <div className="bg-white border border-[#E8EDF2] rounded-2xl p-3 shadow-lg">
+    <div className="bg-white border border-[#E8EDF2] rounded-xl p-3 shadow-lg">
       <p className="text-xs font-semibold text-[#0F172A] mb-1">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2">
@@ -21,9 +21,9 @@ function CustomTooltip({ active, payload, label }) {
             className="w-2 h-2 rounded-full"
             style={{ backgroundColor: p.color }}
           />
-          <span className="text-xs text-[#64748B]">ctDNA:</span>
+          <span className="text-xs text-[#64748B]">NIHSS:</span>
           <span className="text-xs font-bold text-[#0F172A]">
-            {p.value}% MAF
+            {p.value}
           </span>
         </div>
       ))}
@@ -35,26 +35,30 @@ export default function TreatmentProgress({ patient }) {
   const { treatment } = patient
 
   /* Filter out null values for the chart */
-  const chartData = ctDNATrend.filter((d) => d.value !== null)
+  const chartData = nihssTrend.filter((d) => d.value !== null)
 
   const progressPct = Math.round(
     (treatment.cycle / treatment.totalCycles) * 100
   )
 
+  const peak = nihssTrend[0]?.value ?? 0
+  const latest = chartData[chartData.length - 1]?.value ?? 0
+  const improvementPct = peak > 0 ? Math.round(((peak - latest) / peak) * 100) : 0
+
   return (
     <Card variant="default" padding="lg">
       <SectionTitle
-        title="Treatment Progress"
-        subtitle={`${treatment.currentRegimen} — Cycle ${treatment.cycle} of ${treatment.totalCycles}`}
+        title="Recovery Progress"
+        subtitle={`${treatment.currentRegimen} — Session ${treatment.cycle} of ${treatment.totalCycles}`}
         className="mb-6"
       />
 
-      {/* Treatment meta row */}
+      {/* Recovery meta row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Current Cycle',  value: `${treatment.cycle}/${treatment.totalCycles}` },
-          { label: 'Response',       value: 'Partial Response' },
-          { label: 'Start Date',     value: 'Nov 2023' },
+          { label: 'Rehab Session',  value: `${treatment.cycle}/${treatment.totalCycles}` },
+          { label: 'Response',       value: treatment.response },
+          { label: 'Onset Date',     value: 'Nov 2023' },
           { label: 'Next Review',    value: 'Nov 15, 2024' },
         ].map((item) => (
           <div
@@ -75,7 +79,7 @@ export default function TreatmentProgress({ patient }) {
           <div className="flex items-center gap-2">
             <Pill size={13} className="text-[#2563EB]" />
             <span className="text-xs font-semibold text-[#0F172A]">
-              Treatment Cycle Progress
+              Rehabilitation Progress
             </span>
           </div>
           <span className="text-xs font-bold text-[#2563EB]">
@@ -94,21 +98,21 @@ export default function TreatmentProgress({ patient }) {
           />
         </div>
         <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-[#94A3B8]">Cycle 1 — Nov 2023</span>
-          <span className="text-[10px] text-[#94A3B8]">Cycle 18 — May 2025</span>
+          <span className="text-[10px] text-[#94A3B8]">Session 1 — Nov 2023</span>
+          <span className="text-[10px] text-[#94A3B8]">Session 18 — May 2025</span>
         </div>
       </div>
 
-      {/* ctDNA trend chart */}
+      {/* NIHSS score trend chart */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown size={13} className="text-[#16A34A]" />
           <span className="text-xs font-semibold text-[#0F172A]">
-            ctDNA Trend (% MAF)
+            NIHSS Score Trend
           </span>
           <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold
                            bg-[#DCFCE7] text-[#16A34A]">
-            -78% from peak
+            -{improvementPct}% from peak
           </span>
         </div>
 
@@ -138,7 +142,6 @@ export default function TreatmentProgress({ patient }) {
               tick={{ fontSize: 10, fill: '#94A3B8' }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => `${v}%`}
             />
             <Tooltip content={<CustomTooltip />} />
             <Area

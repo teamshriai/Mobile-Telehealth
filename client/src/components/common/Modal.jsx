@@ -69,7 +69,7 @@ export default function Modal({
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className={`
-              relative w-full bg-white rounded-3xl
+              relative w-full bg-white rounded-xl
               border border-[#E8EDF2] overflow-hidden
               shadow-[0_20px_60px_0_rgba(15,23,42,0.18)]
               ${SIZES[size] || SIZES.md}

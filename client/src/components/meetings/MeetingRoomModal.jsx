@@ -6,21 +6,20 @@ import {
   VideoOff,
   PhoneOff,
   MessageSquare,
-  Users,
   Shield,
   Send,
   X,
-  FileText,
 } from 'lucide-react'
 
 export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
   const [micOn, setMicOn] = useState(true)
   const [videoOn, setVideoOn] = useState(true)
   const [activeTab, setActiveTab] = useState('chat')
+  const [showPanelMobile, setShowPanelMobile] = useState(false)
   
   // Chat state inside meeting
   const [messages, setMessages] = useState([
-    { id: 1, sender: 'Dr. Priya Nair', text: 'Hello Anand! I have loaded your latest ctDNA analysis.', time: '10:31 AM', isDoctor: true },
+    { id: 1, sender: 'Dr. Priya Nair', text: 'Hello Anand! I have loaded your latest imaging and NIHSS assessment.', time: '10:31 AM', isDoctor: true },
     { id: 2, sender: 'You', text: 'Good morning Doctor. Thank you, I can hear you clearly.', time: '10:32 AM', isDoctor: false },
   ])
   const [newMessage, setNewMessage] = useState('')
@@ -72,11 +71,20 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center gap-1.5 text-slate-400 text-xs font-medium">
               <Shield size={14} className="text-blue-400" />
               <span>Encrypted Video</span>
             </div>
+            <button
+              onClick={() => setShowPanelMobile((v) => !v)}
+              className={`lg:hidden p-1.5 rounded transition-colors ${
+                showPanelMobile ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Toggle chat & notes"
+            >
+              <MessageSquare size={18} />
+            </button>
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
@@ -88,7 +96,7 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
         </div>
 
         {/* Main Grid Area */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 bg-slate-950">
+        <div className="relative flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 bg-slate-950">
           {/* Main Doctor Stream Area */}
           <div className="lg:col-span-8 p-3 flex flex-col gap-3 relative overflow-hidden bg-slate-950">
             <div className="flex-1 relative rounded-lg overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center">
@@ -124,8 +132,20 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Tools Panel (Chat / Notes) */}
-          <div className="hidden lg:flex lg:col-span-4 border-l border-slate-800 bg-slate-900 flex-col">
+          {/* Tools Panel (Chat / Notes) — a side panel on desktop, a full overlay toggled from
+              the header on smaller screens where there isn't room for a persistent side panel */}
+          <div
+            className={`${showPanelMobile ? 'flex absolute inset-0 z-10' : 'hidden'} lg:static lg:z-auto lg:flex lg:col-span-4 border-l border-slate-800 bg-slate-900 flex-col`}
+          >
+            <div className="flex items-center border-b border-slate-800 bg-slate-900 lg:hidden px-2 py-1.5">
+              <button
+                onClick={() => setShowPanelMobile(false)}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white px-2 py-1 rounded transition-colors"
+              >
+                <Video size={13} />
+                Back to video
+              </button>
+            </div>
             <div className="flex border-b border-slate-800 bg-slate-900">
               <button
                 onClick={() => setActiveTab('chat')}
@@ -237,7 +257,7 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
         </div>
 
         {/* Control Bar Bottom */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-800 bg-slate-900">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-t border-slate-800 bg-slate-900">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMicOn(!micOn)}
@@ -246,7 +266,7 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
               }`}
             >
               {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-              <span>{micOn ? 'Mute' : 'Unmute'}</span>
+              <span className="hidden sm:inline">{micOn ? 'Mute' : 'Unmute'}</span>
             </button>
 
             <button
@@ -256,16 +276,16 @@ export default function MeetingRoomModal({ meeting, isOpen, onClose }) {
               }`}
             >
               {videoOn ? <Video size={16} /> : <VideoOff size={16} />}
-              <span>{videoOn ? 'Stop Video' : 'Start Video'}</span>
+              <span className="hidden sm:inline">{videoOn ? 'Stop Video' : 'Start Video'}</span>
             </button>
           </div>
 
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
+            className="px-3 sm:px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
           >
             <PhoneOff size={15} />
-            <span>Leave Meeting</span>
+            <span className="hidden sm:inline">Leave Meeting</span>
           </button>
         </div>
       </div>

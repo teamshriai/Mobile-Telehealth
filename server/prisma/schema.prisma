@@ -13,7 +13,13 @@
 // =============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" covers local dev (whatever glibc/macOS host you run on).
+  // "linux-musl-openssl-3.0.x" is required for the Docker image — it's
+  // built on node:20-alpine, which uses musl libc, not glibc. Without this,
+  // `prisma generate` run on a non-Alpine host would produce a client
+  // missing the engine binary the container actually needs at runtime.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -140,6 +146,7 @@ enum AuditAction {
   ProfileUpdated
   ProfilePhotoUpdated
   RoleChanged
+  AccountDeleted
 
   @@map("audit_action")
 }
@@ -326,10 +333,26 @@ model PatientProfile {
   photoMetadata     ProfilePhoto?
 
   // ── Identification ────────────────────────────────────────────────────────
-  abhaId        String? @unique @map("abha_id")
+  // abhaId is stored ENCRYPTED (AES-256-GCM, random IV per value) — see
+  // server/src/utils/encryption.ts. Because a random IV means the same
+  // plaintext never re-encrypts to the same ciphertext, uniqueness can't be
+  // enforced on this column directly. abhaIdHash is a deterministic
+  // HMAC-SHA256 blind index of the plaintext, carrying the @unique
+  // constraint instead — the encrypted value is never used for lookups.
+  abhaId        String? @map("abha_id")
+  abhaIdHash    String? @unique @map("abha_id_hash")
   passportNumber String? @map("passport_number")
+  // Only the last 4 digits are ever accepted or stored — the full 12-digit
+  // Aadhaar number is never persisted, so there is no "full identifier" to
+  // secure/migrate later. Displayed to the user as e.g. "XXXX-XXXX-1234".
+  // Stored encrypted — no longer a fixed-width column (ciphertext is longer
+  // than 4 chars).
+  aadhaarLast4  String? @map("aadhaar_last4")
 
   // ── Contact ───────────────────────────────────────────────────────────────
+  // phoneNumber/alternatePhone/address* are stored ENCRYPTED (see abhaId
+  // comment above for the encryption scheme). country is left plaintext —
+  // low sensitivity, used as a display default.
   phoneNumber     String? @map("phone_number")
   alternatePhone  String? @map("alternate_phone")
   addressLine1    String? @map("address_line1")
@@ -342,6 +365,7 @@ model PatientProfile {
   postalCode      String? @map("postal_code")
 
   // ── Emergency Contact ─────────────────────────────────────────────────────
+  // Stored ENCRYPTED.
   emergencyContactName     String? @map("emergency_contact_name")
   emergencyContactPhone    String? @map("emergency_contact_phone")
   emergencyContactRelation String? @map("emergency_contact_relation")
@@ -354,13 +378,18 @@ model PatientProfile {
   occupation       String?
 
   // ── Medical Summary ───────────────────────────────────────────────────────
-  // Stored as plain text / comma-separated lists.
+  // Stored as plain text / comma-separated lists, ENCRYPTED.
   // Future: normalize to separate tables per domain requirement.
   knownAllergies    String?   @map("known_allergies")
   currentMedications String? @map("current_medications")
   existingDiseases  String?  @map("existing_diseases")
   familyHistory     String?  @map("family_history")
   previousSurgeries String?  @map("previous_surgeries")
+
+  // ── Preferences ───────────────────────────────────────────────────────────
+  // Notification/privacy/accessibility/language settings from the Settings
+  // page. Not sensitive PII — stored as plaintext JSON, not encrypted.
+  preferences Json?
 
   // ── Soft Delete ───────────────────────────────────────────────────────────
   deletedAt DateTime? @map("deleted_at")
@@ -374,7 +403,8 @@ model PatientProfile {
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
-  // [abhaId]: unique identifier look-up.
+  // [abhaIdHash]: @unique blind-index look-up — abhaId itself is encrypted
+  // and can't be looked up or constrained directly (see comment above).
   // userId: @unique creates the index implicitly — not duplicated.
   @@index([lastName, firstName])
   @@map("patient_profiles")

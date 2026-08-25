@@ -25,13 +25,13 @@ const BREADCRUMB_MAP = {
   '/dashboard/settings':        ['Dashboard', 'Settings'],
 }
 
-/* ── Mock notifications ── */
-const NOTIFICATIONS = [
+/* ── Mock notifications (demo data — dashboard has no live notifications API yet) ── */
+const INITIAL_NOTIFICATIONS = [
   {
     id: 1,
     type: 'success',
-    title: 'Liquid biopsy result ready',
-    desc: 'Your ctDNA analysis from Oct 14 is now available.',
+    title: 'NIHSS assessment completed',
+    desc: 'Your latest NIHSS assessment from Oct 14 is now available.',
     time: '2 min ago',
     unread: true,
   },
@@ -47,7 +47,7 @@ const NOTIFICATIONS = [
     id: 3,
     type: 'warning',
     title: 'Report review pending',
-    desc: 'Your uploaded MRI scan awaits physician review.',
+    desc: 'New CT/MRI imaging report awaits physician review.',
     time: '3 hr ago',
     unread: false,
   },
@@ -55,7 +55,7 @@ const NOTIFICATIONS = [
     id: 4,
     type: 'info',
     title: 'AI insight generated',
-    desc: 'New treatment recommendation based on latest genomics.',
+    desc: 'AI insight: blood pressure trending high. Neurology follow-up recommended.',
     time: 'Yesterday',
     unread: false,
   },
@@ -71,12 +71,17 @@ export default function Topbar({ onOpenSidebar }) {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const [searchOpen,  setSearchOpen]  = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [notifOpen,   setNotifOpen]   = useState(false)
+  const [searchOpen,     setSearchOpen]     = useState(false)
+  const [searchQuery,    setSearchQuery]    = useState('')
+  const [notifOpen,      setNotifOpen]      = useState(false)
+  const [notifications,  setNotifications]  = useState(INITIAL_NOTIFICATIONS)
 
   const breadcrumbs = BREADCRUMB_MAP[location.pathname] || ['Dashboard']
-  const unreadCount = NOTIFICATIONS.filter((n) => n.unread).length
+  const unreadCount = notifications.filter((n) => n.unread).length
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
+  }
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -108,7 +113,7 @@ export default function Topbar({ onOpenSidebar }) {
 
   const initials = user.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'AK'
+    : '—'
 
   return (
     <header
@@ -207,7 +212,7 @@ export default function Topbar({ onOpenSidebar }) {
                   exit={{ opacity: 0, y: 8, scale: 0.96 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                   className="absolute right-0 top-12 w-[min(340px,calc(100vw-2rem))] bg-white
-                             rounded-2xl border border-[#E8EDF2] z-50 overflow-hidden"
+                             rounded-xl border border-[#E8EDF2] z-50 overflow-hidden"
                   style={{
                     boxShadow: '0 8px 40px 0 rgba(15,23,42,0.12)',
                   }}
@@ -238,7 +243,7 @@ export default function Topbar({ onOpenSidebar }) {
 
                   {/* List */}
                   <div className="divide-y divide-[#F1F5F9] max-h-[360px] overflow-y-auto">
-                    {NOTIFICATIONS.map((notif) => (
+                    {notifications.map((notif) => (
                       <NotificationItem key={notif.id} notif={notif} />
                     ))}
                   </div>
@@ -246,8 +251,11 @@ export default function Topbar({ onOpenSidebar }) {
                   {/* Footer */}
                   <div className="px-4 py-3 border-t border-[#E8EDF2] bg-[#FAFBFC]">
                     <button
+                      onClick={markAllRead}
+                      disabled={unreadCount === 0}
                       className="text-xs text-[#2563EB] font-medium
-                                 hover:text-[#1D4ED8] transition-colors"
+                                 hover:text-[#1D4ED8] transition-colors
+                                 disabled:text-[#94A3B8] disabled:cursor-not-allowed"
                     >
                       Mark all as read
                     </button>
@@ -278,7 +286,7 @@ export default function Topbar({ onOpenSidebar }) {
           </div>
           <div className="hidden md:block text-left">
             <p className="text-xs font-semibold text-[#0F172A] leading-none">
-              {user.name?.split(' ')[0] || 'Anand'}
+              {user.name?.split(' ')[0] || 'Patient'}
             </p>
             <p className="text-[10px] text-[#94A3B8] leading-none mt-0.5">Patient</p>
           </div>
@@ -382,7 +390,7 @@ function SearchOverlay({ query, onQueryChange, onClose }) {
         exit={{ opacity: 0, scale: 0.96, y: -16 }}
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
         className="fixed left-1/2 top-[12vh] max-h-[80vh] -translate-x-1/2 w-[calc(100%-2rem)] max-w-[520px]
-                   bg-white rounded-2xl border border-[#E8EDF2] z-50 overflow-hidden"
+                   bg-white rounded-xl border border-[#E8EDF2] z-50 overflow-hidden"
         style={{ boxShadow: '0 20px 60px 0 rgba(15,23,42,0.16)' }}
       >
         {/* Input */}

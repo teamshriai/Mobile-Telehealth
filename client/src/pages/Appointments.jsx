@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Calendar,
@@ -56,7 +57,7 @@ const STATUS_FILTERS = [
 
 const TYPE_FILTERS = [
   { label: 'All Types',  value: 'all' },
-  { label: 'Oncology',   value: 'oncology' },
+  { label: 'Neurology',  value: 'neurology' },
   { label: 'Lab',        value: 'lab' },
   { label: 'Imaging',    value: 'imaging' },
   { label: 'Telehealth', value: 'telehealth' },
@@ -64,13 +65,26 @@ const TYPE_FILTERS = [
 ]
 
 export default function Appointments() {
+  const navigate = useNavigate()
+  const [appointments, setAppointments] = useState(mockAppointments)
   const [statusFilter,  setStatusFilter]  = useState('all')
   const [typeFilter,    setTypeFilter]    = useState('all')
   const [selectedAppt,  setSelectedAppt]  = useState(null)
   const [bookingOpen,   setBookingOpen]   = useState(false)
 
+  /** No real Appointments backend exists yet (mock-data module) — this
+   * updates local state honestly rather than pretending to call an API
+   * that isn't there. Reuses the 'cancelled' status the filters already
+   * anticipate. */
+  const handleCancelAppointment = (id) => {
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: 'cancelled' } : a)),
+    )
+    setSelectedAppt(null)
+  }
+
   /* ── Filter logic ── */
-  const filtered = mockAppointments.filter((a) => {
+  const filtered = appointments.filter((a) => {
     const matchStatus = statusFilter === 'all' || a.status === statusFilter
     const matchType   = typeFilter   === 'all' || a.type   === typeFilter
     return matchStatus && matchType
@@ -83,27 +97,27 @@ export default function Appointments() {
   const stats = [
     {
       label: 'Upcoming',
-      value: mockAppointments.filter((a) => a.status === 'upcoming').length,
+      value: appointments.filter((a) => a.status === 'upcoming').length,
       color: '#2563EB',
       bg:    '#EFF6FF',
     },
     {
       label: 'Completed',
-      value: mockAppointments.filter((a) => a.status === 'completed').length,
+      value: appointments.filter((a) => a.status === 'completed').length,
       color: '#16A34A',
       bg:    '#DCFCE7',
     },
     {
       label: 'This Month',
-      value: mockAppointments.filter((a) =>
+      value: appointments.filter((a) =>
         a.date.startsWith('2024-10') || a.date.startsWith('2024-11')
       ).length,
-      color: '#7C3AED',
-      bg:    '#EDE9FE',
+      color: '#64748B',
+      bg:    '#F1F5F9',
     },
     {
       label: 'Telehealth',
-      value: mockAppointments.filter((a) => a.mode === 'telehealth').length,
+      value: appointments.filter((a) => a.mode === 'telehealth').length,
       color: '#D97706',
       bg:    '#FEF3C7',
     },
@@ -117,7 +131,7 @@ export default function Appointments() {
       className="max-w-[1100px] mx-auto space-y-8"
     >
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <SectionTitle
           title="Appointments"
           subtitle="Manage your upcoming and past medical visits"
@@ -250,7 +264,7 @@ export default function Appointments() {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20 text-center"
           >
-            <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] border border-[#E8EDF2]
+            <div className="w-14 h-14 rounded-xl bg-[#F1F5F9] border border-[#E8EDF2]
                             flex items-center justify-center mb-4">
               <Calendar size={22} className="text-[#94A3B8]" />
             </div>
@@ -276,6 +290,8 @@ export default function Appointments() {
       <AppointmentDetailModal
         appointment={selectedAppt}
         onClose={() => setSelectedAppt(null)}
+        onCancel={handleCancelAppointment}
+        onJoinCall={() => navigate('/dashboard/meetings')}
       />
 
       {/* ── Book appointment modal ── */}
@@ -294,7 +310,7 @@ function NextAppointmentHero({ appointment, onClick }) {
   const apptDate  = new Date(appointment.date)
   const isToday   = apptDate.toDateString() === new Date().toDateString()
   const isTele    = appointment.mode === 'telehealth'
-  const typeMeta  = appointmentTypes[appointment.type] || appointmentTypes.oncology
+  const typeMeta  = appointmentTypes[appointment.type] || appointmentTypes.neurology
 
   /* Days until appointment */
   const daysUntil = Math.ceil(
@@ -307,33 +323,14 @@ function NextAppointmentHero({ appointment, onClick }) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       onClick={onClick}
-      className="relative rounded-3xl overflow-hidden cursor-pointer group"
-      style={{
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E3A8A 60%, #2563EB 100%)',
-      }}
+      className="relative rounded-xl overflow-hidden cursor-pointer group bg-slate-900 border border-slate-800"
     >
-      {/* Dot grid */}
-      <div
-        className="absolute inset-0 opacity-10"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }}
-      />
-
-      {/* Glow */}
-      <div
-        className="absolute -top-16 -right-16 w-64 h-64 rounded-full opacity-20 pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #60A5FA 0%, transparent 70%)' }}
-      />
-
-      <div className="relative z-10 p-8">
+      <div className="relative z-10 p-5 sm:p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
 
           {/* Left — date block */}
           <div className="flex items-center gap-5">
-            <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-white/15
+            <div className="flex-shrink-0 w-20 h-20 rounded-xl bg-white/15
                             border border-white/20 flex flex-col items-center
                             justify-center backdrop-blur-sm">
               <span className="text-white/70 text-xs font-semibold uppercase tracking-wider">
@@ -392,7 +389,7 @@ function NextAppointmentHero({ appointment, onClick }) {
 
             {/* Doctor */}
             <div
-              className="flex items-center gap-3 px-4 py-3 rounded-2xl
+              className="flex items-center gap-3 px-4 py-3 rounded-xl
                          backdrop-blur-sm"
               style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
@@ -410,7 +407,7 @@ function NextAppointmentHero({ appointment, onClick }) {
 
             {/* Location / mode */}
             <div
-              className="flex items-center gap-3 px-4 py-3 rounded-2xl
+              className="flex items-center gap-3 px-4 py-3 rounded-xl
                          backdrop-blur-sm"
               style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
@@ -421,7 +418,7 @@ function NextAppointmentHero({ appointment, onClick }) {
               )}
               <div>
                 <p className="text-white text-sm font-semibold">
-                  {isTele ? 'Video Call' : appointment.facility.split(',')[0]}
+                  {isTele ? 'Video Call' : (appointment.facility?.split(',')[0] ?? 'Location TBD')}
                 </p>
                 <p className="text-white/60 text-xs">
                   {isTele ? 'Online visit' : appointment.room || 'In-person'}
@@ -432,7 +429,7 @@ function NextAppointmentHero({ appointment, onClick }) {
             {/* Days away */}
             <div
               className="flex flex-col items-center justify-center px-5 py-3
-                         rounded-2xl backdrop-blur-sm"
+                         rounded-xl backdrop-blur-sm"
               style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               <span
@@ -470,7 +467,7 @@ function NextAppointmentHero({ appointment, onClick }) {
    APPOINTMENT ROW
 ───────────────────────────────────────────── */
 function AppointmentRow({ appointment, onClick, muted = false }) {
-  const typeMeta = appointmentTypes[appointment.type] || appointmentTypes.oncology
+  const typeMeta = appointmentTypes[appointment.type] || appointmentTypes.neurology
   const isTele   = appointment.mode === 'telehealth'
   const isUpcoming = appointment.status === 'upcoming'
 
@@ -485,7 +482,7 @@ function AppointmentRow({ appointment, onClick, muted = false }) {
       transition={{ duration: 0.2 }}
       onClick={onClick}
       className={`
-        flex items-center gap-4 p-4 rounded-2xl border cursor-pointer
+        flex items-center gap-4 p-4 rounded-xl border cursor-pointer
         transition-all duration-200 group
         ${muted
           ? 'bg-[#FAFBFC] border-[#E8EDF2] hover:bg-white hover:border-[#BFDBFE]'
@@ -496,7 +493,7 @@ function AppointmentRow({ appointment, onClick, muted = false }) {
       {/* Date block */}
       <div
         className={`
-          flex-shrink-0 w-14 h-14 rounded-2xl flex flex-col items-center
+          flex-shrink-0 w-14 h-14 rounded-xl flex flex-col items-center
           justify-center border
           ${isUpcoming
             ? 'bg-[#EFF6FF] border-[#BFDBFE]'
@@ -537,7 +534,7 @@ function AppointmentRow({ appointment, onClick, muted = false }) {
             {isUpcoming ? 'Upcoming' : 'Completed'}
           </StatusBadge>
           {isTele && (
-            <StatusBadge variant="purple" size="xs">
+            <StatusBadge variant="info" size="xs">
               Telehealth
             </StatusBadge>
           )}
@@ -568,7 +565,7 @@ function AppointmentRow({ appointment, onClick, muted = false }) {
               : <MapPin size={11} className="text-[#94A3B8]" />
             }
             <span className="text-xs text-[#94A3B8] truncate max-w-[140px]">
-              {isTele ? 'Video consultation' : appointment.facility.split(',')[0]}
+              {isTele ? 'Video consultation' : (appointment.facility?.split(',')[0] ?? 'Location TBD')}
             </span>
           </div>
         </div>
@@ -587,10 +584,10 @@ function AppointmentRow({ appointment, onClick, muted = false }) {
 /* ─────────────────────────────────────────────
    APPOINTMENT DETAIL MODAL
 ───────────────────────────────────────────── */
-function AppointmentDetailModal({ appointment, onClose }) {
+function AppointmentDetailModal({ appointment, onClose, onCancel, onJoinCall }) {
   if (!appointment) return null
 
-  const typeMeta  = appointmentTypes[appointment.type] || appointmentTypes.oncology
+  const typeMeta  = appointmentTypes[appointment.type] || appointmentTypes.neurology
   const isTele    = appointment.mode === 'telehealth'
   const isUpcoming = appointment.status === 'upcoming'
 
@@ -616,6 +613,7 @@ function AppointmentDetailModal({ appointment, onClose }) {
               variant="primary"
               size="sm"
               icon={<Video size={13} />}
+              onClick={onJoinCall}
             >
               Join Video Call
             </Button>
@@ -625,6 +623,7 @@ function AppointmentDetailModal({ appointment, onClose }) {
               variant="danger"
               size="sm"
               icon={<X size={13} />}
+              onClick={() => onCancel(appointment.id)}
             >
               Cancel Appointment
             </Button>
@@ -636,11 +635,10 @@ function AppointmentDetailModal({ appointment, onClose }) {
 
         {/* Date + time hero */}
         <div
-          className="rounded-2xl p-5"
-          style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)' }}
+          className="rounded-xl p-5 bg-[#EFF6FF] border border-[#DBEAFE]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#2563EB] flex flex-col
+            <div className="w-14 h-14 rounded-xl bg-[#2563EB] flex flex-col
                             items-center justify-center flex-shrink-0">
               <span className="text-white/70 text-[9px] font-bold uppercase tracking-wider">
                 {apptDate.toLocaleDateString('en-US', { month: 'short' })}
@@ -692,13 +690,13 @@ function AppointmentDetailModal({ appointment, onClose }) {
           {/* Location */}
           <DetailBlock
             icon={isTele
-              ? <Video size={14} className="text-[#7C3AED]" />
+              ? <Video size={14} className="text-[#0284C7]" />
               : <MapPin size={14} className="text-[#64748B]" />
             }
             label={isTele ? 'Visit Mode' : 'Location'}
             value={isTele ? 'Video Consultation' : appointment.facility}
             sub={isTele ? 'Online via MyChart' : appointment.room}
-            bg={isTele ? '#EDE9FE' : '#F1F5F9'}
+            bg={isTele ? '#E0F2FE' : '#F1F5F9'}
           />
 
           {/* Appointment type */}
@@ -715,14 +713,13 @@ function AppointmentDetailModal({ appointment, onClose }) {
             icon={<FileText size={14} className="text-[#94A3B8]" />}
             label="Appointment ID"
             value={appointment.id}
-            sub="Reference number"
             bg="#F1F5F9"
           />
         </div>
 
         {/* Instructions */}
         {appointment.instructions && (
-          <div className="bg-[#F8FAFC] border border-[#E8EDF2] rounded-2xl p-4">
+          <div className="bg-[#F8FAFC] border border-[#E8EDF2] rounded-xl p-4">
             <p className="text-[10px] font-bold text-[#94A3B8] uppercase
                           tracking-widest mb-2">
               Clinical Instructions
@@ -735,7 +732,7 @@ function AppointmentDetailModal({ appointment, onClose }) {
 
         {/* Preparation notes */}
         {appointment.notes && (
-          <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl p-4">
+          <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl p-4">
             <p className="text-[10px] font-bold text-[#92400E] uppercase
                           tracking-widest mb-2">
               Preparation Notes
@@ -748,26 +745,24 @@ function AppointmentDetailModal({ appointment, onClose }) {
 
         {/* Telehealth join */}
         {isTele && appointment.telehealth && isUpcoming && (
-          <div
-            className="rounded-2xl p-4 flex items-center gap-4"
-            style={{ background: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)' }}
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#7C3AED] flex items-center
+          <div className="rounded-xl p-4 flex items-center gap-4 bg-[#EFF6FF] border border-[#DBEAFE]">
+            <div className="w-10 h-10 rounded-xl bg-[#2563EB] flex items-center
                             justify-center flex-shrink-0">
               <Video size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#4C1D95]">
+              <p className="text-sm font-bold text-[#1E3A8A]">
                 Video Call Ready
               </p>
-              <p className="text-xs text-[#6D28D9]">
+              <p className="text-xs text-[#2563EB]">
                 {appointment.telehealth.platform}
               </p>
             </div>
             <button
+              onClick={onJoinCall}
               className="flex items-center gap-2 px-4 py-2 rounded-xl
-                         bg-[#7C3AED] text-white text-xs font-semibold
-                         hover:bg-[#6D28D9] transition-colors"
+                         bg-[#2563EB] text-white text-xs font-semibold
+                         hover:bg-[#1D4ED8] transition-colors"
             >
               <ExternalLink size={12} />
               Join Now
@@ -902,11 +897,11 @@ function BookingModal({ isOpen, onClose }) {
                          focus:ring-4 focus:ring-[#2563EB]/10"
             >
               <option value="">Select physician...</option>
-              <option>Dr. Priya Nair — Medical Oncology</option>
-              <option>Dr. James Okafor — Radiation Oncology</option>
+              <option>Dr. Priya Nair — Vascular Neurology</option>
+              <option>Dr. James Okafor — Interventional Neurology</option>
               <option>Dr. Sarah Chen — Pulmonology</option>
               <option>Dr. Rajan Mehta — Radiology</option>
-              <option>Meera Pillai, NP — Oncology Nursing</option>
+              <option>Meera Pillai, NP — Neuro Rehabilitation</option>
             </select>
           </BookingField>
 
@@ -995,18 +990,12 @@ function BookingModal({ isOpen, onClose }) {
 /* ─────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────── */
-function ApptStat({ label, value, color, bg }) {
+function ApptStat({ label, value, color }) {
   return (
     <div
-      className="bg-white rounded-2xl border border-[#E8EDF2] p-4"
+      className="bg-white rounded-xl border border-[#E8EDF2] p-4"
       style={{ boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)' }}
     >
-      <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
-        style={{ backgroundColor: bg }}
-      >
-        <Calendar size={15} style={{ color }} />
-      </div>
       <p
         className="text-2xl font-bold leading-none mb-1"
         style={{
@@ -1025,7 +1014,7 @@ function ApptStat({ label, value, color, bg }) {
 function DetailBlock({ icon, label, value, sub, bg }) {
   return (
     <div
-      className="flex items-start gap-3 p-4 rounded-2xl border border-[#E8EDF2]"
+      className="flex items-start gap-3 p-4 rounded-xl border border-[#E8EDF2]"
       style={{ backgroundColor: bg }}
     >
       <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center

@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { mockPatient } from '../data/mockPatients.js'
 import OverviewCards from '../components/dashboard/OverviewCards.jsx'
 import LiquidBiopsyCard from '../components/dashboard/LiquidBiopsyCard.jsx'
@@ -7,6 +6,8 @@ import RecentReports from '../components/dashboard/RecentReports.jsx'
 import TreatmentProgress from '../components/dashboard/TreatmentProgress.jsx'
 import PatientVitals from '../components/dashboard/PatientVitals.jsx'
 import AppointmentCard from '../components/dashboard/AppointmentCard.jsx'
+import EmergencyAlert from '../components/dashboard/EmergencyAlert.jsx'
+import SpokeRail from '../components/dashboard/SpokeRail.jsx'
 import { mockAppointments } from '../data/mockAppointments.js'
 import { FileText, Calendar, CheckCircle } from 'lucide-react'
 
@@ -25,26 +26,30 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] space-y-6">
-      {/* Clean Professional Hero Header */}
-      <HeroGreeting
-        greeting={greeting}
-        firstName={firstName}
-        patient={patient}
-      />
+    <div className="w-full space-y-5">
+      {/* Hero + hub-and-spoke nav are one visual group */}
+      <div className="space-y-3">
+        <HeroGreeting
+          greeting={greeting}
+          firstName={firstName}
+        />
+        <SpokeRail />
+      </div>
 
       {/* Primary Key Metric Cards */}
       <OverviewCards patient={patient} />
 
-      {/* Main Content Layout Grid */}
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {/* Main Content Layout Grid — two columns from lg: up, so the
+          collapsed-sidebar/1024-1280px range doesn't fall back to a single
+          narrow column with the rest of the viewport sitting empty. */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
           <LiquidBiopsyCard />
           <TreatmentProgress patient={patient} />
           <RecentReports />
         </div>
 
-        <aside className="min-w-0 space-y-6 xl:sticky xl:top-6">
+        <aside className="min-w-0 space-y-6 lg:sticky lg:top-6">
           <AppointmentCard appointment={nextAppointment} />
           <PatientVitals vitals={patient.vitals} />
           <QuickActions />
@@ -57,35 +62,31 @@ export default function Dashboard() {
   )
 }
 
-function HeroGreeting({ greeting, firstName, patient }) {
+function HeroGreeting({ greeting, firstName }) {
   return (
-    <div className="rounded-xl bg-slate-900 border border-slate-800 p-6 text-white">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="space-y-2">
+    <div
+      className="relative overflow-hidden rounded-xl border border-slate-800 p-6 text-white"
+      style={{
+        background: 'radial-gradient(900px circle at 100% -10%, rgba(59,130,246,0.28), transparent 55%), #0B1220',
+      }}
+    >
+      <div className="relative flex flex-col lg:flex-row lg:items-center gap-6">
+        <div className="space-y-2 lg:flex-1">
           <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
             {greeting}, {firstName}
           </span>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            Patient Telehealth Overview
+            AI Powered Command Centre
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
-            Welcome to your healthcare portal. Manage your upcoming consultations, health records, and treatment updates easily in one place.
+            Your recovery, care team, and appointments in one place — with emergency stroke response one tap away.
           </p>
         </div>
 
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-          <div className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-left min-w-[140px]">
-            <span className="block text-[10px] uppercase font-semibold text-slate-400">Treatment Plan</span>
-            <span className="text-base font-bold text-white mt-0.5 block">Cycle {patient.treatment.cycle} / 18</span>
-            <span className="text-[11px] text-emerald-400 font-medium">On Schedule</span>
-          </div>
+        {/* Divider unifies the greeting and the alert action as one panel */}
+        <div className="hidden lg:block h-16 w-px bg-white/10 flex-shrink-0" />
 
-          <div className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700 text-left min-w-[140px]">
-            <span className="block text-[10px] uppercase font-semibold text-slate-400">Next Doctor Visit</span>
-            <span className="text-base font-bold text-white mt-0.5 block">Oct 28, 2024</span>
-            <span className="text-[11px] text-blue-400 font-medium">Dr. Priya Nair</span>
-          </div>
-        </div>
+        <EmergencyAlert />
       </div>
     </div>
   )
@@ -111,9 +112,9 @@ function PatientHealthSummary({ patient }) {
             Key Clinical Points
           </p>
           <ul className="space-y-1 text-gray-600 list-disc list-inside">
-            <li>ctDNA levels reduced by 47% from peak</li>
-            <li>No secondary resistance mutations detected</li>
-            <li>Vital signs remain stable</li>
+            <li>NIHSS score improved from 8 to 3 since admission</li>
+            <li>No hemorrhagic transformation on follow-up CT</li>
+            <li>Blood pressure remains within target range</li>
           </ul>
         </div>
 
@@ -123,9 +124,9 @@ function PatientHealthSummary({ patient }) {
             Upcoming Activities
           </p>
           <ul className="space-y-1 text-gray-600 list-disc list-inside">
-            <li>Oct 28: Oncology Follow-up with Dr. Nair</li>
-            <li>Nov 07: Cycle 13 Blood Collection</li>
-            <li>Nov 15: Treatment Response Review</li>
+            <li>Oct 28: Neurology Follow-up with Dr. Nair</li>
+            <li>Nov 07: Speech Therapy Session</li>
+            <li>Nov 15: Repeat Carotid Doppler Ultrasound</li>
           </ul>
         </div>
 
@@ -135,7 +136,7 @@ function PatientHealthSummary({ patient }) {
             Care Team Instructions
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Continue Osimertinib 80mg daily. Hydrate freely and bring updated symptom log to your next appointment.
+            Continue Clopidogrel 75mg and Atorvastatin 40mg daily. Attend all scheduled rehabilitation sessions and monitor blood pressure twice daily.
           </p>
         </div>
       </div>

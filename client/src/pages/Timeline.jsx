@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { mockTimeline, timelineTypes } from '../data/mockTimeline.js'
 import {
-  Filter,
   Search,
   Calendar,
   ChevronDown,
@@ -10,13 +9,15 @@ import {
   Paperclip,
   User,
   MapPin,
-  Dna,
+  Zap,
+  Ambulance,
+  Building2,
   FlaskConical,
   Stethoscope,
   Image,
   Pill,
-  Microscope,
-  Sparkles,
+  Dumbbell,
+  Brain,
   Star,
   Activity,
 } from 'lucide-react'
@@ -35,29 +36,31 @@ const pageVariants = {
 
 /* ── Map event type → icon ── */
 const TYPE_ICONS = {
-  diagnosis:     Activity,
-  biopsy:        Microscope,
+  onset:         Zap,
+  ems:           Ambulance,
+  admission:     Building2,
   imaging:       Image,
   treatment:     Pill,
-  liquid_biopsy: FlaskConical,
-  genomics:      Dna,
+  rehab:         Dumbbell,
   appointment:   Stethoscope,
   lab:           FlaskConical,
   milestone:     Star,
-  ai_prediction: Sparkles,
+  ai_prediction: Brain,
 }
 
 /* ── Filter options ── */
 const FILTERS = [
   { label: 'All Events',     value: 'all' },
-  { label: 'Liquid Biopsy', value: 'liquid_biopsy' },
-  { label: 'Imaging',       value: 'imaging' },
-  { label: 'Genomics',      value: 'genomics' },
-  { label: 'Appointments',  value: 'appointment' },
-  { label: 'Treatment',     value: 'treatment' },
-  { label: 'Lab Results',   value: 'lab' },
-  { label: 'Milestones',    value: 'milestone' },
-  { label: 'AI Analysis',   value: 'ai_prediction' },
+  { label: 'Symptom Onset',  value: 'onset' },
+  { label: 'EMS Response',   value: 'ems' },
+  { label: 'Admission',      value: 'admission' },
+  { label: 'Imaging',        value: 'imaging' },
+  { label: 'Treatment',      value: 'treatment' },
+  { label: 'Rehabilitation', value: 'rehab' },
+  { label: 'Appointments',   value: 'appointment' },
+  { label: 'Lab Results',    value: 'lab' },
+  { label: 'Milestones',     value: 'milestone' },
+  { label: 'AI Detection',   value: 'ai_prediction' },
 ]
 
 /* ── Badge variant map ── */
@@ -104,42 +107,35 @@ export default function Timeline() {
       <div className="mb-8">
         <SectionTitle
           title="Medical Timeline"
-          subtitle="Your complete oncology journey — chronologically ordered"
+          subtitle="Your complete stroke care journey — chronologically ordered"
           size="xl"
         />
 
         {/* Stats strip */}
         <div className="flex flex-wrap gap-4 mt-5">
           <TimelineStat label="Total Events"   value={mockTimeline.length} />
-          <TimelineStat label="Liquid Biopsies" value={mockTimeline.filter(e => e.type === 'liquid_biopsy').length} />
+          <TimelineStat label="Care Milestones" value={mockTimeline.filter(e => e.type === 'milestone').length} />
           <TimelineStat label="Imaging Studies" value={mockTimeline.filter(e => e.type === 'imaging').length} />
           <TimelineStat label="Months Active"   value="13+" />
         </div>
       </div>
 
-      {/* ── Search + filter bar ── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <SearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Search events, doctors, findings..."
-          className="flex-1"
-        />
-        <FilterDropdown
-          filters={FILTERS}
-          active={activeFilter}
-          onChange={setActiveFilter}
-        />
-      </div>
+      {/* ── Search bar ── */}
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search events, doctors, findings..."
+        className="mb-4"
+      />
 
-      {/* ── Filter pill strip ── */}
-      <div className="flex gap-2 flex-wrap mb-8">
+      {/* ── Filter pill strip (horizontally scrollable — avoids wrapping into many rows) ── */}
+      <div className="flex gap-2 flex-nowrap overflow-x-auto scrollbar-hide mb-8 pb-1 -mx-1 px-1">
         {FILTERS.map((f) => (
           <button
             key={f.value}
             onClick={() => setActiveFilter(f.value)}
             className={`
-              px-3 py-1.5 rounded-full text-xs font-semibold
+              flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold
               border transition-all duration-200
               ${activeFilter === f.value
                 ? 'bg-[#2563EB] text-white border-[#2563EB]'
@@ -183,7 +179,7 @@ export default function Timeline() {
               animate={{ opacity: 1 }}
               className="flex flex-col items-center justify-center py-20 text-center"
             >
-              <div className="w-14 h-14 rounded-2xl bg-[#F1F5F9] border border-[#E8EDF2]
+              <div className="w-14 h-14 rounded-xl bg-[#F1F5F9] border border-[#E8EDF2]
                               flex items-center justify-center mb-4">
                 <Calendar size={22} className="text-[#94A3B8]" />
               </div>
@@ -230,7 +226,7 @@ function TimelineEvent({ event, index, isExpanded, onToggle, isLast }) {
         <motion.div
           whileHover={{ scale: 1.1 }}
           transition={{ duration: 0.2 }}
-          className="w-11 h-11 rounded-2xl flex items-center justify-center
+          className="w-11 h-11 rounded-xl flex items-center justify-center
                      border-2 border-white flex-shrink-0"
           style={{
             backgroundColor: typeMeta.bg,
@@ -255,7 +251,7 @@ function TimelineEvent({ event, index, isExpanded, onToggle, isLast }) {
         {/* Card */}
         <motion.div
           layout
-          className="bg-white rounded-2xl border border-[#E8EDF2] overflow-hidden
+          className="bg-white rounded-xl border border-[#E8EDF2] overflow-hidden
                      transition-shadow duration-200 hover:shadow-[0_4px_24px_0_rgba(15,23,42,0.08)]"
           style={{
             boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04), 0 4px 16px 0 rgba(15,23,42,0.06)',
@@ -297,6 +293,9 @@ function TimelineEvent({ event, index, isExpanded, onToggle, isLast }) {
 
               {/* Expand toggle */}
               <button
+                type="button"
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                 className="w-7 h-7 rounded-xl bg-[#F1F5F9] flex items-center
                            justify-center text-[#64748B] hover:bg-[#E8EDF2]
                            transition-colors flex-shrink-0 mt-0.5"
@@ -400,32 +399,14 @@ function TimelineEvent({ event, index, isExpanded, onToggle, isLast }) {
 /* ── Result chip ── */
 function ResultChip({ label, value }) {
   const labelMap = {
-    ctDNA:        'ctDNA Result',
-    trend:        'Trend',
-    keyFind:      'Key Finding',
-    ecog:         'ECOG Status',
-    weight:       'Weight',
-    tumorSize:    'Tumor Size',
-    nodes:        'Lymph Nodes',
-    stage:        'Stage',
-    primary:      'Primary Lesion',
-    hgb:          'Hemoglobin',
-    alt:          'ALT',
-    driver:       'Driver Mutation',
-    coAlt:        'Co-alteration',
-    tmb:          'TMB',
-    drug:         'Drug',
-    basis:        'Evidence Basis',
-    recist:       'RECIST Response',
-    change:       'Change',
-    path:         'Pathology',
-    ihc:          'IHC Profile',
-    responseProb: 'Response Probability',
-    resistance:   'Resistance',
-    impression:   'Impression',
-    plan:         'Action Plan',
-    finding:      'Finding',
-    action:       'Action',
+    nihss:            'NIHSS Score',
+    onsetToTreatment: 'Onset-to-Treatment Time',
+    occlusionSite:    'Occlusion Site',
+    treatmentGiven:   'Treatment Given',
+    mRS:              'Modified Rankin Scale',
+    imagingFinding:   'Imaging Finding',
+    bloodPressure:    'Blood Pressure',
+    keyFind:          'Key Finding',
   }
 
   return (
@@ -480,66 +461,6 @@ function TimelineStat({ label, value }) {
         {value}
       </span>
       <span className="text-xs text-[#64748B] font-medium">{label}</span>
-    </div>
-  )
-}
-
-/* ── Filter dropdown ── */
-function FilterDropdown({ filters, active, onChange }) {
-  const [open, setOpen] = useState(false)
-  const current = filters.find((f) => f.value === active)
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl
-                   bg-white border border-[#E8EDF2] text-sm font-medium
-                   text-[#64748B] hover:border-[#94A3B8] transition-colors
-                   whitespace-nowrap"
-      >
-        <Filter size={14} />
-        {current?.label}
-        <ChevronDown
-          size={13}
-          className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.96 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute right-0 top-12 w-52 bg-white rounded-2xl
-                         border border-[#E8EDF2] z-20 overflow-hidden py-1"
-              style={{ boxShadow: '0 8px 30px 0 rgba(15,23,42,0.12)' }}
-            >
-              {filters.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => { onChange(f.value); setOpen(false) }}
-                  className={`w-full text-left px-4 py-2.5 text-sm font-medium
-                               transition-colors duration-150
-                               ${f.value === active
-                                 ? 'bg-[#EFF6FF] text-[#2563EB]'
-                                 : 'text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]'
-                               }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   )
 }

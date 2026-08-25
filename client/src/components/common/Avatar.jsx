@@ -52,7 +52,7 @@ export default function Avatar({
     ? 'rounded-full'
     : rounded === 'xl'
     ? 'rounded-xl'
-    : 'rounded-2xl'
+    : 'rounded-xl'
 
   return (
     <div className={`relative inline-flex flex-shrink-0 ${className}`}>

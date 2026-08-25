@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Dna,
+  Brain,
   FlaskConical,
   TrendingDown,
   Activity,
@@ -44,7 +44,7 @@ const pageVariants = {
 function ChartTooltip({ active, payload, label, unit = '' }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-[#E8EDF2] rounded-2xl p-3 shadow-lg">
+    <div className="bg-white border border-[#E8EDF2] rounded-xl p-3 shadow-lg">
       <p className="text-xs font-semibold text-[#0F172A] mb-1">{label}</p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2">
@@ -63,10 +63,10 @@ export default function MedicalRecords() {
   const patient = mockPatient
 
   const tabs = [
-    { id: 'genomics',   label: 'Genomic Profile',  icon: Dna },
-    { id: 'ctdna',      label: 'ctDNA Trends',     icon: FlaskConical },
-    { id: 'tumor',      label: 'Tumor Response',   icon: TrendingDown },
-    { id: 'biomarkers', label: 'Lab Biomarkers',   icon: Activity },
+    { id: 'genomics',   label: 'Imaging & Scans',    icon: Brain },
+    { id: 'ctdna',      label: 'NIHSS Score Trend',  icon: Activity },
+    { id: 'tumor',      label: 'Recovery Progress',  icon: TrendingDown },
+    { id: 'biomarkers', label: 'Lab & Vitals',       icon: FlaskConical },
   ]
 
   return (
@@ -77,41 +77,39 @@ export default function MedicalRecords() {
       className="max-w-[1100px] mx-auto space-y-7"
     >
       {/* ── Page header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <SectionTitle
-          title="Health Records"
-          subtitle="A clear view of your records, results, and specialist information"
-          size="xl"
-        />
-      </div>
+      <SectionTitle
+        title="Health Records"
+        subtitle="A clear view of your records, results, and specialist information"
+        size="xl"
+      />
 
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           {
-            label: 'Targetable Mutations',
+            label: 'Actionable Findings',
             value: mockMutations.filter(m => m.targetable).length,
             color: '#D97706', bg: '#FEF3C7',
           },
           {
-            label: 'Total Genes Tested',
+            label: 'Imaging Studies',
             value: mockMutations.length,
             color: '#2563EB', bg: '#EFF6FF',
           },
           {
-            label: 'Current ctDNA',
-            value: `${patient.ctDNA.current}%`,
+            label: 'Current NIHSS',
+            value: `${patient.ctDNA.current}`,
             color: '#16A34A', bg: '#DCFCE7',
           },
           {
-            label: 'Tumor Reduction',
-            value: '38%',
+            label: 'mRS Improvement',
+            value: '4 → 1',
             color: '#7C3AED', bg: '#EDE9FE',
           },
         ].map((stat) => (
           <div
             key={stat.label}
-            className="bg-white rounded-2xl border border-[#E8EDF2] p-4"
+            className="bg-white rounded-xl border border-[#E8EDF2] p-4"
             style={{ boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)' }}
           >
             <p
@@ -187,47 +185,49 @@ function GenomicsTab({ mutations }) {
       {/* Summary rings */}
       <Card variant="default" padding="lg">
         <SectionTitle
-          title="Genomic Summary"
-          subtitle="FoundationOne CDx — Comprehensive Genomic Profile — Feb 2024"
+          title="Imaging Summary"
+          subtitle="CT Angiogram — Brain & Neck — Feb 2024"
           className="mb-6"
         />
         <div className="flex flex-wrap gap-8 items-center">
-          <ProgressRing
-            value={2}
-            max={7}
-            size={90}
-            strokeWidth={7}
-            color="#D97706"
-            label="Targetable"
-            sublabel="mutations"
-            fontSize="text-2xl"
-          />
-          <ProgressRing
-            value={3}
-            max={7}
-            size={90}
-            strokeWidth={7}
-            color="#DC2626"
-            label="Detected"
-            sublabel="variants"
-            fontSize="text-2xl"
-          />
-          <ProgressRing
-            value={4}
-            max={4}
-            size={90}
-            strokeWidth={7}
-            color="#16A34A"
-            label="Mut/Mb"
-            sublabel="TMB (Low)"
-            fontSize="text-2xl"
-          />
+          <div className="flex flex-wrap gap-8 justify-around w-full sm:w-auto sm:justify-start">
+            <ProgressRing
+              value={2}
+              max={7}
+              size={90}
+              strokeWidth={7}
+              color="#D97706"
+              label="Actionable"
+              sublabel="findings"
+              fontSize="text-2xl"
+            />
+            <ProgressRing
+              value={3}
+              max={7}
+              size={90}
+              strokeWidth={7}
+              color="#DC2626"
+              label="Detected"
+              sublabel="findings"
+              fontSize="text-2xl"
+            />
+            <ProgressRing
+              value={8}
+              max={10}
+              size={90}
+              strokeWidth={7}
+              color="#16A34A"
+              label="ASPECTS"
+              sublabel="Score (Favorable)"
+              fontSize="text-2xl"
+            />
+          </div>
           <div className="flex-1 min-w-[200px] space-y-3">
             {[
-              { label: 'Microsatellite Status', value: 'MSS (Stable)',      color: '#16A34A' },
-              { label: 'Tumor Mutational Burden',value: '4 Mut/Mb — Low',  color: '#16A34A' },
-              { label: 'PD-L1 Expression',       value: 'TPS 65% — High',  color: '#0EA5E9' },
-              { label: 'Report Version',          value: 'FoundationOne CDx v3.2', color: '#64748B' },
+              { label: 'Occlusion Site',           value: 'Left MCA — M1 segment',        color: '#DC2626' },
+              { label: 'Hemorrhagic Transformation',value: 'None Identified',              color: '#16A34A' },
+              { label: 'Collateral Circulation',    value: 'Good — Grade 3',               color: '#0EA5E9' },
+              { label: 'Imaging Protocol',          value: 'Stroke CTA/CTP Protocol v2.1', color: '#64748B' },
             ].map(({ label, value, color }) => (
               <div key={label} className="flex items-center justify-between">
                 <p className="text-xs text-[#64748B]">{label}</p>
@@ -241,8 +241,8 @@ function GenomicsTab({ mutations }) {
       {/* Detected mutations */}
       <Card variant="default" padding="lg">
         <SectionTitle
-          title="Detected Variants"
-          subtitle={`${detected.length} variants detected across ${detected.length} genes`}
+          title="Positive Findings"
+          subtitle={`${detected.length} findings identified across ${mutations.length} imaging studies`}
           className="mb-5"
         />
         <div className="space-y-3">
@@ -264,7 +264,7 @@ function GenomicsTab({ mutations }) {
       <Card variant="ghost" padding="lg">
         <SectionTitle
           title="Not Detected"
-          subtitle="Genes tested with no pathogenic variants found"
+          subtitle="Additional studies reviewed with no abnormal findings"
           className="mb-4"
         />
         <div className="flex flex-wrap gap-2">
@@ -288,8 +288,8 @@ function GenomicsTab({ mutations }) {
 /* ── Mutation row with expand ── */
 function MutationRow({ mutation, index, isExpanded, onToggle }) {
   const tierColors = {
-    'I':   { bg: '#FEE2E2', color: '#DC2626', label: 'Tier I' },
-    'II':  { bg: '#FEF3C7', color: '#D97706', label: 'Tier II' },
+    'I':   { bg: '#FEE2E2', color: '#DC2626', label: 'Critical' },
+    'II':  { bg: '#FEF3C7', color: '#D97706', label: 'Moderate' },
     'N/A': { bg: '#F1F5F9', color: '#94A3B8', label: 'N/A' },
   }
   const tier = tierColors[mutation.tier] || tierColors['N/A']
@@ -300,7 +300,7 @@ function MutationRow({ mutation, index, isExpanded, onToggle }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.07, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-2xl border border-[#E8EDF2] overflow-hidden bg-white"
+      className="rounded-xl border border-[#E8EDF2] overflow-hidden bg-white"
     >
       {/* Header row */}
       <div
@@ -312,7 +312,7 @@ function MutationRow({ mutation, index, isExpanded, onToggle }) {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-[#FEE2E2] flex items-center
                           justify-center flex-shrink-0">
-            <Dna size={16} className="text-[#DC2626]" />
+            <Brain size={16} className="text-[#DC2626]" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -324,10 +324,10 @@ function MutationRow({ mutation, index, isExpanded, onToggle }) {
                 {tier.label}
               </span>
               {mutation.targetable && (
-                <StatusBadge variant="warning" size="xs">Targetable</StatusBadge>
+                <StatusBadge variant="warning" size="xs">Actionable</StatusBadge>
               )}
               {mutation.clinicalTrial && (
-                <StatusBadge variant="info" size="xs">Trial Available</StatusBadge>
+                <StatusBadge variant="info" size="xs">Trial Eligible</StatusBadge>
               )}
             </div>
             <p className="text-xs text-[#64748B] truncate mt-0.5">
@@ -336,10 +336,10 @@ function MutationRow({ mutation, index, isExpanded, onToggle }) {
           </div>
         </div>
 
-        {/* VAF */}
+        {/* Confidence */}
         {mutation.vaf > 0 && (
           <div className="text-right flex-shrink-0">
-            <p className="text-[10px] text-[#94A3B8] font-medium">VAF</p>
+            <p className="text-[10px] text-[#94A3B8] font-medium">Confidence</p>
             <p className="text-sm font-bold text-[#0F172A]">
               {(mutation.vaf * 100).toFixed(0)}%
             </p>
@@ -378,14 +378,14 @@ function MutationRow({ mutation, index, isExpanded, onToggle }) {
             <div className="px-4 pb-4 border-t border-[#F1F5F9]">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                 {[
-                  { label: 'Variant Type',     value: mutation.type },
-                  { label: 'Classification',   value: mutation.classification },
-                  { label: 'Chromosome',       value: mutation.chromosome },
-                  { label: 'Coverage Depth',   value: `${mutation.coverage}x` },
-                  { label: 'VAF',              value: mutation.vaf > 0 ? `${(mutation.vaf * 100).toFixed(0)}%` : 'N/A' },
-                  { label: 'Significance',     value: mutation.significance },
-                  { label: 'Targeted Therapy', value: mutation.therapy || 'None' },
-                  { label: 'Clinical Trial',   value: mutation.clinicalTrial ? 'Available' : 'None' },
+                  { label: 'Finding Type',        value: mutation.type },
+                  { label: 'Classification',      value: mutation.classification },
+                  { label: 'Location',            value: mutation.chromosome },
+                  { label: 'Images Analyzed',     value: `${mutation.coverage} slices` },
+                  { label: 'Confidence',          value: mutation.vaf > 0 ? `${(mutation.vaf * 100).toFixed(0)}%` : 'N/A' },
+                  { label: 'Significance',        value: mutation.significance },
+                  { label: 'Recommended Treatment',value: mutation.therapy || 'None' },
+                  { label: 'Trial Eligibility',   value: mutation.clinicalTrial ? 'Eligible' : 'None' },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-[#F8FAFC] border border-[#E8EDF2] rounded-xl p-3">
                     <p className="text-[10px] font-semibold text-[#94A3B8]
@@ -414,18 +414,18 @@ function CtDNATab({ data }) {
     <div className="space-y-5">
       <Card variant="default" padding="lg">
         <SectionTitle
-          title="ctDNA Trend (MAF %)"
-          subtitle="Circulating tumor DNA — Mutant Allele Frequency over treatment cycles"
+          title="NIHSS Score Trend"
+          subtitle="National Institutes of Health Stroke Scale — assessed at each care milestone"
           className="mb-6"
         />
 
         {/* Summary pills */}
         <div className="flex flex-wrap gap-3 mb-6">
           {[
-            { label: 'Peak ctDNA',    value: '0.82%', color: '#DC2626', bg: '#FEE2E2' },
-            { label: 'Current ctDNA', value: '0.18%', color: '#16A34A', bg: '#DCFCE7' },
-            { label: 'Total Reduction', value: '78%', color: '#2563EB', bg: '#EFF6FF' },
-            { label: 'Trend',          value: 'Decreasing', color: '#16A34A', bg: '#DCFCE7' },
+            { label: 'Peak NIHSS (at onset)', value: '15', color: '#DC2626', bg: '#FEE2E2' },
+            { label: 'Current NIHSS',         value: '3',  color: '#16A34A', bg: '#DCFCE7' },
+            { label: 'Total Improvement',     value: '80%', color: '#2563EB', bg: '#EFF6FF' },
+            { label: 'Trend',                 value: 'Decreasing', color: '#16A34A', bg: '#DCFCE7' },
           ].map((item) => (
             <div
               key={item.label}
@@ -453,8 +453,8 @@ function CtDNATab({ data }) {
               axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }}
               axisLine={false} tickLine={false}
-              tickFormatter={(v) => `${v}%`} />
-            <Tooltip content={<ChartTooltip unit="% MAF" />} />
+              tickFormatter={(v) => `${v}`} />
+            <Tooltip content={<ChartTooltip />} />
             <Area
               type="monotone" dataKey="value"
               stroke="#2563EB" strokeWidth={2.5}
@@ -471,7 +471,7 @@ function CtDNATab({ data }) {
             <div key={d.month} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-[#2563EB]" />
               <span className="text-[10px] text-[#94A3B8]">
-                {d.month}: <span className="font-bold text-[#0F172A]">{d.value}%</span>
+                {d.month}: <span className="font-bold text-[#0F172A]">{d.value}</span>
               </span>
             </div>
           ))}
@@ -484,12 +484,12 @@ function CtDNATab({ data }) {
           <CheckCircle size={18} className="text-[#16A34A] flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-bold text-[#0F172A]">
-              No Resistance Mutations Detected
+              No New Neurological Deficits
             </p>
             <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
-              Serial ctDNA monitoring shows no emergence of T790M or C797S
-              resistance mutations to Osimertinib as of Cycle 12. Continued
-              monitoring at each cycle is recommended.
+              Serial NIHSS assessments show steady neurological improvement
+              with no new deficits or complications since admission. Continued
+              monitoring at each follow-up visit is recommended.
             </p>
           </div>
         </div>
@@ -506,24 +506,21 @@ function TumorTab({ data }) {
     <div className="space-y-5">
       <Card variant="default" padding="lg">
         <SectionTitle
-          title="Tumor Size Response"
-          subtitle="Right upper lobe primary lesion — longest diameter (cm)"
+          title="Modified Rankin Scale (mRS)"
+          subtitle="Functional independence over time — lower score indicates greater independence"
           className="mb-6"
         />
 
-        {/* RECIST banner */}
-        <div
-          className="rounded-2xl p-4 mb-6"
-          style={{ background: 'linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%)' }}
-        >
+        {/* Recovery banner */}
+        <div className="rounded-xl p-4 mb-6 bg-[#DCFCE7] border border-[#BBF7D0]">
           <div className="flex items-center gap-3">
             <CheckCircle size={18} className="text-[#16A34A]" />
             <div>
               <p className="text-sm font-bold text-[#14532D]">
-                Partial Response — RECIST 1.1 Criteria
+                Significant Improvement
               </p>
               <p className="text-xs text-[#166534]">
-                38% reduction from baseline (3.4cm → 2.1cm) — Confirmed April 2024
+                mRS improved from 4 to 1 since admission — Confirmed April 2024
               </p>
             </div>
           </div>
@@ -542,8 +539,8 @@ function TumorTab({ data }) {
               axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }}
               axisLine={false} tickLine={false}
-              tickFormatter={(v) => `${v}cm`} domain={[0, 4]} />
-            <Tooltip content={<ChartTooltip unit="cm" />} />
+              tickFormatter={(v) => `${v}`} domain={[0, 6]} />
+            <Tooltip content={<ChartTooltip />} />
             <Bar
               dataKey="size" fill="url(#tumorBarGrad)"
               radius={[6, 6, 0, 0]} maxBarSize={60}
@@ -556,7 +553,7 @@ function TumorTab({ data }) {
           {data.map((d) => (
             <div key={d.month} className="bg-[#F8FAFC] border border-[#E8EDF2] rounded-xl p-3">
               <p className="text-[10px] text-[#94A3B8] font-medium">{d.month}</p>
-              <p className="text-sm font-bold text-[#0F172A] mt-0.5">{d.size}cm</p>
+              <p className="text-sm font-bold text-[#0F172A] mt-0.5">mRS {d.size}</p>
               <p className="text-[10px] text-[#94A3B8]">{d.label}</p>
             </div>
           ))}
@@ -581,8 +578,8 @@ function BiomarkersTab({ data }) {
     <div className="space-y-5">
       <Card variant="default" padding="lg">
         <SectionTitle
-          title="Laboratory Biomarkers"
-          subtitle="Serum tumor markers and clinical chemistry — Jun 2024"
+          title="Stroke Risk Labs & Vitals"
+          subtitle="INR, lipid panel, glucose, and blood pressure monitoring — Jun 2024"
           className="mb-5"
         />
 
@@ -597,7 +594,7 @@ function BiomarkersTab({ data }) {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.06, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                className="p-4 rounded-2xl border border-[#E8EDF2] bg-[#FAFBFC]"
+                className="p-4 rounded-xl border border-[#E8EDF2] bg-[#FAFBFC]"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">

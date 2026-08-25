@@ -1,6 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
   GitBranch,
@@ -16,6 +15,9 @@ import {
   Video,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import Modal from '../common/Modal.jsx'
+import Button from '../common/Button.jsx'
+import BrandMark from '../common/BrandMark.jsx'
 
 /* ── Navigation items ── */
 const NAV_ITEMS = [
@@ -48,16 +50,38 @@ const BOTTOM_ITEMS = [
   { label: 'Settings', path: '/dashboard/settings', icon: Settings },
 ]
 
-/* ── Sidebar widths ── */
-const COLLAPSED_W = 64
-const EXPANDED_W  = 216
+/* Smoothly reveals a label as the rail expands, without the mount/unmount
+   races that independent AnimatePresence blocks were prone to during the
+   hover-expand transition — a single continuous CSS transition instead. */
+function RevealLabel({ expanded, children, className = '' }) {
+  return (
+    <div
+      className={`grid overflow-hidden transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        expanded ? 'grid-cols-[1fr]' : 'grid-cols-[0fr]'
+      }`}
+    >
+      <div className="min-w-0 overflow-hidden">
+        <div
+          className={`transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+            expanded ? 'opacity-100' : 'opacity-0'
+          } ${className}`}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Sidebar({ expanded, onExpandChange, mobileOpen = false, onMobileClose }) {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { logout } = useAuth()
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const handleLogout = async () => {
+    setSigningOut(true)
     await logout()
     navigate('/login', { replace: true })
   }
@@ -73,7 +97,7 @@ export default function Sidebar({ expanded, onExpandChange, mobileOpen = false, 
 
   const initials = user.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'AK'
+    : '—'
   // A touch device has no hover state; the open drawer must always show labels.
   const showExpanded = expanded || mobileOpen
 
@@ -92,56 +116,44 @@ export default function Sidebar({ expanded, onExpandChange, mobileOpen = false, 
         />
       )}
 
-      <motion.aside
-        initial={false}
-        animate={{ width: showExpanded ? EXPANDED_W : COLLAPSED_W }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      {/* Width and every label reveal inside this sidebar share the exact same
+          CSS transition (duration-300, same cubic-bezier) so they run on one
+          browser-compositor timeline instead of two independent animation
+          engines — that mismatch was the actual cause of labels/positions
+          looking wrong mid-transition, not something a visual patch fixes. */}
+      <aside
         onMouseEnter={() => onExpandChange(true)}
         onMouseLeave={() => onExpandChange(false)}
-        className={`fixed left-0 top-0 z-40 flex h-screen w-[88vw] max-w-[280px] flex-col overflow-hidden border-r border-[#E8EDF2] bg-white/95 transition-transform duration-300 sm:w-[280px] lg:w-auto lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed left-0 top-0 z-40 flex h-screen w-[88vw] max-w-[280px] flex-col overflow-hidden border-r border-white/20 backdrop-blur-2xl transition-[width,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:w-[280px] lg:translate-x-0 ${
+          showExpanded ? 'lg:w-[216px]' : 'lg:w-[64px]'
+        } ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{
+          background: 'linear-gradient(165deg, rgba(23,37,84,0.97) 0%, rgba(29,58,138,0.95) 45%, rgba(30,64,175,0.92) 100%)',
           boxShadow: expanded
-            ? '4px 0 24px 0 rgba(15,23,42,0.06)'
-            : '1px 0 0 0 rgba(15,23,42,0.06)',
+            ? '4px 0 32px 0 rgba(23,37,84,0.35)'
+            : '1px 0 0 0 rgba(23,37,84,0.25)',
         }}
       >
 
       {/* ── Logo area ── */}
-      <div className="flex h-14 flex-shrink-0 items-center border-b border-slate-200 px-3">
+      <div className="flex h-14 flex-shrink-0 items-center border-b border-white/15 px-3">
         <div className="flex items-center gap-3 min-w-0">
 
           {/* Logo mark */}
-          <div
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
-            style={{
-              background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
-            }}
-          >
-            <OncotraceMark />
-          </div>
+          <BrandMark size={16} />
 
           {/* Brand name — slides in when expanded */}
-          <AnimatePresence>
-            {showExpanded && (
-              <motion.div
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="overflow-hidden"
-              >
-                <p
-                  className="text-sm font-bold text-[#0F172A] whitespace-nowrap tracking-tight"
-                  style={{ fontFamily: 'DM Sans, Inter, sans-serif' }}
-                >
-                  CareFlow
-                </p>
-                <p className="text-[10px] text-[#94A3B8] whitespace-nowrap font-medium">
-                  Health workspace
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <RevealLabel expanded={showExpanded}>
+            <p
+              className="text-sm font-bold text-white whitespace-nowrap tracking-tight"
+              style={{ fontFamily: 'DM Sans, Inter, sans-serif' }}
+            >
+              Stroke AI
+            </p>
+            <p className="text-[10px] text-white/70 whitespace-nowrap font-medium">
+              Emergency care workspace
+            </p>
+          </RevealLabel>
         </div>
       </div>
 
@@ -162,7 +174,7 @@ export default function Sidebar({ expanded, onExpandChange, mobileOpen = false, 
       </nav>
 
       {/* ── Bottom section ── */}
-      <div className="flex-shrink-0 border-t border-[#E8EDF2] px-3 py-3 space-y-1">
+      <div className="flex-shrink-0 border-t border-white/15 px-3 py-3 space-y-1">
 
         {/* Profile + Settings links */}
         {BOTTOM_ITEMS.map((item) => (
@@ -176,88 +188,79 @@ export default function Sidebar({ expanded, onExpandChange, mobileOpen = false, 
         ))}
 
         {/* Divider */}
-        <div className="my-2 h-px bg-[#E8EDF2]" />
+        <div className="my-2 h-px bg-white/15" />
 
         {/* Patient avatar row */}
         <div
           className="flex items-center gap-3 px-2 py-2.5 rounded-xl
-                     hover:bg-[#F1F5F9] transition-colors duration-200 cursor-pointer group"
-          onClick={() => navigate('/profile')}
+                     hover:bg-white/10 transition-colors duration-200 cursor-pointer group"
+          onClick={() => navigate('/dashboard/profile')}
         >
           {/* Avatar */}
           <div
             className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center
-                       text-white text-xs font-bold"
+                       text-white text-xs font-bold ring-1 ring-white/30"
             style={{
-              background: 'linear-gradient(135deg, #2563EB, #3B82F6)',
+              background: 'linear-gradient(135deg, #1E3A8A, #2563EB)',
             }}
           >
             {initials}
           </div>
 
           {/* Name + role */}
-          <AnimatePresence>
-            {showExpanded && (
-              <motion.div
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="flex-1 min-w-0 overflow-hidden"
-              >
-                <p className="text-xs font-semibold text-[#0F172A] truncate">
-                  {user.name || 'Anand Krishnamurthy'}
-                </p>
-                <p className="text-[10px] text-[#94A3B8] truncate">Patient</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <RevealLabel expanded={showExpanded} className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-white truncate">
+              {user.name || 'Patient'}
+            </p>
+            <p className="text-[10px] text-white/65 truncate">Patient</p>
+          </RevealLabel>
 
           {/* Chevron */}
-          <AnimatePresence>
-            {showExpanded && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <ChevronRight
-                  size={14}
-                  className="text-[#94A3B8] group-hover:text-[#64748B] transition-colors"
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {showExpanded && (
+            <ChevronRight
+              size={14}
+              className="text-white/50 group-hover:text-white/80 transition-colors flex-shrink-0"
+            />
+          )}
         </div>
 
         {/* Logout button */}
         <button
-          onClick={handleLogout}
+          onClick={() => setLogoutModalOpen(true)}
           className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl
-                     text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEE2E2]
+                     text-white/70 hover:text-white hover:bg-white/10
                      transition-all duration-200 group"
         >
           <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-            <LogOut size={16} className="transition-colors duration-200" />
+            <LogOut size={16} className="transition-colors duration-200 group-hover:text-red-200" />
           </div>
 
-          <AnimatePresence>
-            {showExpanded && (
-              <motion.span
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="text-xs font-medium whitespace-nowrap"
-              >
-                Sign out
-              </motion.span>
-            )}
-          </AnimatePresence>
+          <RevealLabel expanded={showExpanded}>
+            <span className="text-xs font-medium whitespace-nowrap">Sign out</span>
+          </RevealLabel>
         </button>
       </div>
-      </motion.aside>
+      </aside>
+
+      {/* Sign-out confirmation */}
+      <Modal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        title="Sign out?"
+        subtitle="You'll need to sign in again to access your account."
+        size="sm"
+        closeable={!signingOut}
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setLogoutModalOpen(false)} disabled={signingOut}>
+              No, stay signed in
+            </Button>
+            <Button variant="primary" size="sm" icon={<LogOut size={13} />} loading={signingOut} onClick={handleLogout}>
+              Yes, sign out
+            </Button>
+          </>
+        }
+      />
     </>
   )
 }
@@ -267,20 +270,12 @@ function NavGroup({ section, items, expanded, currentPath, onNavigate }) {
   return (
     <div className="space-y-0.5">
       {/* Section label */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="px-2 mb-2 text-[10px] font-semibold text-[#94A3B8]
-                       uppercase tracking-widest whitespace-nowrap"
-          >
-            {section}
-          </motion.p>
-        )}
-      </AnimatePresence>
+      <RevealLabel expanded={expanded}>
+        <p className={`px-2 text-[10px] font-semibold text-white/55
+                       uppercase tracking-widest whitespace-nowrap ${expanded ? 'mb-2' : ''}`}>
+          {section}
+        </p>
+      </RevealLabel>
 
       {/* Nav items */}
       {items.map((item) => (
@@ -315,80 +310,46 @@ function SidebarNavItem({ item, expanded, isActive, onNavigate }) {
         className={`relative flex items-center gap-3 px-2 py-2.5 rounded-xl
                     transition-all duration-200 group cursor-pointer
                     ${isActive
-                      ? 'bg-[#EFF6FF] text-[#2563EB]'
-                      : 'text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]'
+                      ? 'bg-white/15 text-white'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
       >
-        {/* Active indicator bar */}
-        {isActive && (
-          <motion.div
-            layoutId="activeIndicator"
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5
-                       bg-[#2563EB] rounded-full"
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          />
-        )}
+        {/* Active indicator bar — local to this item, no cross-item shared
+            animation. A shared `layoutId` here previously tried to FLIP-
+            animate between two items' bounding boxes while the sidebar's
+            own width was also changing, which is what broke its alignment;
+            a plain per-item transition can't desync like that. */}
+        <span
+          aria-hidden="true"
+          className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5
+                     bg-white rounded-full transition-opacity duration-200
+                     ${isActive ? 'opacity-100' : 'opacity-0'}`}
+        />
 
-        {/* Icon */}
+        {/* Icon — a plain solid circle behind the active icon, tightly sized
+            to the tile itself. The previous `ring-1` here added a second
+            box-shadow layer that, under the sidebar's own backdrop-blur-2xl,
+            bled outward into an oversized blurred halo — dropping the ring
+            (keeping the solid fill) removes that without losing the circle. */}
         <div
-          className={`w-8 h-8 flex items-center justify-center flex-shrink-0
-                      rounded-lg transition-all duration-200
-                      ${isActive
-                        ? 'bg-[#2563EB]/10'
-                        : 'group-hover:bg-[#F1F5F9]'
-                      }`}
+          className={`w-8 h-8 flex items-center justify-center flex-shrink-0 rounded-full transition-colors duration-200
+                      ${isActive ? 'bg-white/20' : ''}`}
         >
           <Icon
-            size={16}
+            size={17}
+            strokeWidth={1.75}
             className={`transition-colors duration-200
-              ${isActive ? 'text-[#2563EB]' : 'text-[#64748B] group-hover:text-[#0F172A]'}`}
+              ${isActive ? 'text-white' : 'text-white/70 group-hover:text-white'}`}
           />
         </div>
 
         {/* Label */}
-        <AnimatePresence>
-          {expanded && (
-            <motion.span
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className={`text-xs font-medium whitespace-nowrap
-                ${isActive ? 'text-[#2563EB]' : ''}`}
-            >
-              {label}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        <RevealLabel expanded={expanded}>
+          <span className={`text-xs font-medium whitespace-nowrap ${isActive ? 'text-white' : ''}`}>
+            {label}
+          </span>
+        </RevealLabel>
       </div>
     </NavLink>
-  )
-}
-
-/* ── SVG logo mark ── */
-function OncotraceMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <path
-        d="M4 9C4 6.239 6.239 4 9 4C11.761 4 14 6.239 14 9"
-        stroke="white"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <circle cx="9" cy="9" r="2" fill="white" />
-      <path
-        d="M9 11L9 14"
-        stroke="white"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6.5 12.5L11.5 12.5"
-        stroke="white"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        opacity="0.5"
-      />
-    </svg>
   )
 }

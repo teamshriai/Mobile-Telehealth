@@ -8,6 +8,7 @@ import AppLayout from './components/layout/AppLayout.jsx'
 const Login         = lazy(() => import('./components/auth/Login.jsx'))
 const Register      = lazy(() => import('./components/auth/Register.jsx'))
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.jsx'))
+const ResetPassword  = lazy(() => import('./components/auth/ResetPassword.jsx'))
 
 /* ── Pages ── */
 const LandingPage   = lazy(() => import('./components/landing/LandingPage.jsx'))
@@ -21,6 +22,16 @@ const AIAssistant   = lazy(() => import('./pages/AIAssistant.jsx'))
 const Profile       = lazy(() => import('./pages/Profile.jsx'))
 const Settings      = lazy(() => import('./pages/Settings.jsx'))
 const NotFound      = lazy(() => import('./pages/NotFound.jsx'))
+const LegalPlaceholder = lazy(() => import('./pages/LegalPlaceholder.jsx'))
+
+/* ── Platform demo (public, unauthenticated role previews) ── */
+const DemoIndex        = lazy(() => import('./pages/demo/DemoIndex.jsx'))
+const DemoCommandCentre = lazy(() => import('./pages/demo/CommandCentre.jsx'))
+const DemoAmbulance    = lazy(() => import('./pages/demo/Ambulance.jsx'))
+const DemoScanLab      = lazy(() => import('./pages/demo/ScanLab.jsx'))
+const DemoAiRadiologist = lazy(() => import('./pages/demo/AiRadiologist.jsx'))
+const DemoHospitalHub  = lazy(() => import('./pages/demo/HospitalHub.jsx'))
+const DemoTelehealth   = lazy(() => import('./pages/demo/Telehealth.jsx'))
 
 /* ── Auth helpers ── */
 const isAuthenticated = () => {
@@ -37,6 +48,14 @@ const ProtectedRoute = ({ children }) =>
 const PublicRoute = ({ children }) =>
   isAuthenticated() ? <Navigate to="/dashboard" replace /> : children
 
+// Same idea as PublicRoute, but renders LandingPage instead of arbitrary
+// children — used for "/" and "/landing" so the auth check happens at this
+// component's own render time rather than being baked into a route element
+// once at App's initial render (which could otherwise go stale and cause a
+// redirect loop, e.g. right after an account deletion navigates to "/landing").
+const RootRoute = () =>
+  isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -44,14 +63,8 @@ export default function App() {
         <Routes>
 
           {/* ── Public routes ── */}
-          <Route
-            path="/"
-            element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />}
-          />
-          <Route
-            path="/landing"
-            element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />}
-          />
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/landing" element={<RootRoute />} />
           <Route
             path="/login"
             element={<PublicRoute><Login /></PublicRoute>}
@@ -64,6 +77,21 @@ export default function App() {
             path="/forgot-password"
             element={<PublicRoute><ForgotPassword /></PublicRoute>}
           />
+          <Route
+            path="/reset-password"
+            element={<PublicRoute><ResetPassword /></PublicRoute>}
+          />
+          <Route path="/terms" element={<LegalPlaceholder title="Terms of Service" />} />
+          <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
+
+          {/* ── Platform demo (public role previews, no auth) ── */}
+          <Route path="/demo" element={<DemoIndex />} />
+          <Route path="/demo/command-centre" element={<DemoCommandCentre />} />
+          <Route path="/demo/ambulance" element={<DemoAmbulance />} />
+          <Route path="/demo/scan-lab" element={<DemoScanLab />} />
+          <Route path="/demo/ai-radiologist" element={<DemoAiRadiologist />} />
+          <Route path="/demo/hospital-hub" element={<DemoHospitalHub />} />
+          <Route path="/demo/telehealth" element={<DemoTelehealth />} />
 
           {/* ── Protected routes ── */}
           <Route

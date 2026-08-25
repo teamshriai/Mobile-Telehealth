@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import BrandMark from './BrandMark.jsx'
 
 /**
  * Loader component
@@ -22,7 +23,7 @@ export function SkeletonLine({ width = 'full', height = 'h-4' }) {
 /* ── Skeleton card ── */
 export function SkeletonCard({ lines = 3, className = '' }) {
   return (
-    <div className={`bg-white rounded-2xl border border-[#E8EDF2] p-5 space-y-3 ${className}`}>
+    <div className={`bg-white rounded-xl border border-[#E8EDF2] p-5 space-y-3 ${className}`}>
       <SkeletonLine height="h-4" width="1/2" />
       {Array.from({ length: lines }).map((_, i) => (
         <SkeletonLine
@@ -95,24 +96,14 @@ export function PageLoader() {
         className="flex flex-col items-center gap-6"
       >
         {/* Logo */}
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #1E3A8A, #2563EB)' }}
-        >
-          <svg width="28" height="28" viewBox="0 0 18 18" fill="none">
-            <path d="M4 9C4 6.239 6.239 4 9 4C11.761 4 14 6.239 14 9"
-              stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-            <circle cx="9" cy="9" r="2" fill="white" />
-            <path d="M9 11L9 14" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </div>
+        <BrandMark size={28} rounded="rounded-xl" />
 
         <div className="flex flex-col items-center gap-3">
           <p
             className="text-sm font-semibold text-[#0F172A]"
             style={{ fontFamily: 'DM Sans, Inter, sans-serif' }}
           >
-            OncoTrace AI
+            Stroke AI
           </p>
           <LoadingDots />
         </div>

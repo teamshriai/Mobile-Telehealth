@@ -22,7 +22,7 @@ export default function AppointmentCard({ appointment }) {
         title="Next Appointment"
         action={
           <button
-            onClick={() => navigate('/appointments')}
+            onClick={() => navigate('/dashboard/appointments')}
             className="flex items-center gap-1 text-xs text-[#2563EB] font-semibold
                        hover:text-[#1D4ED8] transition-colors"
           >
@@ -38,7 +38,7 @@ export default function AppointmentCard({ appointment }) {
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-2xl p-4 mb-4"
+        className="rounded-xl p-4 mb-4"
         style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)' }}
       >
         <div className="flex items-start gap-3">
@@ -123,7 +123,7 @@ export default function AppointmentCard({ appointment }) {
 
       {/* Action */}
       <button
-        onClick={() => navigate('/appointments')}
+        onClick={() => navigate('/dashboard/appointments')}
         className="mt-4 w-full py-2.5 rounded-xl bg-[#2563EB] text-white
                    text-xs font-semibold hover:bg-[#1D4ED8] transition-colors
                    flex items-center justify-center gap-2"

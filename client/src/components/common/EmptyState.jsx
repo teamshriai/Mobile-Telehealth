@@ -34,7 +34,7 @@ export default function EmptyState({
       {icon && (
         <div
           className={`
-            ${s.icon} rounded-2xl bg-[#F1F5F9] border border-[#E8EDF2]
+            ${s.icon} rounded-xl bg-[#F1F5F9] border border-[#E8EDF2]
             flex items-center justify-center mb-4 text-[#94A3B8]
           `}
         >
