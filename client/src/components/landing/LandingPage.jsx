@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import LandingNavbar from './LandingNavbar.jsx'
 import LandingHeader from './LandingHeader.jsx'
 import LandingFooter from './LandingFooter.jsx'
+import AnnouncementTicker from './hero/AnnouncementTicker.jsx'
 
 export default function LandingPage() {
   const { hash } = useLocation()
@@ -17,11 +18,12 @@ export default function LandingPage() {
     const scrollToTarget = () => {
       const el = document.getElementById(id)
       if (!el) return
-      const top = el.getBoundingClientRect().top + window.scrollY
+      // scrollIntoView (rather than a measured window.scrollTo) so each section's
+      // own `scroll-margin-top` is honoured and the heading clears the fixed nav.
       // Explicit 'instant' bypasses the root's `scroll-behavior: smooth`
       // (index.css), which would otherwise animate and may not finish
       // before the browser considers the page "loaded".
-      window.scrollTo({ top, behavior: 'instant' })
+      el.scrollIntoView({ behavior: 'instant', block: 'start' })
     }
 
     // Images below the fold (feature/benefit photos) can still be decoding
@@ -35,8 +37,12 @@ export default function LandingPage() {
   }, [hash])
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
-      {/* Fixed navigation bar */}
+    <div
+      className="sa-landing min-h-screen selection:bg-[#e6e2d3] selection:text-[#16160F]"
+      style={{ background: '#F7F5EF', color: '#16160F' }}
+    >
+      {/* Announcement ticker, then the sticky navigation bar */}
+      <AnnouncementTicker />
       <LandingNavbar />
 
       {/* Hero + scroll-reveal content sections (all in one component) */}

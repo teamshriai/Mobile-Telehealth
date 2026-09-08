@@ -14,6 +14,17 @@
   --font-sans:      var(--font-helvetica);
   --font-aether:    'Aether', sans-serif;
 
+  /* ── Landing page editorial pairing: Playfair display over Lato text ── */
+  --font-serif:     'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-lato:      'Lato', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* ── Landing page ground: warm cream + ink, hairline rules ── */
+  --color-sa-cream: #F7F5EF;
+  --color-sa-paper: #FFFDF8;
+  --color-sa-ink:   #16160F;
+  --color-sa-body:  #55554D;
+  --color-sa-rule:  rgba(22, 22, 15, 0.13);
+
   /* ── Material hierarchy: surface layers (canvas → soft → elevated) ── */
   --color-surface-1: #FAFBFC;
   --color-surface-2: #F1F5F9;
@@ -65,6 +76,19 @@
 @variant dark (&:where(.dark, .dark *));
 
 @layer base {
+  /* ── Local: Archivo Variable (hero + ticker only — see landing/hero/heroTheme.js).
+     Self-hosted per the hero spec's performance budget: one variable file
+     carries both the weight axis (400-700 used) and the width axis (the
+     display sizes lean on font-stretch instead of a second static family). */
+  @font-face {
+    font-family: 'Archivo Variable';
+    src: url('/fonts/archivo/archivo-variable.woff2') format('woff2-variations');
+    font-weight: 100 900;
+    font-stretch: 62% 125%;
+    font-style: normal;
+    font-display: swap;
+  }
+
   /* ── Local: Aether display face (used for section labels) ── */
   @font-face {
     font-family: 'Aether';
@@ -100,7 +124,9 @@
   body {
     min-width: 320px;
     min-height: 100vh;
-    overflow-x: hidden;
+    /* `clip`, not `hidden`: `hidden` makes body a scroll container in some
+       engines, which breaks `position: sticky` descendants (the pinned hero). */
+    overflow-x: clip;
     background: #f8fafc;
     color: #111827;
     /* Helvetica Light for all body copy */
@@ -121,6 +147,33 @@
     font-synthesis: none;
     letter-spacing: -0.02em;
     line-height: 1.05;
+  }
+
+  /* ── Landing page scope ──────────────────────────────────────────────
+     The marketing page runs its own editorial pairing (Playfair display over
+     Lato text) without disturbing the app shell, which keeps the global
+     Helvetica/Plus Jakarta rules above. Display faces are reserved for h1/h2;
+     h3 and below stay sans, matching the reference's bold sans sub-labels. */
+  .sa-landing {
+    font-family: var(--font-lato);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .sa-landing h1,
+  .sa-landing h2 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.012em;
+  }
+
+  .sa-landing h3,
+  .sa-landing h4,
+  .sa-landing h5,
+  .sa-landing h6 {
+    font-family: var(--font-lato);
+    font-weight: 700;
+    letter-spacing: 0;
   }
 
   button, a {

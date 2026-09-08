@@ -1,255 +1,154 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  DISPLAY, BODY, STRONG,
+  CREAM, PAPER, INK, INK_BODY, INK_SUBTLE, RULE, TINT,
+  reducedMotion,
+} from './theme.js'
+import Hero from './hero/Hero.jsx'
+import ArchitectureFlow from './ArchitectureFlow.jsx'
+import PartnerMap from './PartnerMap.jsx'
+import { Reveal, SectionHead } from './primitives.jsx'
 
 /* ═══════════════════════════════════════════════════════════════════
-   LandingHeader — Hero + Features + How It Works + Benefits Bento
-   Font contract:
-     Hero h1 / section headings  → Plus Jakarta Sans 400
-     Body / desc / subtitles     → Helvetica Light 300
+   LandingHeader — hero, partner band, and every content section below it.
+
+   Type contract (see theme.js):
+     h1 / h2  → Playfair Display 400
+     h3 and below, all body copy → Lato 400 / 700
+   (The hero itself is the one exception — see hero/heroTheme.js.)
 ═══════════════════════════════════════════════════════════════════ */
 
-const DISPLAY = {
-  fontFamily: "'Plus Jakarta Sans', sans-serif",
-  fontWeight: 400,
-  fontSynthesis: 'none',
-  WebkitFontSmoothing: 'antialiased',
-}
-const HELV = {
-  fontFamily: "'Helvetica', 'Helvetica Neue', Arial, sans-serif",
-  fontWeight: 300,
-  fontSynthesis: 'none',
-  WebkitFontSmoothing: 'antialiased',
-}
-
-/* ── Feature card data ── */
-const FEATURES = [
+/* ── "Why It Matters" — two figures and the context behind them ── */
+const MATTERS_CARDS = [
+  { type: 'stat', tint: TINT.clay, to: 1.9, decimals: 1, suffix: 'M', label: 'Neurons lost, on average, for every minute a stroke goes untreated.' },
+  { type: 'stat', tint: TINT.sand, to: 60, decimals: 0, suffix: ' min', label: 'The golden hour clinicians race against, from first symptom to first treatment.' },
   {
-    num: '01',
-    title: 'Instant\nAlert',
-    bg: '#c9e156',
-    photo: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=700&q=75',
-    desc: 'A single action connects you to the stroke care network the moment symptoms appear — no searching, no delay',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-      </svg>
-    ),
-  },
-  {
-    num: '02',
-    title: 'AI-Assisted\nTriage',
-    bg: '#afd5ef',
-    photo: null,
-    desc: 'Symptom checks and case details reach your care team instantly — so the right help is already on the way',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-      </svg>
-    ),
-  },
-  {
-    num: '03',
-    title: 'Connected\nCare Network',
-    bg: '#b4c5bc',
-    photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=700&q=75',
-    desc: 'Access vascular neurologists and stroke specialists without leaving home or waiting for a slot',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="2" x2="12" y2="22"/>
-        <line x1="2" y1="12" x2="22" y2="12"/>
-        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-        <line x1="4.93" y1="19.07" x2="19.07" y2="4.93"/>
-      </svg>
-    ),
+    type: 'note',
+    tint: TINT.teal,
+    text: 'Every layer of delay — recognising symptoms, reaching a hospital, reading a scan — compounds against the clock. Stroke AI is built to collapse that delay into a single, coordinated response.',
+    cite: 'Source: Saver, J.L., "Time Is Brain — Quantified," Stroke, 2006.',
   },
 ]
 
-/* ── "3 Steps" card data ── */
-const STEPS = [
-  { num: '01', title: 'Recognize the Signs',      desc: 'Learn the FAST/BEFAST warning signs so you can act the moment symptoms appear.' },
-  { num: '02', title: 'Alert & Connect',          desc: 'One tap connects you to the stroke care network — no searching, no phone tree.' },
-  { num: '03', title: 'Track Care in Real Time',  desc: 'Follow your case status from your dashboard as care is coordinated around you.' },
+const TEAM = [
+  {
+    tint: TINT.clay,
+    name: 'SHRI-AI',
+    desc: 'Brings the AI and telehealth technology behind "AI for Health, Care for All" — imaging models, real-time coordination software, and the mobile platform patients and bystanders will actually use.',
+  },
+  {
+    tint: TINT.sky,
+    name: 'IndoStates Health Hospital',
+    desc: 'Brings the clinical and hospital network behind "Prevent, Screen, Treat" — decades of frontline emergency and neurology care, and the ambulance and scan-lab partnerships a stroke response depends on.',
+  },
 ]
 
-/* ── Scroll-reveal ── */
-function Reveal({ children, delay = 0, y = 28 }) {
+/* ── Count-up: figures animate from zero once scrolled into view ── */
+function CountUp({ to, decimals = 0, suffix = '' }) {
   const ref = useRef(null)
+  const [val, setVal] = useState(0)
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.opacity = '0'
-    el.style.transform = `translateY(${y}px)`
-    el.style.transition = `opacity 0.68s ease ${delay}ms, transform 0.68s ease ${delay}ms`
+    if (reducedMotion()) { setVal(to); return }
     const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) {
-        el.style.opacity = '1'
-        el.style.transform = 'translateY(0)'
-        obs.disconnect()
+      if (!e.isIntersecting) return
+      const duration = 1500
+      const start = performance.now()
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / duration)
+        setVal(to * (1 - Math.pow(1 - t, 3)))
+        if (t < 1) requestAnimationFrame(tick)
       }
-    }, { threshold: 0.1 })
+      requestAnimationFrame(tick)
+      obs.disconnect()
+    }, { threshold: 0.5 })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [delay, y])
-  return <div ref={ref} style={{ willChange: 'opacity, transform' }}>{children}</div>
+  }, [to])
+  return <span ref={ref}>{val.toFixed(decimals)}{suffix}</span>
 }
 
-/* ── Feature card ── */
-function FeatureCard({ card, delay }) {
-  return (
-    <Reveal delay={delay}>
-      <article style={{
-        borderRadius: '18px',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'clamp(380px, 44vw, 500px)',
-        minWidth: 0,
-      }}>
-        <div style={{ background: card.bg, padding: 'clamp(16px, 2.2vw, 24px)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-            <h3 style={{
-              ...DISPLAY,
-              fontSize: 'clamp(16px, 2vw, 24px)',
-              lineHeight: 1.15,
-              letterSpacing: '-0.02em',
-              color: '#0f172a',
-              margin: 0,
-              whiteSpace: 'pre-line',
-            }}>
-              {card.title}
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexShrink: 0, paddingTop: '2px' }}>
-              <span style={{ ...HELV, fontSize: '10.5px', letterSpacing: '0.04em', color: 'rgba(0,0,0,0.45)' }}>
-                ({card.num})
-              </span>
-              <div style={{
-                width: 32, height: 32,
-                background: 'rgba(255,255,255,0.68)',
-                borderRadius: '9px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#333', flexShrink: 0,
-              }}>
-                {card.icon}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style={{ position: 'relative', flex: 1, background: card.bg, overflow: 'hidden' }}>
-          {card.photo && (
-            <img
-              src={card.photo}
-              alt={card.title.replace('\n', ' ')}
-              loading="lazy"
-              decoding="async"
-              style={{
-                position: 'absolute', inset: 0,
-                width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center top',
-              }}
-            />
-          )}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            padding: 'clamp(14px, 2vw, 22px)',
-            background: card.photo
-              ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0) 100%)'
-              : 'transparent',
-          }}>
-            <p style={{
-              ...HELV,
-              fontSize: 'clamp(11px, 1.05vw, 13px)',
-              letterSpacing: '0.02em',
-              lineHeight: 1.7,
-              color: card.photo ? 'rgba(255,255,255,0.90)' : 'rgba(0,0,0,0.58)',
-              margin: 0,
-            }}>
-              {card.desc}
-            </p>
-          </div>
-        </div>
-      </article>
-    </Reveal>
-  )
-}
-
-/* ── Hub-and-spoke diagram ── */
-function DiagramNode({ label, filled = false }) {
-  return (
-    <span style={{
-      ...HELV, fontSize: 'clamp(10.5px, 0.95vw, 12.5px)', letterSpacing: '0.01em',
-      color: filled ? '#fff' : '#111',
-      background: filled ? '#0f172a' : '#fff',
-      border: filled ? 'none' : '1px solid rgba(0,0,0,.12)',
-      borderRadius: '10px', padding: '9px 14px',
-      display: 'inline-block', whiteSpace: 'nowrap',
-    }}>
-      {label}
-    </span>
-  )
-}
-
-function HubSpokeDiagram() {
-  const downArrow = (
-    <svg width="14" height="22" viewBox="0 0 14 22" fill="none">
-      <path d="M7 1V19M7 19L1 13M7 19L13 13" stroke="#c7d2e0" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-
-  return (
-    <div style={{
-      background: '#f8fafc', borderRadius: '18px', border: '1px solid rgba(0,0,0,.07)',
-      padding: 'clamp(20px, 3vw, 36px) clamp(14px, 3vw, 28px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-    }}>
-      <DiagramNode label="Patient / Bystander" />
-      {downArrow}
-      <DiagramNode label="Command Centre — the Hub" filled />
-      {downArrow}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
-        <DiagramNode label="Ambulance + GPS" />
-        <DiagramNode label="Scan Lab" />
-        <DiagramNode label="Mobile AI Doctor" />
-      </div>
-      {downArrow}
-      <DiagramNode label="AI Inference + Radiologist (in parallel)" />
-      {downArrow}
-      <DiagramNode label="Hospital Hub" filled />
-    </div>
-  )
-}
-
-/* ── Bento line-chart SVG ── */
+/* ── Bento line chart ── */
 function BentoLineChart() {
-  const points = [
-    [32, 148],
-    [168, 72],
-    [304, 158],
-    [440, 88],
-    [520, 60],
-  ]
-  const polyStr = points.map(([x, y]) => `${x},${y}`).join(' ')
+  const points = [[32, 148], [168, 72], [304, 158], [440, 88], [520, 60]]
   return (
-    <svg
-      viewBox="0 0 552 220"
-      preserveAspectRatio="xMidYMid meet"
-      style={{ width: '100%', height: '100%', display: 'block' }}
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 552 220" preserveAspectRatio="xMidYMid meet"
+      style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden="true">
       <polyline
-        points={polyStr}
-        fill="none"
-        stroke="#0f172a"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
+        points={points.map(([x, y]) => `${x},${y}`).join(' ')}
+        fill="none" stroke={INK} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round"
       />
       {points.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="7.5" fill="#0f172a" />
+        <circle key={i} cx={cx} cy={cy} r="6" fill={INK} />
       ))}
     </svg>
+  )
+}
+
+/* ── Partner band — full-bleed, the two organisations behind the programme ── */
+function PartnerBand({ offset }) {
+  return (
+    <section
+      aria-label="Programme partners"
+      style={{
+        position: 'relative', zIndex: 10,
+        width: '100%',
+        background: PAPER,
+        borderTop: `1px solid ${RULE}`,
+        borderBottom: `1px solid ${RULE}`,
+        marginTop: offset,
+      }}
+    >
+      <div style={{
+        padding: 'clamp(22px, 3vw, 40px) clamp(1rem, 3vw, 2.5rem)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 'clamp(10px, 1.4vw, 14px)',
+      }}>
+        <div className="sa-band-row">
+          <picture className="sa-band-logo">
+            <source srcSet="/shri-ai-logo-trans.webp" type="image/webp" />
+            <img
+              src="/shri-ai-logo.png"
+              alt="SHRI-AI — AI for Health, Care for All"
+              width="640" height="640"
+              loading="lazy" decoding="async"
+              style={{ height: 'clamp(118px, 15vw, 224px)', width: 'auto', display: 'block' }}
+            />
+          </picture>
+          <span aria-hidden="true" className="sa-band-div" style={{
+            width: '1px', height: 'clamp(92px, 11vw, 148px)', background: RULE, flexShrink: 0,
+          }} />
+          {/* The source PNG is artwork on an opaque white ground, which showed as
+              a visible box once the mark doubled in size. The WebP is the same
+              artwork with the white keyed out. */}
+          <picture className="sa-band-logo">
+            <source srcSet="/logo-indostates-trans.webp" type="image/webp" />
+            <img
+              src="/logo-indostates.png"
+              alt="IndoStates Health Hospital — Prevent, Screen, Treat"
+              width="640" height="156"
+              loading="lazy" decoding="async"
+              style={{ height: 'clamp(52px, 7.6vw, 104px)', width: 'auto', display: 'block' }}
+            />
+          </picture>
+        </div>
+        <p style={{
+          ...BODY,
+          fontSize: 'clamp(12px, 1vw, 13.5px)',
+          lineHeight: 1.7,
+          color: INK_BODY,
+          textAlign: 'center',
+          maxWidth: '70ch',
+          margin: 0,
+        }}>
+          A joint initiative of <span style={{ ...STRONG, color: INK }}>SHRI-AI</span> and{' '}
+          <span style={{ ...STRONG, color: INK }}>IndoStates Health Hospital</span> — pairing applied
+          medical AI with frontline hospital, ambulance, and imaging capability.
+        </p>
+      </div>
+    </section>
   )
 }
 
@@ -257,194 +156,157 @@ function BentoLineChart() {
 export default function LandingHeader() {
   return (
     <>
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ HERO ━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section style={{
-        position: 'relative',
-        width: '100%',
-        height: '100svh',
-        minHeight: '640px',
-        overflow: 'hidden',
-      }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: "url('/doctor1.jpg')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'brightness(0.80) contrast(1.1)',
-          }}
-        />
-        <div aria-hidden="true" style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(180deg,rgba(0,0,0,.52) 0%,rgba(0,0,0,.06) 44%,rgba(0,0,0,.58) 100%)',
-        }}/>
-        <div style={{
-          position: 'absolute',
-          bottom: 'clamp(6rem, 14vh, 11rem)',
-          left: 0, right: 0,
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          textAlign: 'center',
-          padding: '0 clamp(1.25rem, 5vw, 3rem)',
-        }}>
-          <h1 style={{
-            ...DISPLAY,
-            fontSize: 'clamp(2.2rem, 5.8vw, 4.6rem)',
-            lineHeight: 1.04,
-            letterSpacing: '-0.025em',
-            color: '#fff',
-            marginBottom: 'clamp(0.85rem, 2vw, 1.4rem)',
-          }}>
-            Every second counts.<br />Stroke care, connected.
-          </h1>
-          <p style={{
-            ...HELV,
-            fontSize: 'clamp(11px, 1.05vw, 13px)',
-            letterSpacing: '0.02em',
-            textAlign: 'left',
-            color: 'rgba(255,255,255,0.72)',
-            lineHeight: 1.78,
-            maxWidth: '340px',
-            width: '100%',
-            marginBottom: 'clamp(1.5rem, 3vw, 2.25rem)',
-          }}>
-            Instant alerts, AI-assisted triage and a connected
-            care network — built to move as fast as a stroke
-            demands, from anywhere on any device.
-          </p>
-          <Link
-            to="/register"
-            style={{
-              ...HELV,
-              fontSize: 'clamp(10.5px, 0.9vw, 12.5px)',
-              letterSpacing: '0.05em',
-              color: '#0f172a',
-              background: 'rgba(255,255,255,0.96)',
-              padding: '9px 28px',
-              borderRadius: '100px',
-              display: 'inline-flex', alignItems: 'center',
-              textDecoration: 'none',
-              transition: 'opacity .2s ease, transform .2s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'scale(1.016)' }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)' }}
-          >
-            Get Started
-          </Link>
-        </div>
-      </section>
+      <style>{`
+        .sa-focus:focus-visible {
+          outline: 2px solid #5aa9e6;
+          outline-offset: 2px;
+        }
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ FEATURES ━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="services" style={{ background: '#ddeaf2', position: 'relative', zIndex: 10, scrollMarginTop: '100px' }}>
+        /* Partner band. These marks are sized by height with an auto width, so
+           as ordinary flex items they were being shrunk horizontally on narrow
+           screens — the fixed height stayed, the width gave way, and both logos
+           came out squashed. flex-shrink:0 stops the squeeze, wrap gives them
+           somewhere to go instead, and object-fit:contain means even a future
+           squeeze would letterbox rather than distort. */
+        .sa-band-row {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
+          gap: clamp(18px, 4vw, 44px);
+        }
+        .sa-band-logo {
+          flex: 0 0 auto;
+          max-width: 100%;
+          display: block;
+        }
+        .sa-band-logo img {
+          max-width: 100%;
+          object-fit: contain;
+        }
+        /* Stranded between two stacked logos, the divider reads as an error. */
+        @media (max-width: 639px) {
+          .sa-band-div { display: none; }
+        }
+
+        .sa-grid-3 {
+          display: grid;
+          gap: clamp(14px, 2vw, 24px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        }
+        .sa-grid-2 {
+          display: grid;
+          gap: clamp(14px, 2vw, 24px);
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+        }
+
+        /* Benefits bento: stacked on phones, two columns with a full-height
+           third panel from 640px up. */
+        .sa-bento { display: grid; gap: clamp(8px, 1.2vw, 14px); }
+        @media (min-width: 640px) {
+          .sa-bento {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+          }
+          .sa-bento > :nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+        }
+      `}</style>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ HERO ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <Hero />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ PARTNER BAND ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <PartnerBand offset={0} />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ WHAT WE'RE BUILDING ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="services" style={{ background: CREAM, position: 'relative', zIndex: 10, scrollMarginTop: '124px' }}>
+        {/* The heading keeps the page's 1320px measure; the diagram breaks out of
+            it and runs the full width of the section. No 100vw trick — the
+            section is already viewport-wide, so simply not being inside the
+            container is the whole job (and 100vw would overshoot by the
+            scrollbar gutter). */}
         <div style={{
           maxWidth: '1320px', margin: '0 auto',
-          padding: 'clamp(2.5rem, 5vw, 4rem) clamp(1rem, 3vw, 2.5rem)',
+          padding: 'clamp(3rem, 6vw, 5rem) clamp(1.25rem, 3vw, 2.5rem) 0',
         }}>
           <Reveal>
-            <span style={{
-              ...HELV, display: 'block', fontSize: '10px',
-              letterSpacing: '0.14em', textTransform: 'uppercase',
-              color: 'rgba(0,0,0,0.35)', marginBottom: '2rem',
-            }}>
-              Features
-            </span>
+            <SectionHead label="Our Command Centre" title="Anywhere, anytime." />
           </Reveal>
-          <Reveal delay={60}>
-            <h2 style={{
-              ...DISPLAY,
-              fontSize: 'clamp(1.8rem, 4vw, 3rem)',
-              lineHeight: 1.08, letterSpacing: '-0.025em',
-              color: '#111', textAlign: 'center',
-              maxWidth: '520px', margin: '0 auto clamp(2.5rem, 5vw, 4rem)',
-            }}>
-              Built for the Golden Hour
-            </h2>
-          </Reveal>
-          <div className="hidden md:grid" style={{
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: 'clamp(10px, 1.4vw, 18px)',
-          }}>
-            {FEATURES.map((card, i) => (
-              <FeatureCard key={card.num} card={card} delay={i * 105} />
-            ))}
-          </div>
-          <div className="flex flex-col gap-3 md:hidden">
-            {FEATURES.map((card, i) => (
-              <FeatureCard key={card.num} card={card} delay={i * 80} />
-            ))}
-          </div>
         </div>
+
+        <Reveal
+          delay={80}
+          style={{
+            maxWidth: '1800px',
+            margin: '0 auto',
+            padding: 'clamp(1.75rem, 3.5vw, 2.75rem) clamp(1rem, 3vw, 2.5rem) clamp(3rem, 6vw, 5rem)',
+          }}
+        >
+          <ArchitectureFlow />
+        </Reveal>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ HOW IT WORKS ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ THE PARTNER NETWORK ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <PartnerMap />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ WHY IT MATTERS ━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section
         id="how-it-works"
         style={{
-          background: '#f8fafc',
-          borderTop: '1px solid rgba(0,0,0,.06)',
-          zIndex: 10, position: 'relative',
-          scrollMarginTop: '100px',
+          background: PAPER,
+          borderTop: `1px solid ${RULE}`,
+          position: 'relative', zIndex: 10,
+          scrollMarginTop: '124px',
         }}
       >
         <div style={{
           maxWidth: '1320px', margin: '0 auto',
-          padding: 'clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2.5rem)',
+          padding: 'clamp(3rem, 6vw, 5rem) clamp(1.25rem, 3vw, 2.5rem)',
         }}>
           <Reveal>
-            <div style={{ textAlign: 'center', marginBottom: 'clamp(2.5rem, 5vw, 4rem)' }}>
-              <span style={{
-                ...HELV, display: 'block', fontSize: '10px',
-                letterSpacing: '0.14em', textTransform: 'uppercase',
-                color: 'rgba(0,0,0,0.35)', marginBottom: '1rem',
-              }}>
-                Benefits
-              </span>
-              <h2 style={{
-                ...DISPLAY,
-                fontSize: 'clamp(1.8rem, 4vw, 3rem)',
-                lineHeight: 1.08, letterSpacing: '-0.025em',
-                color: '#111', maxWidth: '480px', margin: '0 auto',
-              }}>
-                3 Steps When Every Second Matters
-              </h2>
-            </div>
+            <SectionHead
+              label="Why It Matters"
+              title="Act in Time, Save the Brain"
+              lede="Stroke damage is measured in minutes, not hours. Every delay between the first symptom and the first treatment costs tissue that does not come back."
+            />
           </Reveal>
-          {/* Desktop + Tablet: explicit 3-column grid (matches the "One Platform" three-beat
-              cards below at the same breakpoint) — `auto-fit` previously left card 03 stranded
-              alone on a second row at tablet widths (~768px), where two 260px+ cards fit per
-              row but not three. */}
-          <div className="hidden md:grid" style={{
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'clamp(10px, 2vw, 18px)',
-          }}>
-            {STEPS.map(({ num, title, desc }, i) => (
-              <Reveal key={num} delay={i * 90}>
+
+          <div className="sa-grid-3" style={{ marginTop: 'clamp(1.75rem, 3.5vw, 2.75rem)' }}>
+            {MATTERS_CARDS.map((c, i) => (
+              <Reveal key={i} delay={i * 90}>
                 <div style={{
-                  background: '#fff', borderRadius: '18px',
-                  border: '1px solid rgba(0,0,0,.07)',
-                  padding: 'clamp(20px, 2.8vw, 32px)',
-                  height: '100%', boxSizing: 'border-box',
-                  display: 'flex', flexDirection: 'column', gap: '14px',
+                  background: c.tint.bg,
+                  border: `1px solid ${RULE}`,
+                  borderRadius: '10px',
+                  padding: 'clamp(20px, 2.4vw, 30px)',
+                  height: '100%',
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: c.type === 'stat' ? 'flex-start' : 'center',
                 }}>
-                  <span style={{ ...HELV, fontSize: '18px', letterSpacing: '0.12em', color: '#d1d5db' }}>{num}</span>
-                  <h3 style={{ ...DISPLAY, fontSize: 'clamp(16px, 1.8vw, 21px)', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
-                  <p style={{ ...HELV, fontSize: 'clamp(11.5px, 1vw, 13px)', letterSpacing: '0.02em', lineHeight: 1.75, color: '#9ca3af', margin: 0 }}>{desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <div className="flex flex-col gap-3 md:hidden">
-            {STEPS.map(({ num, title, desc }, i) => (
-              <Reveal key={num} delay={i * 90}>
-                <div style={{
-                  background: '#fff', borderRadius: '18px',
-                  border: '1px solid rgba(0,0,0,.07)',
-                  padding: 'clamp(20px, 2.8vw, 32px)',
-                  display: 'flex', flexDirection: 'column', gap: '14px',
-                }}>
-                  <span style={{ ...HELV, fontSize: '18px', letterSpacing: '0.12em', color: '#d1d5db' }}>{num}</span>
-                  <h3 style={{ ...DISPLAY, fontSize: 'clamp(16px, 1.8vw, 21px)', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
-                  <p style={{ ...HELV, fontSize: 'clamp(11.5px, 1vw, 13px)', letterSpacing: '0.02em', lineHeight: 1.75, color: '#9ca3af', margin: 0 }}>{desc}</p>
+                  {c.type === 'stat' ? (
+                    <>
+                      <div style={{
+                        ...DISPLAY, fontSize: 'clamp(2.4rem, 4.4vw, 3.4rem)',
+                        lineHeight: 1, letterSpacing: '-0.02em', color: c.tint.ink, marginBottom: '14px',
+                      }}>
+                        <CountUp to={c.to} decimals={c.decimals} suffix={c.suffix} />
+                      </div>
+                      <p style={{ ...BODY, fontSize: 'clamp(13px, 1.05vw, 14.5px)', lineHeight: 1.65, color: INK_BODY, margin: 0 }}>
+                        {c.label}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ ...BODY, fontSize: 'clamp(13px, 1.05vw, 14.5px)', lineHeight: 1.7, color: INK_BODY, margin: '0 0 12px' }}>
+                        {c.text}
+                      </p>
+                      <p style={{ ...BODY, fontSize: '11.5px', lineHeight: 1.6, color: INK_BODY, margin: 0 }}>
+                        {c.cite}
+                      </p>
+                    </>
+                  )}
                 </div>
               </Reveal>
             ))}
@@ -452,425 +314,234 @@ export default function LandingHeader() {
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ ONE PLATFORM. ONE GOLDEN HOUR. ━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <section id="platform" style={{ background: '#fff', position: 'relative', zIndex: 10, scrollMarginTop: '100px' }}>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ THE PLATFORM ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="platform" style={{ background: CREAM, borderTop: `1px solid ${RULE}`, position: 'relative', zIndex: 10, scrollMarginTop: '124px' }}>
         <div style={{
           maxWidth: '1320px', margin: '0 auto',
-          padding: 'clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2.5rem)',
+          padding: 'clamp(3rem, 6vw, 5rem) clamp(1.25rem, 3vw, 2.5rem)',
         }}>
           <Reveal>
-            <div style={{ textAlign: 'center', marginBottom: 'clamp(2rem, 4vw, 3rem)' }}>
-              <span style={{
-                ...HELV, display: 'block', fontSize: '10px',
-                letterSpacing: '0.14em', textTransform: 'uppercase',
-                color: 'rgba(0,0,0,0.35)', marginBottom: '1rem',
-              }}>
-                The Platform
-              </span>
-              <h2 style={{
-                ...DISPLAY,
-                fontSize: 'clamp(1.8rem, 4vw, 3rem)',
-                lineHeight: 1.08, letterSpacing: '-0.025em',
-                color: '#111', maxWidth: '560px', margin: '0 auto 0.9rem',
-              }}>
-                One Platform. One Golden Hour.
-              </h2>
-              <p style={{
-                ...HELV, fontSize: 'clamp(12px, 1.1vw, 14px)', lineHeight: 1.7,
-                color: '#6b7280', maxWidth: '540px', margin: '0 auto',
-              }}>
-                From the patient's first alert to treatment, every step is engineered to run in parallel —
-                not in sequence.
-              </p>
-            </div>
+            <SectionHead
+              label="The Platform"
+              title="One platform. One golden hour."
+              lede="From the first alert to treatment, every step is built to run in parallel rather than in sequence."
+            />
           </Reveal>
 
-          {/* Three-beat framing: Instant Alert / Parallel Action / AI-Powered Readiness */}
-          <div className="hidden md:grid" style={{
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'clamp(10px, 1.4vw, 18px)',
-            marginBottom: 'clamp(2.5rem, 5vw, 3.5rem)',
-          }}>
-            {[
-              { num: '01', title: 'Instant Alert', desc: 'A patient or bystander triggers the mobile app. The Command Centre is notified in the same instant.' },
-              { num: '02', title: 'Parallel Action', desc: 'Ambulances, the scan lab, and the Mobile AI Doctor are alerted together — nothing waits in a queue.' },
-              { num: '03', title: 'AI-Powered Readiness', desc: "AI inference and the radiologist's report arrive before the patient leaves the scan centre." },
-            ].map(({ num, title, desc }, i) => (
-              <Reveal key={num} delay={i * 90}>
-                <div style={{
-                  background: '#f8fafc', borderRadius: '18px',
-                  border: '1px solid rgba(0,0,0,.07)',
-                  padding: 'clamp(20px, 2.4vw, 28px)',
-                  height: '100%', boxSizing: 'border-box',
-                  display: 'flex', flexDirection: 'column', gap: '12px',
-                }}>
-                  <span style={{ ...HELV, fontSize: '16px', letterSpacing: '0.12em', color: '#c7d2e0' }}>{num}</span>
-                  <h3 style={{ ...DISPLAY, fontSize: 'clamp(15px, 1.6vw, 19px)', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
-                  <p style={{ ...HELV, fontSize: 'clamp(11px, 0.95vw, 12.5px)', letterSpacing: '0.01em', lineHeight: 1.7, color: '#6b7280', margin: 0 }}>{desc}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <div className="flex flex-col gap-3 md:hidden" style={{ marginBottom: '2.5rem' }}>
-            {[
-              { num: '01', title: 'Instant Alert', desc: 'A patient or bystander triggers the mobile app. The Command Centre is notified in the same instant.' },
-              { num: '02', title: 'Parallel Action', desc: 'Ambulances, the scan lab, and the Mobile AI Doctor are alerted together — nothing waits in a queue.' },
-              { num: '03', title: 'AI-Powered Readiness', desc: "AI inference and the radiologist's report arrive before the patient leaves the scan centre." },
-            ].map(({ num, title, desc }) => (
-              <div key={num} style={{
-                background: '#f8fafc', borderRadius: '18px',
-                border: '1px solid rgba(0,0,0,.07)', padding: '20px',
-                display: 'flex', flexDirection: 'column', gap: '10px',
-              }}>
-                <span style={{ ...HELV, fontSize: '14px', letterSpacing: '0.12em', color: '#c7d2e0' }}>{num}</span>
-                <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#111', margin: 0 }}>{title}</h3>
-                <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: '#6b7280', margin: 0 }}>{desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Hub-and-spoke diagram */}
           <Reveal delay={120}>
-            <HubSpokeDiagram />
-          </Reveal>
-
-          {/* CTA */}
-          <Reveal delay={160}>
-            <div style={{ textAlign: 'center', marginTop: 'clamp(2rem, 4vw, 2.75rem)' }}>
+            <div style={{
+              textAlign: 'center',
+              marginTop: 'clamp(2rem, 4.5vw, 3rem)',
+              background: TINT.sky.bg,
+              border: `1px solid ${RULE}`,
+              borderRadius: '10px',
+              padding: 'clamp(26px, 4vw, 44px) clamp(20px, 3vw, 32px)',
+            }}>
               <Link
                 to="/demo"
+                className="sa-focus"
                 style={{
-                  ...DISPLAY, fontWeight: 500,
-                  fontSize: 'clamp(12px, 1vw, 13.5px)',
-                  color: '#fff', background: '#0f172a',
-                  padding: '13px 30px', borderRadius: '999px',
-                  display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  textDecoration: 'none', transition: 'opacity .2s ease',
+                  ...STRONG,
+                  fontSize: 'clamp(12.5px, 1vw, 13.5px)',
+                  color: PAPER, background: INK,
+                  border: `1px solid ${INK}`,
+                  padding: '13px 28px', borderRadius: '8px',
+                  display: 'inline-flex', alignItems: 'center', gap: '9px',
+                  textDecoration: 'none',
+                  transition: 'background .2s ease, color .2s ease',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = INK }}
+                onMouseLeave={e => { e.currentTarget.style.background = INK; e.currentTarget.style.color = PAPER }}
               >
                 Explore the Platform
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </Link>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ BENEFITS BENTO ━━━━━━━━━━━━━━━━━━━━━━━━
-          Full-viewport-height section.
-          "Why Ride with Us" label — centred, near the top.
-          Cards pinned to the bottom ~38% of the section.
-          Desktop: left col = two stacked cards, right col = one tall blue card.
-          Tablet:  same two-column layout, slightly compressed.
-          Mobile:  single column stack.
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ OUR TEAM ━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <section id="team" style={{ background: PAPER, borderTop: `1px solid ${RULE}`, position: 'relative', zIndex: 10, scrollMarginTop: '124px' }}>
+        <div style={{
+          maxWidth: '1100px', margin: '0 auto',
+          padding: 'clamp(3rem, 6vw, 5rem) clamp(1.25rem, 3vw, 2.5rem)',
+        }}>
+          <Reveal>
+            <SectionHead label="Our Team" title="One mission, strong partnership." />
+          </Reveal>
+
+          <div className="sa-grid-2" style={{ margin: 'clamp(1.75rem, 3.5vw, 2.75rem) 0 clamp(2rem, 4vw, 2.75rem)' }}>
+            {TEAM.map((t, i) => (
+              <Reveal key={t.name} delay={i * 90}>
+                <div style={{
+                  background: t.tint.bg, border: `1px solid ${RULE}`, borderRadius: '10px',
+                  padding: 'clamp(20px, 2.4vw, 30px)', height: '100%', boxSizing: 'border-box',
+                }}>
+                  <h3 style={{ ...STRONG, fontSize: 'clamp(16px, 1.5vw, 19px)', color: INK, margin: '0 0 10px' }}>
+                    {t.name}
+                  </h3>
+                  <p style={{ ...BODY, fontSize: 'clamp(13px, 1.05vw, 14.5px)', lineHeight: 1.7, color: INK_BODY, margin: 0 }}>
+                    {t.desc}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={100}>
+            <p style={{
+              ...BODY, fontSize: 'clamp(13.5px, 1.15vw, 15.5px)', lineHeight: 1.75,
+              color: INK_BODY, textAlign: 'center', maxWidth: '620px', margin: '0 auto',
+            }}>
+              Together, we&rsquo;re building India&rsquo;s first mobile stroke-response network —
+              combining telehealth, AI-assisted imaging, and a coordinated ambulance network into a
+              single race against the clock.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━ WHY STROKE AI ━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <section
         id="benefits"
         style={{
           position: 'relative',
           width: '100%',
-          /* Full viewport height so image fills the screen */
           minHeight: '100svh',
           overflow: 'hidden',
           zIndex: 10,
-          scrollMarginTop: '100px',
-          /* Flex column so label sits top and cards sit bottom */
+          scrollMarginTop: '124px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
         }}
       >
-        {/* ── Background photo ── */}
         <div
           aria-hidden="true"
           style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage:
-              "url('/hero-bg.png')",
+            position: 'absolute', inset: 0,
+            /* One hand holding, the other operating, screen turned away — the
+               patient's way in to a doctor, which is what this section argues.
+               CC0 via Openverse (StockSnap ODN23L0AC9), hosted locally. */
+            backgroundImage: "url('/benefits-phone.webp')",
             backgroundSize: 'cover',
-            backgroundPosition: 'center 25%',
+            /* Focal point sits on the phone (≈45% across), so the tall crop a
+               phone viewport takes still frames the hands rather than a shoulder. */
+            backgroundPosition: '45% 42%',
             filter: 'brightness(0.46) contrast(1.06)',
           }}
         />
-        {/* Side vignettes */}
         <div aria-hidden="true" style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: 'linear-gradient(90deg,rgba(0,0,0,0.45) 0%,rgba(0,0,0,0) 28%,rgba(0,0,0,0) 72%,rgba(0,0,0,0.45) 100%)',
-        }}/>
-        {/* Bottom vignette — subtle darkening where cards sit */}
+        }} />
         <div aria-hidden="true" style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
-          background: 'linear-gradient(to top,rgba(0,0,0,0.28) 0%,rgba(0,0,0,0) 55%)',
-        }}/>
+          background: 'linear-gradient(to top,rgba(0,0,0,0.32) 0%,rgba(0,0,0,0) 55%)',
+        }} />
 
-        {/* ── Section label — top centre ── */}
         <div style={{
-          position: 'relative',
-          zIndex: 2,
-          paddingTop: 'clamp(1.4rem, 3vh, 2.2rem)',
-          display: 'flex',
-          justifyContent: 'center',
+          position: 'relative', zIndex: 2,
+          paddingTop: 'clamp(1.6rem, 3.5vh, 2.6rem)',
+          display: 'flex', justifyContent: 'center',
         }}>
           <Reveal y={-14}>
-            <span style={{
-              ...DISPLAY,
-              fontSize: 'clamp(12px, 1.1vw, 15px)',
-              letterSpacing: '0.01em',
-              color: 'rgba(255,255,255,0.88)',
-              fontWeight: 400,
-            }}>
-              Why Stroke AI
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span aria-hidden="true" style={{ width: '22px', height: '1px', background: 'rgba(255,255,255,0.4)' }} />
+              <span style={{
+                ...STRONG, fontSize: '11px', letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: 'rgba(255,255,255,0.78)',
+              }}>
+                Why Stroke AI
+              </span>
+            </div>
           </Reveal>
         </div>
 
-        {/* ── Cards — bottom of the section ── */}
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            width: '100%',
-            padding: 'clamp(1rem, 2vw, 1.5rem) clamp(1rem, 3vw, 2.5rem) clamp(1.5rem, 3.5vh, 2.8rem)',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div style={{ maxWidth: '1320px', margin: '0 auto' }}>
-
-            {/* Desktop + Tablet: two-column bento */}
-            <div
-              className="hidden sm:grid"
-              style={{
-                gridTemplateColumns: '1fr 1fr',
-                gap: 'clamp(8px, 1.2vw, 14px)',
-                alignItems: 'stretch',
-              }}
-            >
-              {/* Left: two stacked cards */}
+        <div style={{
+          position: 'relative', zIndex: 2, width: '100%',
+          padding: 'clamp(1rem, 2vw, 1.5rem) clamp(1rem, 3vw, 2.5rem) clamp(1.5rem, 3.5vh, 2.8rem)',
+          boxSizing: 'border-box',
+        }}>
+          <div className="sa-bento" style={{ maxWidth: '1320px', margin: '0 auto' }}>
+            {/* 01 — light panel */}
+            <Reveal delay={0} style={{ display: 'flex' }}>
               <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'clamp(8px, 1.2vw, 14px)',
+                background: 'rgba(245, 250, 255, 0.93)',
+                borderRadius: '4px',
+                padding: 'clamp(18px, 2vw, 26px)',
+                display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'space-between',
+                gap: 'clamp(24px, 3vw, 40px)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.7)',
+                boxSizing: 'border-box',
               }}>
-                {/* Card 01 — white */}
-                <Reveal delay={0}>
-                  <div style={{
-                    background: 'rgba(245, 250, 255, 0.93)',
-                    borderRadius: '18px',
-                    padding: 'clamp(16px, 2vw, 24px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'clamp(28px, 4vw, 52px)',
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(255,255,255,0.72)',
-                    boxSizing: 'border-box',
-                  }}>
-                    <span style={{
-                      ...HELV,
-                      fontSize: 'clamp(9.5px, 0.8vw, 11.5px)',
-                      letterSpacing: '0.04em',
-                      color: 'rgba(0,0,0,0.36)',
-                    }}>
-                      (01)
-                    </span>
-                    <div>
-                      <h3 style={{
-                        ...DISPLAY,
-                        fontSize: 'clamp(14px, 1.4vw, 18px)',
-                        letterSpacing: '-0.02em',
-                        lineHeight: 1.2,
-                        color: '#0f172a',
-                        margin: '0 0 5px',
-                      }}>
-                        Golden Hour Focus
-                      </h3>
-                      <p style={{
-                        ...HELV,
-                        fontSize: 'clamp(10px, 0.85vw, 12px)',
-                        letterSpacing: '0.01em',
-                        lineHeight: 1.7,
-                        color: '#c45a1a',
-                        margin: 0,
-                      }}>
-                        Every workflow is built around getting treatment within the critical first hours
-                      </p>
-                    </div>
-                  </div>
-                </Reveal>
-
-                {/* Card 02 — dark glass */}
-                <Reveal delay={110}>
-                  <div style={{
-                    background: 'rgba(18, 22, 28, 0.68)',
-                    borderRadius: '18px',
-                    padding: 'clamp(16px, 2vw, 24px)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'clamp(28px, 4vw, 52px)',
-                    backdropFilter: 'blur(22px) saturate(1.4)',
-                    WebkitBackdropFilter: 'blur(22px) saturate(1.4)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    boxSizing: 'border-box',
-                  }}>
-                    <span style={{
-                      ...HELV,
-                      fontSize: 'clamp(9.5px, 0.8vw, 11.5px)',
-                      letterSpacing: '0.04em',
-                      color: 'rgba(255,255,255,0.30)',
-                    }}>
-                      (02)
-                    </span>
-                    <div>
-                      <h3 style={{
-                        ...DISPLAY,
-                        fontSize: 'clamp(14px, 1.4vw, 18px)',
-                        letterSpacing: '-0.02em',
-                        lineHeight: 1.2,
-                        color: '#ffffff',
-                        margin: '0 0 5px',
-                      }}>
-                        Verified Care Network
-                      </h3>
-                      <p style={{
-                        ...HELV,
-                        fontSize: 'clamp(10px, 0.85vw, 12px)',
-                        letterSpacing: '0.01em',
-                        lineHeight: 1.7,
-                        color: 'rgba(255,255,255,0.50)',
-                        margin: 0,
-                      }}>
-                        Connect only with vetted hospitals and stroke specialists in your area
-                      </p>
-                    </div>
-                  </div>
-                </Reveal>
+                <span style={{ ...BODY, fontSize: '11px', letterSpacing: '0.14em', color: INK_SUBTLE }}>01</span>
+                <div>
+                  <h3 style={{ ...STRONG, fontSize: 'clamp(15px, 1.4vw, 18px)', lineHeight: 1.25, color: INK, margin: '0 0 6px' }}>
+                    Golden hour focus
+                  </h3>
+                  <p style={{ ...BODY, fontSize: 'clamp(12.5px, 0.95vw, 13.5px)', lineHeight: 1.65, color: INK_BODY, margin: 0 }}>
+                    Every step is built around reaching treatment inside the critical first hour.
+                  </p>
+                </div>
               </div>
+            </Reveal>
 
-              {/* Right: tall blue card */}
-              <Reveal delay={55}>
-                <div style={{
-                  background: '#a8d4f5',
-                  borderRadius: '18px',
-                  padding: 'clamp(16px, 2vw, 24px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  height: '100%',
-                  minHeight: 'clamp(220px, 28vw, 360px)',
-                  boxSizing: 'border-box',
-                }}>
-                  <span style={{
-                    ...HELV,
-                    fontSize: 'clamp(9.5px, 0.8vw, 11.5px)',
-                    letterSpacing: '0.04em',
-                    color: 'rgba(0,0,0,0.36)',
-                    display: 'block',
-                  }}>
-                    (03)
-                  </span>
-                  <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: 'clamp(12px, 2.5vw, 28px) 0',
-                    minHeight: 0,
-                  }}>
-                    <BentoLineChart />
-                  </div>
-                  <div>
-                    <h3 style={{
-                      ...DISPLAY,
-                      fontSize: 'clamp(14px, 1.4vw, 18px)',
-                      letterSpacing: '-0.02em',
-                      lineHeight: 1.2,
-                      color: '#0f172a',
-                      margin: '0 0 5px',
-                    }}>
-                      24/7 Support
-                    </h3>
-                    <p style={{
-                      ...HELV,
-                      fontSize: 'clamp(10px, 0.85vw, 12px)',
-                      letterSpacing: '0.01em',
-                      lineHeight: 1.7,
-                      color: 'rgba(0,0,0,0.52)',
-                      margin: 0,
-                    }}>
-                      Round-the-clock monitoring means help is always ready, day or night
-                    </p>
-                  </div>
+            {/* 02 — dark glass */}
+            <Reveal delay={110} style={{ display: 'flex' }}>
+              <div style={{
+                background: 'rgba(18, 22, 28, 0.68)',
+                borderRadius: '4px',
+                padding: 'clamp(18px, 2vw, 26px)',
+                display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'space-between',
+                gap: 'clamp(24px, 3vw, 40px)',
+                backdropFilter: 'blur(22px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(22px) saturate(1.3)',
+                border: '1px solid rgba(255,255,255,0.10)',
+                boxSizing: 'border-box',
+              }}>
+                <span style={{ ...BODY, fontSize: '11px', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.42)' }}>02</span>
+                <div>
+                  <h3 style={{ ...STRONG, fontSize: 'clamp(15px, 1.4vw, 18px)', lineHeight: 1.25, color: '#FFFDF8', margin: '0 0 6px' }}>
+                    A verified care network
+                  </h3>
+                  <p style={{ ...BODY, fontSize: 'clamp(12.5px, 0.95vw, 13.5px)', lineHeight: 1.65, color: 'rgba(255,255,255,0.66)', margin: 0 }}>
+                    You are connected only to hospitals and stroke specialists we have vetted.
+                  </p>
                 </div>
-              </Reveal>
-            </div>
+              </div>
+            </Reveal>
 
-            {/* Mobile: single column */}
-            <div className="flex flex-col gap-3 sm:hidden">
-              {/* Card 01 */}
-              <Reveal delay={0}>
-                <div style={{
-                  background: 'rgba(245, 250, 255, 0.93)',
-                  borderRadius: '18px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '36px',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.72)',
-                }}>
-                  <span style={{ ...HELV, fontSize: '11px', letterSpacing: '0.04em', color: 'rgba(0,0,0,0.36)' }}>(01)</span>
-                  <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>Golden Hour Focus</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: '#c45a1a', margin: 0 }}>Every workflow is built around getting treatment within the critical first hours</p>
-                  </div>
+            {/* 03 — tall panel with the chart */}
+            <Reveal delay={55} style={{ display: 'flex' }}>
+              <div style={{
+                background: '#a8d4f5',
+                borderRadius: '4px',
+                padding: 'clamp(18px, 2vw, 26px)',
+                display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'space-between',
+                minHeight: 'clamp(220px, 28vw, 360px)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                boxSizing: 'border-box',
+              }}>
+                <span style={{ ...BODY, fontSize: '11px', letterSpacing: '0.14em', color: 'rgba(22,22,15,0.45)' }}>03</span>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: 'clamp(12px, 2.5vw, 28px) 0', minHeight: 0 }}>
+                  <BentoLineChart />
                 </div>
-              </Reveal>
-
-              {/* Card 02 */}
-              <Reveal delay={80}>
-                <div style={{
-                  background: 'rgba(18, 22, 28, 0.68)',
-                  borderRadius: '18px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '36px',
-                  backdropFilter: 'blur(22px) saturate(1.4)',
-                  WebkitBackdropFilter: 'blur(22px) saturate(1.4)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <span style={{ ...HELV, fontSize: '11px', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.30)' }}>(02)</span>
-                  <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#ffffff', margin: '0 0 5px' }}>Verified Care Network</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(255,255,255,0.50)', margin: 0 }}>Connect only with vetted hospitals and stroke specialists in your area</p>
-                  </div>
+                <div>
+                  <h3 style={{ ...STRONG, fontSize: 'clamp(15px, 1.4vw, 18px)', lineHeight: 1.25, color: INK, margin: '0 0 6px' }}>
+                    Cover around the clock
+                  </h3>
+                  <p style={{ ...BODY, fontSize: 'clamp(12.5px, 0.95vw, 13.5px)', lineHeight: 1.65, color: INK_BODY, margin: 0 }}>
+                    The command centre is monitored day and night, so help is always ready.
+                  </p>
                 </div>
-              </Reveal>
-
-              {/* Card 03 */}
-              <Reveal delay={160}>
-                <div style={{
-                  background: '#a8d4f5',
-                  borderRadius: '18px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  minHeight: '260px',
-                }}>
-                  <span style={{ ...HELV, fontSize: '11px', letterSpacing: '0.04em', color: 'rgba(0,0,0,0.36)', display: 'block', marginBottom: '12px' }}>(03)</span>
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', paddingBottom: '16px' }}>
-                    <BentoLineChart />
-                  </div>
-                  <div>
-                    <h3 style={{ ...DISPLAY, fontSize: '16px', letterSpacing: '-0.02em', color: '#0f172a', margin: '0 0 5px' }}>24/7 Support</h3>
-                    <p style={{ ...HELV, fontSize: '11.5px', lineHeight: 1.7, color: 'rgba(0,0,0,0.52)', margin: 0 }}>Round-the-clock monitoring means help is always ready, day or night</p>
-                  </div>
-                </div>
-              </Reveal>
-            </div>
-
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
