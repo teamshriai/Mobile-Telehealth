@@ -1,130 +1,164 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 
-/* ── Layout ── */
-import AppLayout from './components/layout/AppLayout.jsx'
+import { AuthProvider, useAuth } from './app/AuthContext.jsx'
+import { RequireAuth, RequireAnonymous, homeForRole } from './app/guards.jsx'
+import { setSessionExpiredHandler } from './lib/apiClient'
+import ErrorBoundary from './components/feedback/ErrorBoundary.jsx'
+import FullPageLoader from './components/feedback/FullPageLoader.jsx'
+import PatientLayout from './components/layout/PatientLayout.jsx'
 
-/* ── Auth Components (moved to components/auth/) ── */
-const Login         = lazy(() => import('./components/auth/Login.jsx'))
-const Register      = lazy(() => import('./components/auth/Register.jsx'))
+/* ── Public ── */
+const LandingPage    = lazy(() => import('./components/landing/LandingPage.jsx'))
+const Login          = lazy(() => import('./components/auth/Login.jsx'))
+const Register       = lazy(() => import('./components/auth/Register.jsx'))
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.jsx'))
 const ResetPassword  = lazy(() => import('./components/auth/ResetPassword.jsx'))
-
-/* ── Pages ── */
-const LandingPage   = lazy(() => import('./components/landing/LandingPage.jsx'))
-const Dashboard     = lazy(() => import('./pages/Dashboard.jsx'))
-const Timeline      = lazy(() => import('./pages/Timeline.jsx'))
-const MedicalRecords = lazy(() => import('./pages/MedicalRecords.jsx'))
-const Reports       = lazy(() => import('./pages/Reports.jsx'))
-const Appointments  = lazy(() => import('./pages/Appointments.jsx'))
-const Meetings      = lazy(() => import('./pages/Meetings.jsx'))
-const AIAssistant   = lazy(() => import('./pages/AIAssistant.jsx'))
-const Profile       = lazy(() => import('./pages/Profile.jsx'))
-const Settings      = lazy(() => import('./pages/Settings.jsx'))
-const NotFound      = lazy(() => import('./pages/NotFound.jsx'))
 const LegalPlaceholder = lazy(() => import('./pages/LegalPlaceholder.jsx'))
+const NotFound       = lazy(() => import('./pages/NotFound.jsx'))
 
-/* ── Platform demo (public, unauthenticated role previews) ── */
-const DemoIndex        = lazy(() => import('./pages/demo/DemoIndex.jsx'))
+/* ── Platform demo (public, explicitly badged as a preview) ── */
+const DemoIndex         = lazy(() => import('./pages/demo/DemoIndex.jsx'))
 const DemoCommandCentre = lazy(() => import('./pages/demo/CommandCentre.jsx'))
-const DemoAmbulance    = lazy(() => import('./pages/demo/Ambulance.jsx'))
-const DemoScanLab      = lazy(() => import('./pages/demo/ScanLab.jsx'))
+const DemoAmbulance     = lazy(() => import('./pages/demo/Ambulance.jsx'))
+const DemoScanLab       = lazy(() => import('./pages/demo/ScanLab.jsx'))
 const DemoAiRadiologist = lazy(() => import('./pages/demo/AiRadiologist.jsx'))
-const DemoHospitalHub  = lazy(() => import('./pages/demo/HospitalHub.jsx'))
-const DemoTelehealth   = lazy(() => import('./pages/demo/Telehealth.jsx'))
+const DemoHospitalHub   = lazy(() => import('./pages/demo/HospitalHub.jsx'))
+const DemoTelehealth    = lazy(() => import('./pages/demo/Telehealth.jsx'))
 
-/* ── Auth helpers ── */
-const isAuthenticated = () => {
-  try {
-    return window.localStorage.getItem('oncotrace_session') === 'active'
-  } catch {
-    return false
-  }
+/* ── Patient portal ── */
+const PatientHome     = lazy(() => import('./pages/patient/PatientHome.jsx'))
+const EmergencyPage   = lazy(() => import('./pages/patient/EmergencyPage.jsx'))
+const AppointmentsPage = lazy(() => import('./pages/patient/AppointmentsPage.jsx'))
+const MyHealthPage    = lazy(() => import('./pages/patient/MyHealthPage.jsx'))
+const CareTeamPage    = lazy(() => import('./pages/patient/CareTeamPage.jsx'))
+const Profile         = lazy(() => import('./pages/Profile.jsx'))
+const Settings        = lazy(() => import('./pages/Settings.jsx'))
+
+/* ── Doctor / Admin: architecture only, no fabricated UI ── */
+const PortalComingSoon = lazy(() => import('./pages/portal/PortalComingSoon.jsx'))
+
+/**
+ * Wires apiClient's "session is irrecoverably over" signal to a real redirect.
+ *
+ * apiClient cannot import the router (it would be a cycle, and it is not a
+ * component), so it exposes a handler slot that this component fills.
+ */
+function SessionExpiryBridge() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      if (!window.location.pathname.startsWith('/login')) {
+        navigate('/login', { replace: true, state: { expired: true } })
+      }
+    })
+    return () => setSessionExpiredHandler(() => {})
+  }, [navigate])
+
+  return null
 }
 
-const ProtectedRoute = ({ children }) =>
-  isAuthenticated() ? children : <Navigate to="/landing" replace />
+/** Sends an already-authenticated visitor to the portal their role belongs to. */
+function RoleHomeRedirect() {
+  const { isChecking, isAuthenticated, role } = useAuth()
 
-const PublicRoute = ({ children }) =>
-  isAuthenticated() ? <Navigate to="/dashboard" replace /> : children
-
-// Same idea as PublicRoute, but renders LandingPage instead of arbitrary
-// children — used for "/" and "/landing" so the auth check happens at this
-// component's own render time rather than being baked into a route element
-// once at App's initial render (which could otherwise go stale and cause a
-// redirect loop, e.g. right after an account deletion navigates to "/landing").
-const RootRoute = () =>
-  isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LandingPage />
+  if (isChecking) return <FullPageLoader label="Checking your session…" />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <Navigate to={homeForRole(role)} replace />
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
+    // Outermost boundary: catches a throw in a layout or provider, where there
+    // is no inner boundary left to handle it.
+    <ErrorBoundary label="app-root">
+      <BrowserRouter>
+        <AuthProvider>
+          <SessionExpiryBridge />
+          <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
+            <Routes>
+              {/* ── Public ── */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/landing" element={<Navigate to="/" replace />} />
 
-          {/* ── Public routes ── */}
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/landing" element={<RootRoute />} />
-          <Route
-            path="/login"
-            element={<PublicRoute><Login /></PublicRoute>}
-          />
-          <Route
-            path="/register"
-            element={<PublicRoute><Register /></PublicRoute>}
-          />
-          <Route
-            path="/forgot-password"
-            element={<PublicRoute><ForgotPassword /></PublicRoute>}
-          />
-          <Route
-            path="/reset-password"
-            element={<PublicRoute><ResetPassword /></PublicRoute>}
-          />
-          <Route path="/terms" element={<LegalPlaceholder title="Terms of Service" />} />
-          <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
+              <Route path="/login"           element={<RequireAnonymous><Login /></RequireAnonymous>} />
+              <Route path="/register"        element={<RequireAnonymous><Register /></RequireAnonymous>} />
+              <Route path="/forgot-password" element={<RequireAnonymous><ForgotPassword /></RequireAnonymous>} />
+              <Route path="/reset-password"  element={<RequireAnonymous><ResetPassword /></RequireAnonymous>} />
 
-          {/* ── Platform demo (public role previews, no auth) ── */}
-          <Route path="/demo" element={<DemoIndex />} />
-          <Route path="/demo/command-centre" element={<DemoCommandCentre />} />
-          <Route path="/demo/ambulance" element={<DemoAmbulance />} />
-          <Route path="/demo/scan-lab" element={<DemoScanLab />} />
-          <Route path="/demo/ai-radiologist" element={<DemoAiRadiologist />} />
-          <Route path="/demo/hospital-hub" element={<DemoHospitalHub />} />
-          <Route path="/demo/telehealth" element={<DemoTelehealth />} />
+              <Route path="/terms"   element={<LegalPlaceholder title="Terms of Service" />} />
+              <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
 
-          {/* ── Protected routes ── */}
-          <Route
-            path="/dashboard"
-            element={<ProtectedRoute><AppLayout /></ProtectedRoute>}
-          >
-            <Route index                  element={<Dashboard />} />
-            <Route path="timeline"        element={<Timeline />} />
-            <Route path="medical-records" element={<MedicalRecords />} />
-            <Route path="reports"         element={<Reports />} />
-            <Route path="appointments"    element={<Appointments />} />
-            <Route path="meetings"        element={<Meetings />} />
-            <Route path="ai"              element={<AIAssistant />} />
-            <Route path="profile"         element={<Profile />} />
-            <Route path="settings"        element={<Settings />} />
-          </Route>
+              {/* ── Platform demo ── */}
+              <Route path="/demo"                  element={<DemoIndex />} />
+              <Route path="/demo/command-centre"   element={<DemoCommandCentre />} />
+              <Route path="/demo/ambulance"        element={<DemoAmbulance />} />
+              <Route path="/demo/scan-lab"         element={<DemoScanLab />} />
+              <Route path="/demo/ai-radiologist"   element={<DemoAiRadiologist />} />
+              <Route path="/demo/hospital-hub"     element={<DemoHospitalHub />} />
+              <Route path="/demo/telehealth"       element={<DemoTelehealth />} />
 
-          {/* ── 404 ── */}
-          <Route path="*" element={<NotFound />} />
+              {/* ── Patient portal (role: Patient) ── */}
+              <Route
+                path="/app"
+                element={
+                  <RequireAuth roles={['Patient']}>
+                    <PatientLayout />
+                  </RequireAuth>
+                }
+              >
+                <Route index                element={<PatientHome />} />
+                <Route path="appointments"  element={<AppointmentsPage />} />
+                <Route path="medicines"     element={<MedicinesRoute />} />
+                <Route path="health"        element={<MyHealthPage />} />
+                <Route path="care-team"     element={<CareTeamPage />} />
+                <Route path="emergency"     element={<EmergencyPage />} />
+                <Route path="profile"       element={<Profile />} />
+                <Route path="settings"      element={<Settings />} />
+              </Route>
 
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+              {/* ── Doctor portal (role: Doctor, HealthcareWorker, LabTechnician) ── */}
+              <Route
+                path="/clinic/*"
+                element={
+                  <RequireAuth roles={['Doctor', 'HealthcareWorker', 'LabTechnician']}>
+                    <PortalComingSoon portal="Doctor" />
+                  </RequireAuth>
+                }
+              />
+
+              {/* ── Admin portal (role: Admin) ── */}
+              <Route
+                path="/admin/*"
+                element={
+                  <RequireAuth roles={['Admin']}>
+                    <PortalComingSoon portal="Admin" />
+                  </RequireAuth>
+                }
+              />
+
+              {/* Legacy /dashboard/* links (bookmarks, emails) → the new portal.
+                  Removing them outright would 404 every existing bookmark. */}
+              <Route path="/dashboard/profile"  element={<Navigate to="/app/profile" replace />} />
+              <Route path="/dashboard/settings" element={<Navigate to="/app/settings" replace />} />
+              <Route path="/dashboard/*"        element={<RoleHomeRedirect />} />
+              <Route path="/dashboard"          element={<RoleHomeRedirect />} />
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 
-function PageLoader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center">
-      <div role="status" className="space-y-3">
-        <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
-        <p className="text-sm font-medium text-slate-600">Loading your care workspace…</p>
-      </div>
-    </div>
-  )
+/* Named wrappers so each lazy module chunk stays separate and the route table
+   above reads as a list of destinations rather than of imports. */
+const Modules = {
+  // Medicines has no backing Medication model — stays an honest placeholder.
+  Medicines: lazy(() => import('./pages/patient/modules.jsx').then((m) => ({ default: m.MedicinesPage }))),
 }
+
+function MedicinesRoute() { return <Modules.Medicines /> }

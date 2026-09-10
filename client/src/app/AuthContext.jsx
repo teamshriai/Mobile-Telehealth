@@ -1,0 +1,160 @@
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import * as authService from '../services/auth.service'
+
+/**
+ * AuthContext — the single source of truth for "who is signed in".
+ *
+ * Phase 1 found useAuth() was a per-component useState hook, so every call
+ * site held an independent copy of the user and signing out in the sidebar
+ * notified nobody. One provider fixes that.
+ *
+ * It also owns the ACCESS TOKEN, deliberately in memory rather than
+ * localStorage: an XSS payload can read localStorage but cannot read a
+ * closure variable. The refresh token lives in an httpOnly cookie the script
+ * cannot touch at all, so a page reload restores the session by calling
+ * /auth/refresh rather than by persisting a credential to disk.
+ */
+const AuthContext = createContext(null)
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null)
+  const [permissions, setPermissions] = useState([])
+  /** 'checking' until the initial silent refresh settles — see bootstrap below. */
+  const [status, setStatus] = useState('checking')
+  const [error, setError] = useState(null)
+
+  // Guards against React 18 StrictMode double-invoking the bootstrap effect.
+  // Because refresh ROTATES the token, a second concurrent call would replay
+  // an already-revoked token and trip server-side reuse detection, signing the
+  // user out at startup.
+  //
+  // The guard must NOT be paired with a `cancelled` flag in the cleanup: under
+  // StrictMode the first mount's cleanup runs immediately, so a cancel flag
+  // would suppress the only state update while the ref stops the second mount
+  // from retrying — leaving status pinned at 'checking' and the entire app
+  // stuck behind the session spinner forever. So this effect deliberately
+  // completes and commits its result even after unmount. Setting state on an
+  // unmounted component is a no-op warning at worst; a permanently blank app
+  // is not.
+  const bootstrapped = useRef(false)
+
+  const applySession = useCallback((nextUser, nextPermissions, nextProfile) => {
+    // /auth/me's `user` is identity-only (email, role — never a name, by
+    // design: identity and profile are separate concerns, see the profile
+    // module's own header comment). The account menu still needs something
+    // better than an email to greet the patient with, so the display name is
+    // derived here, once, from whichever profile came back with this
+    // response — never fetched again just to fill in a label.
+    const displayName = nextProfile
+      ? [nextProfile.firstName, nextProfile.lastName].filter(Boolean).join(' ') || undefined
+      : undefined
+
+    setUser(nextUser ? { ...nextUser, name: displayName } : null)
+    setPermissions(nextPermissions ?? [])
+    setStatus(nextUser ? 'authenticated' : 'anonymous')
+  }, [])
+
+  const clearSession = useCallback(() => {
+    authService.clearAccessToken()
+    setUser(null)
+    setPermissions([])
+    setStatus('anonymous')
+  }, [])
+
+  /**
+   * On mount, try to restore a session from the refresh cookie.
+   * A 401 here is the normal "not signed in" path, not an error worth showing.
+   */
+  useEffect(() => {
+    if (bootstrapped.current) return
+    bootstrapped.current = true
+
+    ;(async () => {
+      try {
+        const { user: u } = await authService.refreshSession()
+        const me = await authService.getMe()
+        applySession(me?.user ?? u, me?.permissions, me?.profile)
+      } catch {
+        // Every failure path lands here — no cookie (the normal first-visit
+        // case), an expired session, a rate limit, or the API being
+        // unreachable. All mean "render as signed out". The status MUST leave
+        // 'checking' on every path, or even the public pages never appear.
+        clearSession()
+      }
+    })()
+  }, [applySession, clearSession])
+
+  const login = useCallback(async (credentials) => {
+    setError(null)
+    try {
+      await authService.login(credentials)
+      const me = await authService.getMe()
+      applySession(me.user, me.permissions, me.profile)
+      return { success: true, role: me.user?.role }
+    } catch (err) {
+      setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
+      return { success: false, fieldErrors: err.fieldErrors ?? null }
+    }
+  }, [applySession])
+
+  const register = useCallback(async (formData) => {
+    setError(null)
+    try {
+      await authService.register(formData)
+      const me = await authService.getMe()
+      applySession(me.user, me.permissions, me.profile)
+      return { success: true, role: me.user?.role }
+    } catch (err) {
+      setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
+      return { success: false, fieldErrors: err.fieldErrors ?? null }
+    }
+  }, [applySession])
+
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout()
+    } finally {
+      // Clear locally even if the network call failed — the user asked to
+      // leave, and the refresh cookie is scoped so the server session is the
+      // only thing that could linger.
+      clearSession()
+    }
+  }, [clearSession])
+
+  /** Re-read the user (e.g. after a profile edit changes the display name). */
+  const reloadUser = useCallback(async () => {
+    try {
+      const me = await authService.getMe()
+      applySession(me.user, me.permissions, me.profile)
+    } catch {
+      clearSession()
+    }
+  }, [applySession, clearSession])
+
+  const value = useMemo(() => ({
+    user,
+    permissions,
+    status,
+    error,
+    isAuthenticated: status === 'authenticated',
+    isChecking: status === 'checking',
+    role: user?.role ?? null,
+    /** UI gating only — the server re-checks every request. */
+    can: (permission) => permissions.includes(permission),
+    login,
+    register,
+    logout,
+    reloadUser,
+    clearError: () => setError(null),
+  }), [user, permissions, status, error, login, register, logout, reloadUser])
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (ctx === null) {
+    throw new Error('useAuth must be used within <AuthProvider>. Wrap the app in App.jsx.')
+  }
+  return ctx
+}

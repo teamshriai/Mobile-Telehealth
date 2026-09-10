@@ -1,6 +1,6 @@
 // =============================================================================
-// OncoTrace AI — Database Schema
-// Designed for a commercial precision oncology platform.
+// Stroke AI — Database Schema
+// Designed for a commercial stroke-care platform (patient / doctor / admin).
 //
 // Design principles:
 //  - User table = authentication + identity ONLY. No medical data.
@@ -147,6 +147,10 @@ enum AuditAction {
   ProfilePhotoUpdated
   RoleChanged
   AccountDeleted
+  // ── Session lifecycle (refresh-token rotation) ──────────────────────────
+  TokenRefreshed
+  TokenReuseDetected
+  SessionRevoked
 
   @@map("audit_action")
 }
@@ -277,8 +281,12 @@ model User {
   // ── Relations ─────────────────────────────────────────────────────────────
   role               Role                 @relation(fields: [roleId], references: [id])
   patientProfile     PatientProfile?
+  doctorProfile      DoctorProfile?
+  staffProfile       StaffProfile?
   auditLogs          AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  refreshTokens      RefreshToken[]
+  notifications      Notification[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // email: @unique creates the lookup index implicitly — not duplicated here.
@@ -401,6 +409,9 @@ model PatientProfile {
   // ── Relations ─────────────────────────────────────────────────────────────
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  careTeam     CareTeamMember[]
+  appointments Appointment[]
+
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
   // [abhaIdHash]: @unique blind-index look-up — abhaId itself is encrypted
@@ -500,4 +511,276 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// =============================================================================
+// REFRESH TOKEN
+//
+// Enables short-lived access tokens (15 min) without logging the patient out
+// every 15 minutes — the single biggest usability defect found in the Phase 1
+// audit.
+//
+// Security model mirrors PasswordResetToken, with rotation added:
+//  - Raw tokens are NEVER stored. Only a SHA-256 hash is persisted.
+//  - Single use: refreshing consumes the token (revokedAt set) and issues a
+//    new one. `replacedBy` chains the rotation so a whole family is traceable.
+//  - Reuse detection: presenting an already-revoked token means the token was
+//    stolen (the legitimate client already rotated it). The correct response is
+//    to revoke the ENTIRE family, forcing re-authentication. `familyId` groups
+//    every token descended from one login for exactly this purpose.
+//  - deviceLabel/ipAddress/userAgent let a patient see and revoke their own
+//    sessions later without another schema change.
+// =============================================================================
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+
+  tokenHash String    @unique @map("token_hash")
+
+  /// All tokens rotated from a single login share this id.
+  familyId  String    @map("family_id") @db.Uuid
+
+  /// Set when this token is rotated away or explicitly revoked. Non-null = unusable.
+  revokedAt DateTime? @map("revoked_at")
+  /// Hash of the token that replaced this one — audit trail for rotation.
+  replacedBy String?  @map("replaced_by")
+
+  expiresAt DateTime  @map("expires_at")
+
+  // ── Session context (for a future "your devices" screen) ─────────────────
+  deviceLabel String? @map("device_label")
+  ipAddress   String? @map("ip_address")
+  userAgent   String? @map("user_agent")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// =============================================================================
+// DOCTOR PROFILE
+//
+// The Doctor portal is NOT built in Phase 2 — but the identity it will need is
+// modelled now so adding it later is additive rather than a restructure.
+//
+// registrationNumber is the state medical council registration; hprId is the
+// ABDM Healthcare Professional Registry id. Both are unique when present, and
+// both are the fields a patient-facing "verified doctor" badge would check.
+// =============================================================================
+model DoctorProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  gender    Gender?
+
+  /// State medical council registration number.
+  registrationNumber String? @unique @map("registration_number")
+  /// ABDM Healthcare Professional Registry id.
+  hprId              String? @unique @map("hpr_id")
+
+  specialty      String?
+  qualifications String?
+  /// Free text until a Hospital/Facility model is justified by real requirements.
+  hospitalName   String? @map("hospital_name")
+  yearsExperience Int?   @map("years_experience")
+
+  /// Set by an administrator once credentials are checked. Never self-service.
+  isVerified Boolean   @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+
+  phoneNumber String? @map("phone_number")
+  profilePhoto String? @map("profile_photo")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt      @map("updated_at")
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  careTeam CareTeamMember[]
+  appointments Appointment[]
+
+  @@index([lastName, firstName])
+  @@index([specialty])
+  @@map("doctor_profiles")
+}
+
+// =============================================================================
+// STAFF PROFILE
+//
+// Covers Admin, HealthcareWorker and LabTechnician — roles that need an
+// identity and a department but not a clinician's credentials. One table rather
+// than three near-identical ones; the role still lives on User.roleId, so this
+// does not duplicate role logic.
+// =============================================================================
+model StaffProfile {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+
+  /// Free-text job title, e.g. "Stroke Care Coordinator".
+  jobTitle   String? @map("job_title")
+  department String?
+  employeeId String? @unique @map("employee_id")
+
+  phoneNumber String? @map("phone_number")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt      @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([lastName, firstName])
+  @@map("staff_profiles")
+}
+
+// =============================================================================
+// CARE TEAM MEMBER  (Patient ↔ Doctor assignment)
+//
+// The keystone of the three-role architecture. Every doctor-facing endpoint
+// answers "is this patient yours?" by querying this table — which is exactly
+// why profile.routes.ts currently refuses to expose GET /profile/:id: until
+// now there was no relationship to authorise against.
+//
+// Historical rows are preserved via activeTo rather than deletion, so "who was
+// on this patient's care team in March?" stays answerable.
+// =============================================================================
+model CareTeamMember {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+  doctorId  String @map("doctor_id")  @db.Uuid
+
+  /// Role on THIS patient's care team, e.g. "Neurologist", "Physiotherapist".
+  /// Distinct from the platform RoleName — a doctor's account role never changes.
+  careRole  String  @map("care_role")
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  activeFrom DateTime  @default(now()) @map("active_from")
+  activeTo   DateTime? @map("active_to")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  DoctorProfile  @relation(fields: [doctorId],  references: [id], onDelete: Restrict)
+
+  /// A doctor holds one active assignment per patient. Re-assignment after an
+  /// activeTo is intentionally allowed — hence the composite includes careRole.
+  @@unique([patientId, doctorId, careRole])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([patientId, activeTo])
+  @@map("care_team_members")
+}
+
+// =============================================================================
+// APPOINTMENT
+//
+// Replaces the mock booking flow, which confirmed appointments no doctor ever
+// received (Phase 1 §D-C3).
+//
+// scheduledAt is stored as an absolute UTC instant; the client renders it in
+// the patient's timezone. Never store wall-clock time without a zone.
+// =============================================================================
+model Appointment {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+  doctorId  String? @map("doctor_id") @db.Uuid
+
+  scheduledAt  DateTime @map("scheduled_at")
+  durationMins Int      @default(30) @map("duration_mins")
+
+  mode   AppointmentMode   @default(InPerson)
+  status AppointmentStatus @default(Requested)
+
+  /// Patient's own words for why they are attending. Encrypted at rest.
+  reason String?
+  /// Clinician-authored notes. Encrypted at rest.
+  notes  String?
+
+  locationName String? @map("location_name")
+
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by") @db.Uuid
+  cancelReason String?   @map("cancel_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  DoctorProfile? @relation(fields: [doctorId],  references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([scheduledAt])
+  @@index([patientId, status, scheduledAt])
+  @@map("appointments")
+}
+
+enum AppointmentMode {
+  InPerson
+  Video
+  Phone
+
+  @@map("appointment_mode")
+}
+
+enum AppointmentStatus {
+  Requested
+  Confirmed
+  Completed
+  Cancelled
+  NoShow
+
+  @@map("appointment_status")
+}
+
+// =============================================================================
+// NOTIFICATION
+//
+// Replaces the hardcoded notification array in Topbar.jsx.
+// Deliberately minimal: no delivery-channel matrix, no templating engine, no
+// scheduling. Those are speculative until real notification triggers exist.
+// =============================================================================
+model Notification {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  type  NotificationType @default(General)
+  title String
+  body  String?
+
+  /// In-app route this notification points at, e.g. "/app/appointments".
+  actionUrl String? @map("action_url")
+
+  readAt DateTime? @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Covers the only two real queries: the unread badge count, and the
+  /// reverse-chronological notification list.
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  General
+  Appointment
+  Report
+  Medication
+  CareTeam
+
+  @@map("notification_type")
 }

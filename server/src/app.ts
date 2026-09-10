@@ -13,6 +13,10 @@ import { env } from './config/env.config';
 import { ApiResponseBuilder } from './utils/apiResponse';
 import { authRouter } from './auth/auth.routes';
 import { profileRouter } from './profile/profile.routes';
+import { appointmentRouter } from './appointment/appointment.routes';
+import { careTeamRouter } from './careteam/careteam.routes';
+import { notificationRouter } from './notification/notification.routes';
+import { doctorRouter } from './doctor/doctor.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Factory
@@ -91,7 +95,7 @@ export function createApp(): Application {
   app.get('/health', (_req, res) => {
     res.status(200).json(
       ApiResponseBuilder.success('Service is healthy.', {
-        service: 'oncotrace-server',
+        service: 'stroke-ai-server',
         environment: env.NODE_ENV,
         timestamp: new Date().toISOString(),
       }),
@@ -101,6 +105,10 @@ export function createApp(): Application {
   // ── API Routes ────────────────────────────────────────────────────────────
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/profile', profileRouter);
+  app.use('/api/v1/appointments', appointmentRouter);
+  app.use('/api/v1/care-team', careTeamRouter);
+  app.use('/api/v1/notifications', notificationRouter);
+  app.use('/api/v1/doctors', doctorRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

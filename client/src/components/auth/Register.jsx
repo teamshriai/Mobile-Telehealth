@@ -14,7 +14,8 @@ import {
   Check,
   Shield
 } from 'lucide-react'
-import { useAuth } from '../../hooks/useAuth'
+import { useAuth } from '../../app/AuthContext.jsx'
+import { homeForRole } from '../../app/guards.jsx'
 import BrandMark from '../common/BrandMark.jsx'
 
 const fadeIn = {
@@ -173,15 +174,15 @@ export default function Register() {
     try {
       const result = await register(form)
       if (result && result.success) {
-        setSuccessBanner('Account created successfully! Redirecting to sign in page...')
+        // Registration signs the user in (the API returns a session), so
+        // sending them to /login would ask them to authenticate again for no
+        // reason — and RequireAnonymous would bounce them straight back.
+        setSuccessBanner('Account created. Taking you to your portal…')
         window.scrollTo({ top: 0, behavior: 'smooth' })
 
         setTimeout(() => {
-          navigate('/login', {
-            replace: true,
-            state: { message: 'Account created successfully! Please sign in with your credentials.' },
-          })
-        }, 1500)
+          navigate(homeForRole(result.role), { replace: true })
+        }, 900)
         return
       }
 
@@ -289,7 +290,7 @@ export default function Register() {
 
             <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 mt-10">
               <Shield size={13} strokeWidth={2} />
-              <span>HIPAA-compliant and secure</span>
+              <span>Your data is encrypted and private</span>
             </div>
           </div>
 
@@ -393,7 +394,7 @@ export default function Register() {
                   <Phone
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
                                transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none z-10"
                   />
                   <div className="absolute left-9 sm:left-10 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none z-10 text-xs sm:text-sm font-semibold text-gray-700">
@@ -411,7 +412,7 @@ export default function Register() {
                     maxLength={11}
                     autoComplete="tel-national"
                     className={`w-full border bg-white rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-400
+                               text-sm text-gray-900 placeholder:text-gray-500
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-white transition-all duration-200 hover:border-gray-300
                                ${errors.phoneNumber
@@ -439,7 +440,7 @@ export default function Register() {
                   <Lock
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
                                transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
                   />
                   <input
@@ -450,7 +451,7 @@ export default function Register() {
                     placeholder="Min. 8 characters"
                     autoComplete="new-password"
                     className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-400
+                               text-sm text-gray-900 placeholder:text-gray-500
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-white transition-all duration-200 hover:border-gray-300
                                ${errors.password
@@ -462,7 +463,7 @@ export default function Register() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -508,7 +509,7 @@ export default function Register() {
                   <Lock
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
                                transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
                   />
                   <input
@@ -519,7 +520,7 @@ export default function Register() {
                     placeholder="Repeat your password"
                     autoComplete="new-password"
                     className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-400
+                               text-sm text-gray-900 placeholder:text-gray-500
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-white transition-all duration-200 hover:border-gray-300
                                ${errors.confirmPassword
@@ -531,7 +532,7 @@ export default function Register() {
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                   >
                     {showConfirmPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -657,7 +658,7 @@ export default function Register() {
             <div className="md:hidden mt-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                 <Shield size={13} strokeWidth={2} />
-                <span>HIPAA-compliant and secure</span>
+                <span>Your data is encrypted and private</span>
               </div>
             </div>
           </div>
@@ -687,13 +688,13 @@ function InputField({
         <Icon
           size={16}
           strokeWidth={2}
-          className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+          className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
                      transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
         />
         <input
           {...inputProps}
           className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
-                     text-sm text-gray-900 placeholder:text-gray-400
+                     text-sm text-gray-900 placeholder:text-gray-500
                      focus:outline-none focus:ring-2 focus:border-transparent
                      focus:bg-white transition-all duration-200 hover:border-gray-300
                      ${error

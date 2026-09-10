@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 
-const STORAGE_KEY = "oncotrace-theme"
+const STORAGE_KEY = "strokeai-theme"
 
 function applyThemeClass(theme) {
   const root = document.documentElement

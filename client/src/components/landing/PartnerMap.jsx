@@ -1,5 +1,5 @@
 import { Reveal, SectionHead } from './primitives.jsx'
-import { BODY, STRONG, DISPLAY, CREAM, PAPER, INK, INK_BODY, RULE, FLOW_GOLD, TINT } from './theme.js'
+import { BODY, STRONG, DISPLAY, CREAM, PAPER, INK, INK_BODY, RULE, FLOW_GOLD } from './theme.js'
 
 /* ═══════════════════════════════════════════════════════════════════
    PartnerMap — the catchment map and the numbers that go with it.

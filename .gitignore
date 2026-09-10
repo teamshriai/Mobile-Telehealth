@@ -24,3 +24,4 @@ Thumbs.db
 .idea/
 .vscode/settings.json
 *.swp
+lint-output.txt

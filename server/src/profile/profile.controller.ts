@@ -1,5 +1,9 @@
 import type { Request, Response } from 'express';
-import { updateProfileSchema, preferencesSchema } from './profile.validator';
+import {
+  updateProfileSchema,
+  updateHealthHistorySchema,
+  preferencesSchema,
+} from './profile.validator';
 import { profileService } from './profile.service';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -53,4 +57,18 @@ export const updatePreferences = asyncHandler(async (req: Request, res: Response
   const profile = await profileService.updatePreferences(req.user!.id, dto);
 
   res.status(200).json(ApiResponseBuilder.success('Preferences updated successfully.', { profile }));
+});
+
+/**
+ * PATCH /api/v1/profile/health-history
+ * Patient's own medical summary and lifestyle information.
+ */
+export const updateHealthHistory = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = updateHealthHistorySchema.parse(req.body);
+  const meta = getRequestMeta(req);
+  const profile = await profileService.updateHealthHistory(req.user!.id, dto, meta);
+
+  res
+    .status(200)
+    .json(ApiResponseBuilder.success('Health information updated successfully.', { profile }));
 });

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Home, ArrowLeft, Sparkles } from 'lucide-react'
+import { Home, ArrowLeft } from 'lucide-react'
 
 export default function NotFound() {
   const navigate = useNavigate()
@@ -139,7 +139,7 @@ export default function NotFound() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="mt-10 text-xs text-[#CBD5E1] font-medium"
+          className="mt-10 text-xs text-[#64748B] font-medium"
         >
           Stroke AI — Patient Portal
         </motion.p>

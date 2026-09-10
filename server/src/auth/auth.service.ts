@@ -7,7 +7,9 @@ import { auditService } from '../services/audit.service';
 import { AuditAction, AuditSeverity } from '../services/audit.service';
 import { signAccessToken } from '../utils/jwt';
 import { authRepository, type UserWithRole } from './auth.repository';
+import { refreshTokenService } from './refreshToken.service';
 import { decryptProfile } from '../profile/profile.repository';
+import { toProfileResponseShape } from '../profile/profile.service';
 import type {
   RegisterDto,
   LoginDto,
@@ -16,6 +18,7 @@ import type {
   ChangePasswordDto,
 } from './auth.validator';
 import type { SanitizedUser } from '../types/auth.types';
+import { permissionsForRole } from '../config/permissions';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -32,7 +35,7 @@ let _dummyHash: string | null = null;
 
 async function getDummyHash(): Promise<string> {
   if (_dummyHash === null) {
-    _dummyHash = await hash('oncotrace-timing-prevention-dummy-value-v1', {
+    _dummyHash = await hash('stroke-ai-timing-prevention-dummy-value-v1', {
       algorithm: Algorithm.Argon2id,
       memoryCost: env.ARGON2_MEMORY_COST,
       timeCost: env.ARGON2_TIME_COST,
@@ -81,7 +84,7 @@ export const authService = {
   async register(
     dto: RegisterDto,
     meta: { ipAddress?: string; userAgent?: string },
-  ): Promise<{ token: string; user: SanitizedUser }> {
+  ): Promise<{ token: string; refreshToken: string; user: SanitizedUser }> {
     // 1. Duplicate email check
     const existing = await authRepository.findByEmail(dto.email);
     if (existing !== null) {
@@ -124,7 +127,10 @@ export const authService = {
       role: user.role.name,
     });
 
-    // 6. Audit log (fire-and-forget — never blocks the response)
+    // 6. Issue the session's first refresh token
+    const refresh = await refreshTokenService.issue(user.id, meta);
+
+    // 7. Audit log (fire-and-forget — never blocks the response)
     auditService.log({
       action: AuditAction.UserRegistered,
       userId: user.id,
@@ -134,7 +140,7 @@ export const authService = {
       metadata: { email: user.email, role: user.role.name },
     });
 
-    return { token, user: sanitize(user) };
+    return { token, refreshToken: refresh.token, user: sanitize(user) };
   },
 
   /**
@@ -150,7 +156,7 @@ export const authService = {
   async login(
     dto: LoginDto,
     meta: { ipAddress?: string; userAgent?: string },
-  ): Promise<{ token: string; user: SanitizedUser }> {
+  ): Promise<{ token: string; refreshToken: string; user: SanitizedUser }> {
     const user = await authRepository.findByEmail(dto.email);
 
     // Always run verify() — prevents timing-based user enumeration.
@@ -219,6 +225,8 @@ export const authService = {
       role: user.role.name,
     });
 
+    const refresh = await refreshTokenService.issue(user.id, meta);
+
     auditService.log({
       action: AuditAction.UserLoginSuccess,
       userId: user.id,
@@ -227,17 +235,66 @@ export const authService = {
       userAgent: meta.userAgent,
     });
 
-    return { token, user: sanitize(user) };
+    return { token, refreshToken: refresh.token, user: sanitize(user) };
+  },
+
+  /**
+   * REFRESH
+   *
+   * Exchanges a valid refresh token for a new access token, rotating the
+   * refresh token in the process. The user is re-read from the database so a
+   * deactivated or soft-deleted account cannot keep refreshing its way to new
+   * access tokens — the same guarantee `authenticate` provides per-request.
+   */
+  async refresh(
+    rawRefreshToken: string,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<{ token: string; refreshToken: string; user: SanitizedUser }> {
+    const rotated = await refreshTokenService.rotate(rawRefreshToken, meta);
+
+    const user = await authRepository.findById(rotated.userId);
+
+    if (user === null || !user.isActive || user.deletedAt !== null) {
+      // The session is real but the account is gone or disabled. Kill every
+      // remaining token rather than leaving a usable family behind.
+      await refreshTokenService.revokeAllForUser(rotated.userId, 'account_inactive_on_refresh');
+      throw new AppError('Invalid or expired session. Please sign in again.', 401);
+    }
+
+    const token = signAccessToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role.name,
+    });
+
+    auditService.log({
+      action: AuditAction.TokenRefreshed,
+      userId: user.id,
+      severity: AuditSeverity.Info,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return { token, refreshToken: rotated.token, user: sanitize(user) };
   },
 
   /**
    * LOGOUT
    *
-   * Without refresh tokens, logout is client-side (discard the token).
-   * We record the audit event and return success.
-   * A token denylist (Redis) would be required for true server-side revocation.
+   * Revokes the presented refresh token so this device's session genuinely
+   * ends server-side. The access token remains valid until it expires (≤15
+   * min) — revoking that too would need a denylist; the short TTL is the
+   * accepted trade-off, and it is now bounded rather than open-ended.
    */
-  logout(userId: string, meta: { ipAddress?: string; userAgent?: string }): void {
+  async logout(
+    userId: string,
+    rawRefreshToken: string | undefined,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<void> {
+    if (rawRefreshToken !== undefined && rawRefreshToken.length > 0) {
+      await refreshTokenService.revoke(rawRefreshToken);
+    }
+
     auditService.log({
       action: AuditAction.UserLogout,
       userId,
@@ -259,7 +316,20 @@ export const authService = {
 
     return {
       user: sanitize(user),
-      profile: user.patientProfile ? decryptProfile(user.patientProfile) : null,
+      // The client uses `permissions` to decide what to RENDER (hide a button
+      // the user cannot use). It is never the authorization decision itself —
+      // every endpoint re-checks server-side. Sending it saves the frontend
+      // from re-deriving the role→capability map and drifting out of sync.
+      permissions: permissionsForRole(user.role.name as RoleName),
+      // Reuse the profile module's curated shaper rather than returning the raw
+      // row. Returning `decryptProfile(...)` directly leaked 41 fields — the
+      // UNMASKED `aadhaarLast4` and the `abhaIdHash` blind index among them —
+      // while GET /profile correctly returned 30 curated fields with
+      // `aadhaarMasked`. One resource must have one wire shape, or a field
+      // ends up protected on one route and exposed on the other.
+      profile: user.patientProfile
+        ? toProfileResponseShape(decryptProfile(user.patientProfile))
+        : null,
     };
   },
 
@@ -382,6 +452,10 @@ export const authService = {
       passwordHash,
     );
 
+    // A password reset is the canonical "I may have been compromised" event.
+    // Every existing session must die, not just the one doing the reset.
+    await refreshTokenService.revokeAllForUser(resetRecord.user.id, 'password_reset', meta);
+
     auditService.log({
       action: AuditAction.PasswordChanged,
       userId: resetRecord.user.id,
@@ -431,6 +505,11 @@ export const authService = {
 
     await authRepository.updatePassword(userId, passwordHash);
 
+    // passwordChangedAt already invalidates outstanding ACCESS tokens via the
+    // authenticate middleware; this kills the refresh tokens too, so no device
+    // can quietly mint a new access token after the change.
+    await refreshTokenService.revokeAllForUser(userId, 'password_changed', meta);
+
     auditService.log({
       action: AuditAction.PasswordChanged,
       userId,
@@ -464,6 +543,7 @@ export const authService = {
     }
 
     await authRepository.softDeleteAccount(userId);
+    await refreshTokenService.revokeAllForUser(userId, 'account_deleted', meta);
 
     auditService.log({
       action: AuditAction.AccountDeleted,

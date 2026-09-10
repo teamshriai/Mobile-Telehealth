@@ -217,7 +217,7 @@ export default function ForgotPassword() {
 
             <div className="relative z-10">
               <p className="text-indigo-200 text-xs">
-                Encrypted and HIPAA-compliant account recovery
+                Encrypted, private account recovery
               </p>
             </div>
           </div>
@@ -318,7 +318,7 @@ export default function ForgotPassword() {
                         <Mail
                           size={17}
                           strokeWidth={2}
-                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500
                                      transition-colors group-focus-within:text-indigo-500 pointer-events-none"
                         />
                         <input
@@ -330,7 +330,7 @@ export default function ForgotPassword() {
                           autoComplete="email"
                           placeholder="you@example.com"
                           className={`w-full border bg-gray-50 rounded-xl pl-11 pr-4 py-3
-                                     text-sm text-gray-900 placeholder:text-gray-400
+                                     text-sm text-gray-900 placeholder:text-gray-500
                                      focus:outline-none focus:ring-2 focus:border-transparent
                                      focus:bg-white transition-all duration-200
                                      ${error
@@ -396,7 +396,7 @@ export default function ForgotPassword() {
                   {/* Divider */}
                   <div className="flex items-center gap-3 my-6">
                     <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-gray-400 font-medium">or</span>
+                    <span className="text-xs text-gray-500 font-medium">or</span>
                     <div className="flex-1 h-px bg-gray-200" />
                   </div>
 

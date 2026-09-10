@@ -1,7 +1,7 @@
 {
-  "name": "oncotrace-server",
+  "name": "stroke-ai-server",
   "version": "1.0.0",
-  "description": "OncoTrace AI — Precision Oncology Platform Backend",
+  "description": "Stroke AI — Patient Portal Platform Backend",
   "main": "dist/server.js",
   "private": true,
   "engines": {

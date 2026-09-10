@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { getProfile, updateProfile, updatePreferences } from './profile.controller';
+import {
+  getProfile,
+  updateProfile,
+  updateHealthHistory,
+  updatePreferences,
+} from './profile.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { RoleName } from '../types/auth.types';
@@ -18,6 +23,12 @@ const router = Router();
 
 router.get('/', authenticate, authorize(RoleName.Patient), getProfile);
 router.patch('/', authenticate, authorize(RoleName.Patient), updateProfile);
+router.patch(
+  '/health-history',
+  authenticate,
+  authorize(RoleName.Patient),
+  updateHealthHistory,
+);
 router.patch('/preferences', authenticate, authorize(RoleName.Patient), updatePreferences);
 
 export { router as profileRouter };

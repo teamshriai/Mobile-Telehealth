@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
   const app = createApp();
 
   const server = app.listen(env.PORT, () => {
-    console.log(`🚀 OncoTrace server running on port ${env.PORT} [${env.NODE_ENV.toUpperCase()}]`);
+    console.log(`🚀 Stroke AI server running on port ${env.PORT} [${env.NODE_ENV.toUpperCase()}]`);
   });
 
   // ── Graceful Shutdown ──────────────────────────────────────────────────────

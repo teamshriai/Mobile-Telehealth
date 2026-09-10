@@ -28,6 +28,10 @@ export enum AuditAction {
   ProfilePhotoUpdated = 'ProfilePhotoUpdated',
   RoleChanged = 'RoleChanged',
   AccountDeleted = 'AccountDeleted',
+  // ── Session lifecycle (refresh-token rotation) ──────────────────────────
+  TokenRefreshed = 'TokenRefreshed',
+  TokenReuseDetected = 'TokenReuseDetected',
+  SessionRevoked = 'SessionRevoked',
 }
 
 export enum AuditSeverity {

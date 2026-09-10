@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { Gender, BloodGroup, MaritalStatus } from '@prisma/client';
+import {
+  Gender,
+  BloodGroup,
+  MaritalStatus,
+  SmokingStatus,
+  AlcoholStatus,
+  TobaccoStatus,
+  PhysicalActivity,
+} from '@prisma/client';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Update Patient Profile Schema
@@ -138,3 +146,49 @@ export const preferencesSchema = z
   .strict();
 
 export type PreferencesDto = z.infer<typeof preferencesSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Health History Schema
+//
+// These columns already existed on PatientProfile and were already encrypted
+// at rest — but they were absent from both updateProfileSchema and the read
+// shaper, so a patient could neither see nor set them. This schema is what
+// makes them reachable.
+//
+// Kept SEPARATE from updateProfileSchema on purpose: identity/contact details
+// and medical information are different kinds of data with different
+// sensitivity, and the UI presents them as different tasks. One combined
+// endpoint would also mean a contact-details save had to round-trip the
+// patient's medical summary.
+//
+// Every field is free text rather than a normalised table. That matches the
+// existing column design and is honest about what it is: a patient-authored
+// summary, not a structured clinical record. Normalising it is a later
+// decision that needs a real clinical requirement behind it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Free-text medical summary field: trimmed, capped, clearable with null. */
+const medicalText = (max = 1000) =>
+  z.string().trim().max(max, `Please keep this under ${max} characters.`).nullable().optional();
+
+export const updateHealthHistorySchema = z.object({
+  knownAllergies: medicalText(),
+  currentMedications: medicalText(),
+  existingDiseases: medicalText(),
+  familyHistory: medicalText(),
+  previousSurgeries: medicalText(),
+
+  smokingStatus: z.nativeEnum(SmokingStatus).nullable().optional(),
+  alcoholStatus: z.nativeEnum(AlcoholStatus).nullable().optional(),
+  tobaccoStatus: z.nativeEnum(TobaccoStatus).nullable().optional(),
+  physicalActivity: z.nativeEnum(PhysicalActivity).nullable().optional(),
+
+  occupation: z
+    .string()
+    .trim()
+    .max(100, 'Please keep this under 100 characters.')
+    .nullable()
+    .optional(),
+});
+
+export type UpdateHealthHistoryDto = z.infer<typeof updateHealthHistorySchema>;

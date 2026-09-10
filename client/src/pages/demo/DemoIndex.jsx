@@ -59,7 +59,7 @@ export default function DemoIndex() {
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 sm:px-6 py-4">
           <BrandMark size={16} />
           <span className="text-sm font-bold text-[#0F172A] tracking-tight">Stroke AI</span>
-          <span className="text-[#CBD5E1]">/</span>
+          <span className="text-[#64748B]">/</span>
           <span className="text-sm font-semibold text-[#64748B]">Platform Preview</span>
           <Link
             to="/landing"
@@ -94,7 +94,7 @@ export default function DemoIndex() {
               <span className="rounded-lg bg-[#F8FAFC] border border-[#E8EDF2] px-3 py-1.5 text-xs font-semibold text-[#0F172A]">
                 {step}
               </span>
-              {i < FLOW.length - 1 && <ArrowRight size={14} className="text-[#CBD5E1] flex-shrink-0" />}
+              {i < FLOW.length - 1 && <ArrowRight size={14} className="text-[#64748B] flex-shrink-0" />}
             </div>
           ))}
         </div>

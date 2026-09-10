@@ -2,7 +2,11 @@ import type { PatientProfile, Prisma } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { profileRepository } from './profile.repository';
-import type { UpdateProfileDto, PreferencesDto } from './profile.validator';
+import type {
+  UpdateProfileDto,
+  UpdateHealthHistoryDto,
+  PreferencesDto,
+} from './profile.validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile Service
@@ -55,11 +59,38 @@ function toResponseShape(profile: PatientProfile) {
     emergencyContactPhone: profile.emergencyContactPhone,
     emergencyContactRelation: profile.emergencyContactRelation,
 
+    // ── Health history ────────────────────────────────────────────────────
+    // Encrypted at rest and decrypted by the repository. Previously omitted
+    // from this shape, which made the columns unreachable from the client.
+    knownAllergies: profile.knownAllergies,
+    currentMedications: profile.currentMedications,
+    existingDiseases: profile.existingDiseases,
+    familyHistory: profile.familyHistory,
+    previousSurgeries: profile.previousSurgeries,
+
+    // ── Lifestyle ─────────────────────────────────────────────────────────
+    smokingStatus: profile.smokingStatus,
+    alcoholStatus: profile.alcoholStatus,
+    tobaccoStatus: profile.tobaccoStatus,
+    physicalActivity: profile.physicalActivity,
+    occupation: profile.occupation,
+
     preferences: (profile.preferences as PreferencesDto | null) ?? {},
 
     updatedAt: profile.updatedAt,
   };
 }
+
+/**
+ * The single source of truth for what a PatientProfile looks like on the wire.
+ *
+ * Exported so `/auth/me` can reuse it. Before this, auth.service returned the
+ * RAW decrypted row — 41 fields including `aadhaarLast4` UNMASKED and the
+ * `abhaIdHash` blind index — while `/profile` returned this curated 30-field
+ * shape. Two shapes for one resource is how a field quietly becomes
+ * over-exposed on one route and not the other.
+ */
+export { toResponseShape as toProfileResponseShape };
 
 export type ProfileResponse = ReturnType<typeof toResponseShape>;
 
@@ -106,6 +137,45 @@ export const profileService = {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       metadata: { fieldsChanged: Object.keys(dto) },
+    });
+
+    return toResponseShape(updated);
+  },
+
+  /**
+   * UPDATE HEALTH HISTORY
+   *
+   * Separate from updateProfile because medical information and contact
+   * details are different tasks with different sensitivity — and because a
+   * combined endpoint would force every address edit to round-trip the
+   * patient's medical summary.
+   *
+   * The repository already encrypts all five medical-summary columns, so no
+   * special handling is needed here.
+   */
+  async updateHealthHistory(
+    userId: string,
+    dto: UpdateHealthHistoryDto,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<ProfileResponse> {
+    const existing = await profileRepository.findByUserId(userId);
+    if (existing === null) {
+      throw new AppError('Patient profile not found.', 404);
+    }
+
+    const updated = await profileRepository.updateByUserId(userId, dto);
+
+    // Field NAMES only. These values are health data; logging them would put
+    // PHI into the audit trail the trail exists to protect.
+    auditService.log({
+      action: AuditAction.ProfileUpdated,
+      userId,
+      severity: AuditSeverity.Info,
+      resource: 'patient_profile',
+      resourceId: updated.id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { section: 'health_history', fieldsChanged: Object.keys(dto) },
     });
 
     return toResponseShape(updated);

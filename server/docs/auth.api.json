@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "OncoTrace AI — Auth API",
+    "name": "Stroke AI — Auth API",
     "type": "collection",
     "version": "1"
   },
@@ -29,10 +29,10 @@
       "body": {
         "mode": "json",
         "json": {
-          "email": "jane.doe@example.com",
+          "email": "arun.kumar@example.com",
           "password": "SecurePass123!",
-          "firstName": "Jane",
-          "lastName": "Doe",
+          "firstName": "Arun",
+          "lastName": "Kumar",
           "dateOfBirth": "1990-06-15",
           "gender": "Female"
         }
@@ -50,10 +50,10 @@
       "body": {
         "mode": "json",
         "json": {
-          "email": "jane.doe@example.com",
+          "email": "arun.kumar@example.com",
           "password": "SecurePass123!",
-          "firstName": "Jane",
-          "lastName": "Doe",
+          "firstName": "Arun",
+          "lastName": "Kumar",
           "dateOfBirth": "1990-06-15"
         }
       },
@@ -90,7 +90,7 @@
       "body": {
         "mode": "json",
         "json": {
-          "email": "jane.doe@example.com",
+          "email": "arun.kumar@example.com",
           "password": "SecurePass123!"
         }
       },
@@ -107,7 +107,7 @@
       "body": {
         "mode": "json",
         "json": {
-          "email": "jane.doe@example.com",
+          "email": "arun.kumar@example.com",
           "password": "WrongPassword999!"
         }
       },

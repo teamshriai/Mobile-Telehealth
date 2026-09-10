@@ -50,9 +50,9 @@ function FlowConnector({ vertical = true, label }) {
     return (
       <div className="flex flex-col items-center py-1.5">
         <div className="h-6 w-px bg-[#CBD5E1]" />
-        <ArrowDown size={16} className="text-[#94A3B8] -my-1" />
+        <ArrowDown size={16} className="text-[#64748B] -my-1" />
         {label && (
-          <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+          <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
             {label}
           </span>
         )}
@@ -62,7 +62,7 @@ function FlowConnector({ vertical = true, label }) {
   return (
     <div className="flex items-center px-1.5">
       <div className="w-6 h-px bg-[#CBD5E1]" />
-      <ArrowRight size={16} className="text-[#94A3B8] -mx-1" />
+      <ArrowRight size={16} className="text-[#64748B] -mx-1" />
     </div>
   )
 }
@@ -343,7 +343,7 @@ export default function AiRadiologist() {
 
       {/* Closing line */}
       <div className="flex items-center gap-2 text-sm text-[#64748B] justify-center text-center">
-        <Clock size={14} className="text-[#94A3B8] flex-shrink-0" />
+        <Clock size={14} className="text-[#64748B] flex-shrink-0" />
         <p>
           Because AI and radiologist review run in parallel rather than sequentially,
           the treatment plan is ready before the patient reaches the hospital.

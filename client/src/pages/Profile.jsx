@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Phone, MapPin, Shield, Edit3, X, Check, Loader2 } from 'lucide-react'
+import { User, Phone, MapPin, Shield, Edit3, X, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import * as profileService from '../services/profile.service'
-import * as authService from '../services/auth.service'
+import { useAuth } from '../app/AuthContext.jsx'
+import { LoadingState, ErrorState, EmptyState, Banner } from '../components/feedback/States.jsx'
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 14 },
@@ -90,7 +92,8 @@ export default function Profile() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [successMessage, setSuccessMessage] = useState('')
 
-  const storedUser = authService.getStoredUser()
+  // From AuthContext, not localStorage — the user object is no longer persisted.
+  const { user: storedUser, reloadUser } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +152,9 @@ export default function Profile() {
       setForm(toFormState(res.profile))
       setEditing(false)
       setSuccessMessage('Profile updated successfully.')
+      // A name change here should be reflected immediately in the topbar's
+      // account menu, not just after the next login.
+      reloadUser()
       window.setTimeout(() => setSuccessMessage(''), 4000)
     } catch (err) {
       if (err.fieldErrors) {
@@ -165,38 +171,20 @@ export default function Profile() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-[#FAFBFC] p-6">
-        <div role="status" className="flex items-center gap-2.5 text-sm text-[#64748B]">
-          <Loader2 size={18} className="animate-spin" />
-          Loading your profile…
-        </div>
-      </div>
-    )
+    return <LoadingState label="Loading your profile…" />
   }
 
   if (loadError) {
-    return (
-      <div className="flex min-h-full items-center justify-center bg-[#FAFBFC] p-6">
-        <div className="max-w-sm text-center">
-          <p className="text-sm font-semibold text-[#0F172A]">Something went wrong</p>
-          <p className="mt-1.5 text-sm text-[#64748B]">{loadError}</p>
-        </div>
-      </div>
-    )
+    return <ErrorState title="Something went wrong" description={loadError} onRetry={() => window.location.reload()} />
   }
 
   if (!profile) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-[#FAFBFC] p-6">
-        <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF6FF]">
-            <User size={20} className="text-[#2563EB]" strokeWidth={1.75} />
-          </div>
-          <p className="text-sm font-semibold text-[#0F172A]">Your patient profile hasn't been completed yet.</p>
-          <p className="mt-1.5 text-sm text-[#64748B]">Contact support if you believe this is unexpected.</p>
-        </div>
-      </div>
+      <EmptyState
+        icon={User}
+        title="Your patient profile hasn't been completed yet"
+        description="Contact support if you believe this is unexpected."
+      />
     )
   }
 
@@ -204,49 +192,49 @@ export default function Profile() {
   const initials = `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase()
 
   return (
-    <div className="p-6 min-h-full bg-[#FAFBFC]">
-      <motion.div {...fade(0)} className="mb-6 flex items-center justify-between">
+    <div className="space-y-5">
+      <motion.div {...fade(0)} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#0F172A]" style={{ fontFamily: '"DM Sans",sans-serif' }}>
-            Patient Profile
-          </h1>
-          <p className="text-sm text-[#64748B] mt-1">Personal, identification, contact, and address information</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">Profile</h1>
+          <p className="mt-1.5 text-sm text-[#475569]">Personal, identification, contact, and address information.</p>
         </div>
         {!editing && (
           <button
+            type="button"
             onClick={startEditing}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-[#64748B] bg-white border border-[#E8EDF2] hover:border-[#BFDBFE] transition-all shadow-sm"
+            className="focus-ring tap-target inline-flex items-center justify-center gap-2 self-start rounded-lg border border-[#E8EDF2] bg-white px-4 text-sm font-medium text-[#475569] transition-colors hover:border-[#BFDBFE] hover:bg-[#F8FAFC] sm:self-auto"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            <Edit3 size={14} aria-hidden="true" />
             Edit
           </button>
         )}
       </motion.div>
 
-      {successMessage && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          role="status"
-          className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-        >
-          <Check size={16} className="flex-shrink-0" />
-          {successMessage}
-        </motion.div>
-      )}
+      {/* Health history (allergies, medications, conditions, lifestyle) is a
+          separate task with different sensitivity — it lives on My Health,
+          not mixed into this identity/contact form. */}
+      <Banner tone="info">
+        Looking for allergies, medications, or other health information?{' '}
+        <Link to="/app/health" className="font-semibold underline underline-offset-2">
+          Go to My Health
+        </Link>
+        .
+      </Banner>
+
+      {successMessage && <Banner tone="success">{successMessage}</Banner>}
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Identity card */}
           <motion.div {...fade(0.05)} className="lg:col-span-1">
-            <div className="bg-white rounded-2xl border border-[#E8EDF2] p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] text-center">
+            <div className="rounded-xl border border-[#E8EDF2] bg-white p-6 text-center shadow-[0_1px_3px_0_rgba(15,23,42,0.04),0_1px_2px_0_rgba(15,23,42,0.06)]">
               <div
                 className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg"
                 style={{ background: 'linear-gradient(135deg,#7C3AED,#2563EB)' }}
               >
                 {initials || <User size={28} />}
               </div>
-              <h2 className="text-lg font-bold text-[#0F172A]" style={{ fontFamily: '"DM Sans",sans-serif' }}>
+              <h2 className="text-lg font-semibold text-[#0F172A]">
                 {fullName || 'Unnamed patient'}
               </h2>
               <p className="text-sm text-[#64748B] mt-0.5">
@@ -259,9 +247,9 @@ export default function Profile() {
                   { label: 'Blood group', value: bloodGroupLabel(profile.bloodGroup) },
                   { label: 'Marital status', value: profile.maritalStatus ?? '—' },
                 ].map((item) => (
-                  <div key={item.label} className="flex justify-between items-center gap-3">
-                    <span className="text-[11px] text-[#94A3B8] flex-shrink-0">{item.label}</span>
-                    <span className="text-[11px] font-semibold text-[#0F172A] text-right min-w-0 flex-1 truncate">{item.value}</span>
+                  <div key={item.label} className="flex items-center justify-between gap-3">
+                    <span className="flex-shrink-0 text-xs text-[#64748B]">{item.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold text-[#0F172A]">{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -330,25 +318,29 @@ export default function Profile() {
             </Section>
 
             {editing && (
-              <motion.div {...fade(0.22)} className="flex items-center justify-end gap-3 pb-2">
-                {saveError && <p className="mr-auto text-sm text-red-600">{saveError}</p>}
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-[#64748B] bg-white border border-[#E8EDF2] hover:border-[#CBD5E1] transition-all disabled:opacity-60"
-                >
-                  <X size={14} />
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-[#2563EB] hover:bg-[#1D4ED8] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
+              <motion.div {...fade(0.22)} className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-end">
+                {saveError && (
+                  <p role="alert" className="text-sm text-[#A33A28] sm:mr-auto">{saveError}</p>
+                )}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={saving}
+                    className="focus-ring tap-target flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#E8EDF2] bg-white px-4 text-sm font-medium text-[#475569] transition-colors hover:border-[#CBD5E1] disabled:opacity-60 sm:flex-none"
+                  >
+                    <X size={14} aria-hidden="true" />
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="focus-ring tap-target flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#2563EB] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
+                  >
+                    <Check size={14} aria-hidden="true" />
+                    {saving ? 'Saving…' : 'Save changes'}
+                  </button>
+                </div>
               </motion.div>
             )}
           </div>
@@ -373,9 +365,9 @@ function formatDate(value) {
 /* ─── Layout components ─── */
 function Section({ title, delay, icon: Icon, children }) {
   return (
-    <motion.div {...fade(delay)} className="bg-white rounded-2xl border border-[#E8EDF2] p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <p className="flex items-center gap-2 text-xs font-bold text-[#0F172A] mb-4 uppercase tracking-wider" style={{ fontFamily: '"DM Sans",sans-serif' }}>
-        {Icon && <Icon size={13} className="text-[#94A3B8]" />}
+    <motion.div {...fade(delay)} className="rounded-xl border border-[#E8EDF2] bg-white p-5 shadow-[0_1px_3px_0_rgba(15,23,42,0.04),0_1px_2px_0_rgba(15,23,42,0.06)]">
+      <p className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0F172A]">
+        {Icon && <Icon size={13} className="text-[#64748B]" />}
         {title}
       </p>
       {children}
@@ -388,11 +380,12 @@ function FieldGrid({ children }) {
 }
 
 function TextField({ label, name, value, editing, onChange, error, type = 'text', wide, required, placeholder, maxLength, displayValue }) {
+  const errorId = error ? `${name}-error` : undefined
   return (
     <div className={wide ? 'sm:col-span-2' : undefined}>
-      <label htmlFor={name} className="block text-[11px] font-medium text-[#94A3B8] mb-1">
+      <label htmlFor={name} className="mb-1 block text-xs font-medium text-[#64748B]">
         {label}
-        {required && editing && <span className="text-red-500"> *</span>}
+        {required && editing && <span className="text-[#A33A28]"> *</span>}
       </label>
       {editing ? (
         <>
@@ -404,14 +397,17 @@ function TextField({ label, name, value, editing, onChange, error, type = 'text'
             onChange={onChange}
             placeholder={placeholder}
             maxLength={maxLength}
-            className={`w-full rounded-xl border px-3 py-2 text-sm text-[#0F172A] bg-[#FAFBFC]
-                       focus:outline-none focus:ring-2 focus:border-transparent transition-all
-                       ${error ? 'border-red-300 focus:ring-red-400' : 'border-[#E8EDF2] focus:ring-[#93C5FD]'}`}
+            aria-invalid={Boolean(error)}
+            aria-describedby={errorId}
+            className={`focus-ring w-full min-h-11 rounded-lg border bg-[#FAFBFC] px-3 py-2 text-sm text-[#0F172A] transition-colors
+                       ${error ? 'border-[#F0C8C0]' : 'border-[#E8EDF2]'}`}
           />
-          {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+          {error && (
+            <p id={errorId} role="alert" className="mt-1 text-xs text-[#A33A28]">{error}</p>
+          )}
         </>
       ) : (
-        <p className="text-sm font-semibold text-[#0F172A] break-words">{displayValue ?? (value || '—')}</p>
+        <p className="break-words text-sm font-semibold text-[#0F172A]">{displayValue ?? (value || '—')}</p>
       )}
     </div>
   )
@@ -420,7 +416,7 @@ function TextField({ label, name, value, editing, onChange, error, type = 'text'
 function SelectField({ label, name, value, editing, onChange, options, displayValue }) {
   return (
     <div>
-      <label htmlFor={name} className="block text-[11px] font-medium text-[#94A3B8] mb-1">
+      <label htmlFor={name} className="mb-1 block text-xs font-medium text-[#64748B]">
         {label}
       </label>
       {editing ? (
@@ -429,8 +425,7 @@ function SelectField({ label, name, value, editing, onChange, options, displayVa
           name={name}
           value={value}
           onChange={onChange}
-          className="w-full rounded-xl border border-[#E8EDF2] bg-[#FAFBFC] px-3 py-2 text-sm text-[#0F172A]
-                     focus:outline-none focus:ring-2 focus:ring-[#93C5FD] focus:border-transparent transition-all"
+          className="focus-ring w-full min-h-11 rounded-lg border border-[#E8EDF2] bg-[#FAFBFC] px-3 py-2 text-sm text-[#0F172A] transition-colors"
         >
           <option value="">—</option>
           {options.map((opt) => (

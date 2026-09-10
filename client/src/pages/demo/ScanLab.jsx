@@ -137,7 +137,7 @@ export default function ScanLab() {
         </div>
 
         {/* Column headers */}
-        <div className="hidden md:grid grid-cols-[1.2fr_1.4fr_0.8fr_1.1fr_0.7fr_auto] gap-3 px-5 py-2.5 bg-[#F8FAFC] border-b border-[#E8EDF2] text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+        <div className="hidden md:grid grid-cols-[1.2fr_1.4fr_0.8fr_1.1fr_0.7fr_auto] gap-3 px-5 py-2.5 bg-[#F8FAFC] border-b border-[#E8EDF2] text-[11px] font-semibold uppercase tracking-wide text-[#64748B]">
           <span>Case ID</span>
           <span>Patient</span>
           <span>Modality</span>
@@ -182,7 +182,7 @@ export default function ScanLab() {
                   <Clock size={12} />
                   {c.time}
                 </div>
-                <div className="hidden md:flex items-center justify-end text-[#94A3B8]">
+                <div className="hidden md:flex items-center justify-end text-[#64748B]">
                   <ChevronRight size={16} />
                 </div>
               </button>
@@ -226,7 +226,7 @@ export default function ScanLab() {
             </Field>
             <Field label="Scheduled Station">
               <span className="inline-flex items-center gap-1.5">
-                <Building2 size={13} className="text-[#94A3B8]" />
+                <Building2 size={13} className="text-[#64748B]" />
                 {selected.station}
               </span>
             </Field>
@@ -259,7 +259,7 @@ export default function ScanLab() {
                           ? 'bg-[#16A34A] border-[#16A34A] text-white'
                           : isCurrent
                           ? 'bg-white border-[#2563EB] text-[#2563EB]'
-                          : 'bg-white border-[#E8EDF2] text-[#CBD5E1]'
+                          : 'bg-white border-[#E8EDF2] text-[#64748B]'
                       }`}
                     >
                       {isDone ? (
@@ -279,7 +279,7 @@ export default function ScanLab() {
                   <div className={`pb-6 ${isLast ? 'pb-0' : ''}`}>
                     <p
                       className={`text-sm font-semibold ${
-                        isDone || isCurrent ? 'text-[#0F172A]' : 'text-[#94A3B8]'
+                        isDone || isCurrent ? 'text-[#0F172A]' : 'text-[#64748B]'
                       }`}
                     >
                       {STATUS_LABEL[step]}
@@ -359,7 +359,7 @@ export default function ScanLab() {
 function Field({ label, children, full = false }) {
   return (
     <div className={full ? 'sm:col-span-2' : ''}>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8] mb-1">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B] mb-1">
         {label}
       </dt>
       <dd className="text-sm font-medium text-[#0F172A]">{children}</dd>

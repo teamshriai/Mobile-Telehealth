@@ -27,7 +27,7 @@ export default function DemoLayout({ role, accent = 'blue', children }) {
             <BrandMark size={14} />
             <span className="text-sm font-bold text-[#0F172A] tracking-tight hidden sm:inline">Stroke AI</span>
           </Link>
-          <span className="text-[#CBD5E1] hidden sm:inline">/</span>
+          <span className="text-[#64748B] hidden sm:inline">/</span>
           <span
             className="rounded-lg px-2.5 py-1 text-xs font-semibold flex-shrink-0"
             style={{ background: a.bg, color: a.color }}

@@ -13,7 +13,6 @@ import {
   Brain,
   Pill,
   HeartPulse,
-  FileText,
   Activity,
   CheckCircle2,
   ShieldCheck,
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react'
 import DemoLayout from '../../components/demo/DemoLayout.jsx'
 import Card from '../../components/common/Card.jsx'
-import Button from '../../components/common/Button.jsx'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 
 // ---- Static mock data -------------------------------------------------
@@ -184,7 +182,7 @@ export default function Telehealth() {
                     </div>
                     <div className="px-2 py-1.5 bg-slate-900/90 border-t border-slate-800">
                       <p className="text-[11px] font-semibold text-white truncate">{p.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{p.role}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{p.role}</p>
                     </div>
                   </div>
                 )
@@ -257,17 +255,17 @@ export default function Telehealth() {
                   <HeartPulse size={13} className="text-[#DC2626]" />
                   Live Vitals
                 </div>
-                <span className="text-[10px] text-[#94A3B8] flex items-center gap-1">
+                <span className="text-[10px] text-[#64748B] flex items-center gap-1">
                   <Activity size={10} /> Live from ambulance
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {VITALS.map((v) => (
                   <div key={v.label} className="rounded-md bg-white border border-[#E8EDF2] px-2 py-1.5 text-center">
-                    <p className="text-[10px] text-[#94A3B8] font-medium">{v.label}</p>
+                    <p className="text-[10px] text-[#64748B] font-medium">{v.label}</p>
                     <p className="text-sm font-bold text-[#0F172A]">
                       {v.value}
-                      <span className="text-[10px] font-medium text-[#94A3B8] ml-0.5">{v.unit}</span>
+                      <span className="text-[10px] font-medium text-[#64748B] ml-0.5">{v.unit}</span>
                     </p>
                   </div>
                 ))}
@@ -304,7 +302,7 @@ export default function Telehealth() {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Pill size={14} className={isSelected ? 'text-[#2563EB]' : 'text-[#94A3B8]'} />
+                  <Pill size={14} className={isSelected ? 'text-[#2563EB]' : 'text-[#64748B]'} />
                   <span className={`text-sm font-bold ${isSelected ? 'text-[#2563EB]' : 'text-[#0F172A]'}`}>
                     {opt.label}
                   </span>

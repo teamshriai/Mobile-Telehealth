@@ -7,6 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { env } from '../config/env.config';
 import { emailService } from '../services/email.service';
 import { getRequestMeta } from '../utils/requestMeta';
+import { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie } from '../utils/authCookies';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Controller
@@ -24,6 +25,8 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
   const dto = registerSchema.parse(req.body);
   const result = await authService.register(dto, getRequestMeta(req));
 
+  setRefreshCookie(res, result.refreshToken);
+
   res.status(201).json(
     ApiResponseBuilder.success('Account created successfully.', {
       token: result.token,
@@ -39,6 +42,8 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
   const dto = loginSchema.parse(req.body);
   const result = await authService.login(dto, getRequestMeta(req));
 
+  setRefreshCookie(res, result.refreshToken);
+
   res.status(200).json(
     ApiResponseBuilder.success('Login successful.', {
       token: result.token,
@@ -51,14 +56,48 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
  * POST /api/v1/auth/logout
  * Protected: requires valid JWT (via authenticate middleware on the router).
  */
-export const logout = asyncHandler((req: Request, res: Response): Promise<void> => {
-  authService.logout(req.user!.id, getRequestMeta(req));
+export const logout = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const rawRefresh = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+
+  await authService.logout(req.user!.id, rawRefresh, getRequestMeta(req));
+  clearRefreshCookie(res);
 
   res
     .status(200)
     .json(ApiResponseBuilder.success('Logged out successfully. Please discard your access token.'));
+});
 
-  return Promise.resolve();
+/**
+ * POST /api/v1/auth/refresh
+ *
+ * Public by design: the caller has no valid access token — that is the whole
+ * point. Authentication comes from the httpOnly refresh cookie instead.
+ */
+export const refresh = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const rawRefresh = req.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+
+  if (rawRefresh === undefined || rawRefresh.length === 0) {
+    clearRefreshCookie(res);
+    res.status(401).json(ApiResponseBuilder.error('No active session. Please sign in.'));
+    return;
+  }
+
+  try {
+    const result = await authService.refresh(rawRefresh, getRequestMeta(req));
+    setRefreshCookie(res, result.refreshToken);
+
+    res.status(200).json(
+      ApiResponseBuilder.success('Session refreshed.', {
+        token: result.token,
+        user: result.user,
+      }),
+    );
+  } catch (err) {
+    // Any refresh failure ends the session — leaving a dead cookie in place
+    // would make the client retry a token that can never work again.
+    clearRefreshCookie(res);
+    throw err;
+  }
 });
 
 /**
@@ -155,6 +194,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response): 
   const meta = getRequestMeta(req);
 
   await authService.changePassword(req.user!.id, dto, meta);
+  clearRefreshCookie(res);
 
   res.status(200).json(ApiResponseBuilder.success('Password changed successfully.'));
 });
@@ -168,6 +208,7 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response): P
   const meta = getRequestMeta(req);
 
   await authService.deleteAccount(req.user!.id, dto.password, meta);
+  clearRefreshCookie(res);
 
   res.status(200).json(ApiResponseBuilder.success('Account deleted successfully.'));
 });

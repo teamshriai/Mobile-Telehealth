@@ -135,7 +135,7 @@ export default function HospitalHub() {
             <div className="grid grid-cols-4 gap-2 mt-3">
               {VITALS.map((v) => (
                 <div key={v.t} className="text-center rounded-lg bg-[#F8FAFC] border border-[#E8EDF2] py-2">
-                  <p className="text-[10px] text-[#94A3B8] font-medium">{v.t}</p>
+                  <p className="text-[10px] text-[#64748B] font-medium">{v.t}</p>
                   <p className="text-xs font-bold text-[#0F172A] mt-0.5">{v.bp}</p>
                   <p className="text-[10px] text-[#64748B]">{v.hr} bpm</p>
                 </div>
@@ -152,8 +152,8 @@ export default function HospitalHub() {
           </h2>
           <div className="flex gap-4">
             <div className="flex-shrink-0 w-20 h-20 rounded-xl border border-[#E8EDF2] bg-[#F8FAFC] flex flex-col items-center justify-center gap-1">
-              <Scan size={22} className="text-[#94A3B8]" />
-              <span className="text-[9px] font-semibold text-[#94A3B8] text-center leading-tight px-1">
+              <Scan size={22} className="text-[#64748B]" />
+              <span className="text-[9px] font-semibold text-[#64748B] text-center leading-tight px-1">
                 CTA — Head &amp; Neck
               </span>
             </div>
@@ -205,7 +205,7 @@ export default function HospitalHub() {
             <HeartPulse size={16} className="text-[#16A34A]" />
             Hospital Resources Notified
           </h2>
-          <span className="text-[11px] text-[#94A3B8]">Synced to ambulance ETA · updates automatically</span>
+          <span className="text-[11px] text-[#64748B]">Synced to ambulance ETA · updates automatically</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {RESOURCES.map((r) => {
@@ -230,7 +230,7 @@ export default function HospitalHub() {
         </div>
       </Card>
 
-      <p className="text-xs text-[#94A3B8] text-center pt-2">
+      <p className="text-xs text-[#64748B] text-center pt-2">
         All case data on this page is simulated for demonstration purposes.
       </p>
     </DemoLayout>
@@ -244,7 +244,7 @@ export default function HospitalHub() {
 function InfoTile({ label, value, valueClassName = 'text-[#0F172A]' }) {
   return (
     <div className="rounded-lg bg-[#F8FAFC] border border-[#E8EDF2] px-3 py-2.5">
-      <p className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider">{label}</p>
+      <p className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">{label}</p>
       <p className={`text-sm font-bold mt-1 ${valueClassName}`}>{value}</p>
     </div>
   )

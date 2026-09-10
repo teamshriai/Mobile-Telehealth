@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# OncoTrace AI — Server
+# Stroke AI — Server
 #
 # Multi-stage build: compile TypeScript in a full node_modules environment,
 # then ship only production dependencies + compiled output. Keeps the final
@@ -39,8 +39,8 @@ RUN npx prisma generate
 COPY --from=build /app/dist ./dist
 
 # Runs as a non-root user — never run a production Node process as root.
-RUN addgroup -S oncotrace && adduser -S oncotrace -G oncotrace
-USER oncotrace
+RUN addgroup -S strokeai && adduser -S strokeai -G strokeai
+USER strokeai
 
 EXPOSE 5000
 

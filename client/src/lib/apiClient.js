@@ -1,72 +1,105 @@
 /**
  * apiClient.js
  *
- * Centralized Axios instance for all backend communication.
+ * The single axios instance. Nothing else in the app imports axios.
  *
- * Design decisions:
- * - baseURL comes from the VITE_API_BASE_URL env variable.
- * - The request interceptor automatically attaches Bearer JWT from localStorage.
- * - The response interceptor unwraps the { success, message, data } envelope so
- *   callers receive `data` directly on success and a clean Error on failure.
- * - On 401 responses the stored session is cleared and the user is redirected to /login.
- *   This handles expired or invalidated JWTs gracefully without any custom event bus.
+ * Phase 2 changes:
+ *  - The access token lives in a module-scoped variable, NOT localStorage.
+ *    An XSS payload can read localStorage; it cannot read this closure.
+ *  - A 401 no longer means "log out". It first attempts a silent refresh
+ *    against the httpOnly cookie and replays the original request. Only if
+ *    that fails is the session actually over. This is what makes a
+ *    15-minute access token invisible to the patient.
+ *  - Concurrent 401s share ONE refresh call. Without this, five parallel
+ *    requests would fire five refreshes; because refresh rotates the token,
+ *    four would replay a revoked token and trip reuse detection, logging the
+ *    user out — the exact opposite of the intent.
  */
 
 import axios from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
 
+// ── In-memory access token ───────────────────────────────────────────────────
+let accessToken = null
+
+export function setAccessToken(token) { accessToken = token ?? null }
+export function getAccessToken() { return accessToken }
+export function clearAccessToken() { accessToken = null }
+
+/** Called by AuthContext when the session ends irrecoverably. */
+let onSessionExpired = () => {}
+export function setSessionExpiredHandler(fn) { onSessionExpired = fn }
+
 const apiClient = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // sends cookies if the backend ever sets any
+  // Required for the httpOnly refresh cookie to be sent at all.
+  withCredentials: true,
   timeout: 15_000,
 })
 
-// ── Request interceptor: attach JWT ────────────────────────────────────────────
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('oncotrace_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
   return config
 })
 
-// ── Response interceptor: unwrap envelope / handle errors ─────────────────────
+// ── Single-flight refresh ────────────────────────────────────────────────────
+let refreshPromise = null
+
+function refreshAccessToken() {
+  if (refreshPromise === null) {
+    // A bare axios call, not apiClient: routing it through the instance would
+    // re-enter this interceptor on failure and recurse.
+    refreshPromise = axios
+      .post(`${BASE_URL}/api/v1/auth/refresh`, {}, { withCredentials: true, timeout: 15_000 })
+      .then((res) => {
+        const token = res.data?.data?.token ?? null
+        setAccessToken(token)
+        return token
+      })
+      .finally(() => { refreshPromise = null })
+  }
+  return refreshPromise
+}
+
+/** Endpoints where a 401 is a legitimate answer, not an expired session. */
+const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout']
+
 apiClient.interceptors.response.use(
-  (response) => {
-    // Unwrap the standard { success, message, data, timestamp } envelope.
-    // Callers get the inner `data` object directly.
-    return response.data?.data
-  },
-  (error) => {
+  (response) => response.data?.data,
+  async (error) => {
     const status = error.response?.status
-    const payload = error.response?.data
+    const original = error.config ?? {}
+    const url = original.url ?? ''
 
-    // Build a descriptive Error from the backend envelope.
-    const message =
-      payload?.message ??
-      error.message ??
-      'An unexpected error occurred. Please try again.'
+    const isRetryable =
+      status === 401 &&
+      original._retried !== true &&
+      !NO_RETRY_PATHS.some((p) => url.includes(p))
 
-    // Attach the raw field-level errors from Zod validation (if present)
-    // so form components can render per-field messages.
-    const fieldErrors = payload?.errors ?? null
-
-    // On 401 (expired/invalid token) clear the session and redirect to login.
-    if (status === 401) {
-      localStorage.removeItem('oncotrace_token')
-      localStorage.removeItem('oncotrace_session')
-      localStorage.removeItem('oncotrace_user')
-      // Use location.replace so the login page is not in history.
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login')
+    if (isRetryable) {
+      original._retried = true
+      try {
+        const token = await refreshAccessToken()
+        if (token) {
+          original.headers = { ...original.headers, Authorization: `Bearer ${token}` }
+          return apiClient(original)
+        }
+      } catch {
+        // Fall through to the session-ended path below.
       }
+      clearAccessToken()
+      onSessionExpired()
     }
 
-    const err = new Error(message)
+    const payload = error.response?.data
+    const err = new Error(
+      payload?.message ?? error.message ?? 'Something went wrong. Please try again.',
+    )
     err.status = status
-    err.fieldErrors = fieldErrors
+    // Zod field errors, so forms can render per-field messages.
+    err.fieldErrors = payload?.errors ?? null
     return Promise.reject(err)
   },
 )

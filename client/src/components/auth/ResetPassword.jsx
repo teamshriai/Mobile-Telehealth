@@ -306,7 +306,7 @@ export default function ResetPassword() {
                       <Lock
                         size={16}
                         strokeWidth={2}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-indigo-500 pointer-events-none"
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-indigo-500 pointer-events-none"
                       />
                       <input
                         type={showPassword ? 'text' : 'password'}
@@ -315,7 +315,7 @@ export default function ResetPassword() {
                         onChange={handleChange}
                         placeholder="Min. 8 characters"
                         autoComplete="new-password"
-                        className={`w-full border bg-white rounded-lg pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                        className={`w-full border bg-white rounded-lg pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-500
                                    focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 hover:border-gray-300
                                    ${errors.password ? 'border-red-300 focus:ring-red-400' : 'border-gray-200 focus:ring-indigo-400'}`}
                       />
@@ -323,7 +323,7 @@ export default function ResetPassword() {
                         type="button"
                         onClick={() => setShowPassword((p) => !p)}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                       >
                         {showPassword ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                       </button>
@@ -353,7 +353,7 @@ export default function ResetPassword() {
                       <Lock
                         size={16}
                         strokeWidth={2}
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-indigo-500 pointer-events-none"
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-indigo-500 pointer-events-none"
                       />
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
@@ -362,7 +362,7 @@ export default function ResetPassword() {
                         onChange={handleChange}
                         placeholder="Repeat your password"
                         autoComplete="new-password"
-                        className={`w-full border bg-white rounded-lg pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                        className={`w-full border bg-white rounded-lg pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder:text-gray-500
                                    focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 hover:border-gray-300
                                    ${errors.confirmPassword ? 'border-red-300 focus:ring-red-400' : 'border-gray-200 focus:ring-indigo-400'}`}
                       />
@@ -370,7 +370,7 @@ export default function ResetPassword() {
                         type="button"
                         onClick={() => setShowConfirmPassword((p) => !p)}
                         aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
                       >
                         {showConfirmPassword ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                       </button>
@@ -405,7 +405,7 @@ export default function ResetPassword() {
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-500">
                   <Shield size={13} strokeWidth={2} />
-                  <span>HIPAA-compliant and secure</span>
+                  <span>Your data is encrypted and private</span>
                 </div>
               </motion.div>
             )}

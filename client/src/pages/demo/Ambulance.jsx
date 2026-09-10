@@ -166,14 +166,14 @@ function MilestoneStepper() {
                       ? 'bg-[#16A34A] border-[#16A34A] text-white'
                       : current
                       ? 'bg-[#2563EB] border-[#2563EB] text-white'
-                      : 'bg-white border-[#E8EDF2] text-[#94A3B8]'
+                      : 'bg-white border-[#E8EDF2] text-[#64748B]'
                   }`}
                 >
                   {done ? <CheckCircle2 size={16} /> : <Circle size={12} className={current ? 'fill-white' : ''} />}
                 </div>
                 <span
                   className={`text-[10px] sm:text-[11px] font-semibold text-center leading-tight ${
-                    current ? 'text-[#2563EB]' : done ? 'text-[#16A34A]' : 'text-[#94A3B8]'
+                    current ? 'text-[#2563EB]' : done ? 'text-[#16A34A]' : 'text-[#64748B]'
                   }`}
                 >
                   {m.label}
@@ -216,7 +216,7 @@ function VitalsCard() {
               >
                 <Icon size={14} />
               </div>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#94A3B8]">{v.label}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">{v.label}</p>
               <p className="mt-0.5 text-base font-bold text-[#0F172A]">
                 {v.value} <span className="text-[11px] font-medium text-[#64748B]">{v.unit}</span>
               </p>
@@ -224,7 +224,7 @@ function VitalsCard() {
           )
         })}
       </div>
-      <p className="mt-3 text-[11px] text-[#94A3B8]">Last recorded 2 minutes ago · read-only mock capture</p>
+      <p className="mt-3 text-[11px] text-[#64748B]">Last recorded 2 minutes ago · read-only mock capture</p>
     </Card>
   )
 }

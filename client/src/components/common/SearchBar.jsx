@@ -50,7 +50,7 @@ export default function SearchBar({
       {/* Search icon */}
       <Search
         size={iconSize}
-        className={`absolute ${left} top-1/2 -translate-y-1/2 text-[#94A3B8] pointer-events-none`}
+        className={`absolute ${left} top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none`}
       />
 
       <input
@@ -61,7 +61,7 @@ export default function SearchBar({
         autoFocus={autoFocus}
         className={`
           w-full bg-white border border-[#E8EDF2]
-          text-[#0F172A] placeholder-[#94A3B8]
+          text-[#0F172A] placeholder-[#64748B]
           transition-all duration-200
           focus:outline-none focus:border-[#2563EB]
           focus:ring-4 focus:ring-[#2563EB]/10
@@ -77,7 +77,7 @@ export default function SearchBar({
           type="button"
           onClick={handleClear}
           className="absolute right-3 top-1/2 -translate-y-1/2
-                     text-[#94A3B8] hover:text-[#64748B] transition-colors"
+                     text-[#64748B] hover:text-[#64748B] transition-colors"
         >
           <X size={13} />
         </button>

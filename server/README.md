@@ -1,6 +1,6 @@
-# OncoTrace AI — Server
+# Stroke AI — Server
 
-Backend foundation for the OncoTrace AI precision oncology platform.
+Backend for the Stroke AI patient portal platform.
 
 ---
 
@@ -41,9 +41,9 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ### 3. Create the database
 
 ```sql
-CREATE USER oncotrace_user WITH ENCRYPTED PASSWORD 'your_strong_password';
-CREATE DATABASE oncotrace_db OWNER oncotrace_user;
-GRANT ALL PRIVILEGES ON DATABASE oncotrace_db TO oncotrace_user;
+CREATE USER strokeai_user WITH ENCRYPTED PASSWORD 'your_strong_password';
+CREATE DATABASE strokeai_db OWNER strokeai_user;
+GRANT ALL PRIVILEGES ON DATABASE strokeai_db TO strokeai_user;
 ```
 
 ### 4. Run migrations

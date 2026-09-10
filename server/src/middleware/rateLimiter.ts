@@ -47,6 +47,29 @@ export const authSlowDown = slowDown({
   maxDelayMs: 20_000,
 });
 
+/**
+ * Refresh is NOT a credential-guessing endpoint and must not share the login
+ * limiter.
+ *
+ * Login has 10 attempts / 15 min because each attempt is a password guess.
+ * Refresh presents an existing 256-bit token: there is nothing to brute force,
+ * and it fires on every page load, tab restore and access-token expiry. Behind
+ * the login limiter, an ordinary user hitting refresh across a few tabs would
+ * be locked out of their OWN valid session — the failure mode is a denial of
+ * service against legitimate users, not protection against attackers.
+ *
+ * It still needs a ceiling (it is unauthenticated and writes to the database),
+ * so the limit is generous but finite. Reuse detection, not rate limiting, is
+ * what defends this endpoint against a stolen token.
+ */
+export const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: ApiResponseBuilder.error('Too many session refresh attempts. Please sign in again.'),
+});
+
 export const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 requests per IP

@@ -30,6 +30,7 @@ import Modal from '../components/common/Modal.jsx'
 import { useTheme } from '../hooks/useTheme.js'
 import * as authService from '../services/auth.service.js'
 import * as profileService from '../services/profile.service.js'
+import { useAuth } from '../app/AuthContext.jsx'
 
 /* ── Page animation ── */
 const pageVariants = {
@@ -58,7 +59,8 @@ export default function Settings() {
   const [activeSection, setActiveSection] = useState('profile')
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const storedUser = authService.getStoredUser()
+  // From AuthContext, not localStorage — the user object is no longer persisted.
+  const { user: storedUser } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -114,7 +116,6 @@ export default function Settings() {
       variants={pageVariants}
       initial="initial"
       animate="animate"
-      className="max-w-[1100px] mx-auto"
     >
       {/* ── Page header ── */}
       <div className="mb-8">
@@ -130,7 +131,7 @@ export default function Settings() {
         {/* ── Left sidebar nav ── */}
         <div className="lg:w-64 flex-shrink-0">
           <Card variant="default" padding="sm">
-            <nav className="space-y-1 p-2">
+            <nav className="space-y-1 p-2" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
               {SECTIONS.map((section) => (
                 <SideNavItem
                   key={section.id}
@@ -175,10 +176,13 @@ function SideNavItem({ section, isActive, onClick }) {
   const { label, icon: Icon } = section
   return (
     <button
+      type="button"
+      role="tab"
+      aria-selected={isActive}
       onClick={onClick}
       className={`
-        w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-        text-left transition-all duration-200 group
+        focus-ring group flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5
+        text-left transition-colors duration-200
         ${isActive
           ? 'bg-[#EFF6FF] text-[#2563EB]'
           : 'text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]'
@@ -210,14 +214,19 @@ function SideNavItem({ section, isActive, onClick }) {
 /* ─────────────────────────────────────────────
    TOGGLE SWITCH
 ───────────────────────────────────────────── */
-function ToggleSwitch({ enabled, onToggle }) {
+function ToggleSwitch({ enabled, onToggle, label }) {
   return (
     <motion.button
+      type="button"
       onClick={onToggle}
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
       className={`
-        relative w-11 h-6 rounded-full transition-colors duration-300 flex-shrink-0
+        focus-ring tap-target relative w-11 rounded-full transition-colors duration-300 flex-shrink-0
         ${enabled ? 'bg-[#2563EB]' : 'bg-[#E8EDF2]'}
       `}
+      style={{ height: '1.5rem' }}
     >
       <motion.div
         animate={{ x: enabled ? 20 : 2 }}
@@ -239,24 +248,29 @@ function SettingsRow({
   iconBg    = '#F1F5F9',
   iconColor = '#64748B',
 }) {
+  // The row's own label doubles as the accessible name for a ToggleSwitch
+  // control — every ToggleSwitch in this file is used exactly this way, so
+  // this is the one place that fixes all 22 otherwise-unlabelled toggles.
+  const namedControl =
+    control?.type === ToggleSwitch ? { ...control, props: { ...control.props, label } } : control
+
   return (
-    <div className="flex items-center justify-between gap-4 py-4
-                    border-b border-[#F1F5F9] last:border-0">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between gap-4 border-b border-[#F1F5F9] py-4 last:border-0">
+      <div className="flex min-w-0 items-center gap-3">
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
           style={{ backgroundColor: iconBg }}
         >
           <Icon size={15} style={{ color: iconColor }} />
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-[#0F172A]">{label}</p>
           {sub && (
-            <p className="text-xs text-[#64748B] mt-0.5">{sub}</p>
+            <p className="mt-0.5 truncate text-xs text-[#64748B]">{sub}</p>
           )}
         </div>
       </div>
-      <div className="flex-shrink-0">{control}</div>
+      <div className="flex-shrink-0">{namedControl}</div>
     </div>
   )
 }
@@ -287,14 +301,14 @@ function SettingsInput({
         placeholder={placeholder}
         disabled={disabled}
         className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-[#0F172A]
-                   placeholder-[#94A3B8] focus:outline-none focus:ring-4
+                   placeholder-[#64748B] focus:outline-none focus:ring-4
                    hover:border-[#94A3B8] transition-all duration-200 disabled:opacity-60
                    ${error
-                     ? 'border-red-300 focus:ring-red-100 focus:border-red-400'
+                     ? 'border-[#F0C8C0] focus:border-[#A33A28] focus:ring-[#A33A28]/10'
                      : 'border-[#E8EDF2] focus:border-[#2563EB] focus:ring-[#2563EB]/10'
                    }`}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-xs text-[#A33A28]">{error}</p>}
     </div>
   )
 }
@@ -331,15 +345,15 @@ function ProfileSection({ storedUser, profile }) {
               </div>
             </div>
           </div>
-          <Button variant="primary" size="sm" onClick={() => navigate('/dashboard/profile')}>
+          <Button variant="primary" size="sm" onClick={() => navigate('/app/profile')}>
             Edit in Profile
           </Button>
         </div>
       </Card>
 
-      <p className="text-xs text-[#94A3B8]">
+      <p className="text-xs text-[#64748B]">
         Personal, identification, and address details are managed on the{' '}
-        <button onClick={() => navigate('/dashboard/profile')} className="font-medium text-[#2563EB] hover:underline">
+        <button onClick={() => navigate('/app/profile')} className="font-medium text-[#2563EB] hover:underline">
           Profile
         </button>{' '}
         page — everything you enter there is stored encrypted.
@@ -418,7 +432,7 @@ function SecuritySection() {
         <p className="text-sm font-bold text-[#0F172A] mb-5">Change Password</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           {globalError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700" role="alert">
+            <div className="rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] px-3.5 py-2.5 text-sm text-[#A33A28]" role="alert">
               {globalError}
             </div>
           )}
@@ -462,7 +476,7 @@ function SecuritySection() {
               {saving ? 'Updating…' : 'Update Password'}
             </Button>
           </div>
-          <p className="text-xs text-[#94A3B8]">
+          <p className="text-xs text-[#64748B]">
             Changing your password signs you out of this session — you'll need to sign in again.
           </p>
         </form>
@@ -470,8 +484,8 @@ function SecuritySection() {
 
       <Card variant="ghost" padding="md">
         <div className="flex items-start gap-3">
-          <Shield size={16} className="text-[#94A3B8] flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-[#94A3B8] leading-relaxed">
+          <Shield size={16} className="text-[#64748B] flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-[#64748B] leading-relaxed">
             Two-factor authentication and active-session management are planned for a
             future update — they aren't implemented yet, so they're not shown here rather
             than presenting a control that wouldn't actually do anything.
@@ -601,19 +615,26 @@ function PrivacySection({ profile, onSave }) {
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Data Management</p>
+        <p className="mb-1 text-sm font-bold text-[#0F172A]">Data Management</p>
         <div className="mt-4">
-          <div className="flex items-center justify-between p-4 rounded-lg
-                          bg-[#FEE2E2] border border-[#FECACA]">
-            <div>
-              <p className="text-sm font-semibold text-[#7F1D1D]">Delete Account</p>
-              <p className="text-xs text-[#991B1B] mt-0.5">
+          {/* Uses the critical palette, not emergency red — red is reserved
+              for the emergency action, so an ordinary (if serious) account
+              action does not compete with it visually. */}
+          <div className="flex flex-col gap-3 rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#A33A28]">Delete Account</p>
+              <p className="mt-0.5 text-xs text-[#8A5A1B]">
                 Permanently delete your account and all data
               </p>
             </div>
-            <Button variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => setDeleteModalOpen(true)}>
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-[#F0C8C0] bg-white px-3.5 text-sm font-semibold text-[#A33A28] transition-colors hover:bg-[#FBEAE7] sm:self-auto"
+            >
+              <Trash2 size={14} aria-hidden="true" />
               Delete
-            </Button>
+            </button>
           </div>
         </div>
       </Card>
@@ -629,24 +650,22 @@ function PrivacySection({ profile, onSave }) {
             <Button variant="outline" size="sm" onClick={() => setDeleteModalOpen(false)} disabled={deleting}>
               Cancel
             </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={<Trash2 size={13} />}
-              loading={deleting}
+            <button
+              type="button"
               onClick={handleDelete}
               disabled={deleting}
+              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#A33A28] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#8A2F20] disabled:opacity-60"
             >
+              <Trash2 size={14} aria-hidden="true" />
               {deleting ? 'Deleting…' : 'Delete Account'}
-            </Button>
+            </button>
           </>
         }
       >
         <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-lg
-                          bg-[#FEE2E2] border border-[#FECACA]">
-            <AlertTriangle size={16} className="text-[#DC2626] flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-[#7F1D1D] leading-relaxed">
+          <div className="flex items-start gap-3 rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] p-4">
+            <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-[#A33A28]" />
+            <p className="text-sm leading-relaxed text-[#A33A28]">
               Deleting your account will deactivate it immediately and remove your access.
               This cannot be undone from the portal — contact support if you change your mind.
             </p>
@@ -714,14 +733,18 @@ function AccessibilitySection({ profile, onSave }) {
 /* ─────────────────────────────────────────────
    LANGUAGE SECTION — real, persisted preferences.
 ───────────────────────────────────────────── */
-const LANGUAGE_DEFAULTS = { language: 'en', timezone: 'America/Los_Angeles', dateFormat: 'MM/DD/YYYY' }
+// India-first defaults: this is an India-deployed product (108/112 emergency
+// numbers, +91 phone validation elsewhere in the app) — Pacific Time /
+// MM/DD/YYYY as the out-of-the-box experience was a leftover from the
+// pre-rebrand codebase.
+const LANGUAGE_DEFAULTS = { language: 'en', timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY' }
 const LANGUAGES = [
-  { code: 'en', label: 'English (US)' },
-  { code: 'es', label: 'Spanish' },
-  { code: 'fr', label: 'French' },
-  { code: 'hi', label: 'Hindi' },
-  { code: 'zh', label: 'Chinese (Simplified)' },
+  { code: 'en', label: 'English' },
+  { code: 'ta', label: 'Tamil (தமிழ்)' },
+  { code: 'ml', label: 'Malayalam (മലയാളം)' },
+  { code: 'hi', label: 'Hindi (हिन्दी)' },
 ]
+const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']
 
 function LanguageSection({ profile, onSave }) {
   const settings = { ...LANGUAGE_DEFAULTS, ...profile?.preferences?.language }
@@ -734,12 +757,12 @@ function LanguageSection({ profile, onSave }) {
       <Card variant="default" padding="lg">
         <div className="space-y-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#0F172A] block">Display Language</label>
+            <label htmlFor="settings-language" className="block text-sm font-medium text-[#0F172A]">Display Language</label>
             <select
+              id="settings-language"
               value={settings.language}
               onChange={(e) => update('language', e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-[#E8EDF2] bg-white text-sm text-[#0F172A]
-                         focus:outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10"
+              className="focus-ring w-full min-h-11 rounded-lg border border-[#E8EDF2] bg-white px-4 py-3 text-sm text-[#0F172A]"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>{l.label}</option>
@@ -748,33 +771,38 @@ function LanguageSection({ profile, onSave }) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#0F172A] block">Timezone</label>
+            <label htmlFor="settings-timezone" className="block text-sm font-medium text-[#0F172A]">Timezone</label>
             <select
+              id="settings-timezone"
               value={settings.timezone}
               onChange={(e) => update('timezone', e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-[#E8EDF2] bg-white text-sm text-[#0F172A]
-                         focus:outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/10"
+              className="focus-ring w-full min-h-11 rounded-lg border border-[#E8EDF2] bg-white px-4 py-3 text-sm text-[#0F172A]"
             >
+              <option value="Asia/Kolkata">India Standard Time (IST)</option>
               <option value="America/Los_Angeles">Pacific Time (PT)</option>
               <option value="America/New_York">Eastern Time (ET)</option>
               <option value="America/Chicago">Central Time (CT)</option>
               <option value="America/Denver">Mountain Time (MT)</option>
-              <option value="Asia/Kolkata">India Standard Time (IST)</option>
               <option value="UTC">UTC</option>
             </select>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#0F172A] block">Date Format</label>
-            <div className="flex gap-3">
-              {['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'].map((fmt) => (
+            <span className="block text-sm font-medium text-[#0F172A]">Date Format</span>
+            {/* grid rather than an unwrapped flex row — three ~10-char labels
+                in a flex-1 row clip below ~360px; the grid keeps every option
+                fully readable down to a 320px viewport. */}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {DATE_FORMATS.map((fmt) => (
                 <button
                   key={fmt}
+                  type="button"
                   onClick={() => update('dateFormat', fmt)}
-                  className={`flex-1 py-2.5 rounded-lg border text-xs font-semibold transition-all duration-200
+                  aria-pressed={settings.dateFormat === fmt}
+                  className={`focus-ring tap-target rounded-lg border text-xs font-semibold transition-colors
                     ${settings.dateFormat === fmt
-                      ? 'bg-[#EFF6FF] border-[#2563EB] text-[#2563EB]'
-                      : 'bg-white border-[#E8EDF2] text-[#64748B] hover:border-[#94A3B8]'
+                      ? 'border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]'
+                      : 'border-[#E8EDF2] bg-white text-[#64748B] hover:border-[#94A3B8]'
                     }`}
                 >
                   {fmt}
@@ -832,7 +860,7 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
-        <p className="mt-4 text-xs text-[#94A3B8]">
+        <p className="mt-4 text-xs text-[#64748B]">
           Saved to this device. Most of the portal is currently designed for light mode —
           dark mode support is still being rolled out across pages.
         </p>

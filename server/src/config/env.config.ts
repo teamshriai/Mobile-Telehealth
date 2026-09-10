@@ -28,6 +28,20 @@ const envSchema = z.object({
 
   JWT_EXPIRES_IN: z.string().default('15m'),
 
+  // ── Refresh tokens ──────────────────────────────────────────────────────
+  // Short access token + long refresh token. Without this pair a 15-minute
+  // access token logs the patient out mid-task every 15 minutes.
+  //
+  // REFRESH_TOKEN_TTL_DAYS is the absolute lifetime of one login session.
+  // Rotation on every refresh means a stolen token is usable only until the
+  // legitimate client next refreshes, at which point reuse detection fires
+  // and the whole family is revoked.
+  REFRESH_TOKEN_TTL_DAYS: z
+    .string()
+    .regex(/^\d+$/, 'REFRESH_TOKEN_TTL_DAYS must be a numeric string')
+    .transform(Number)
+    .default('30'),
+
   ALLOWED_ORIGINS: z.string().min(1, 'ALLOWED_ORIGINS is required'),
 
   // Base URL of the frontend app — used to build links embedded in outbound
@@ -47,7 +61,7 @@ const envSchema = z.object({
     .default('false'),
   EMAIL_USER: z.string().min(1).optional(),
   EMAIL_PASSWORD: z.string().min(1).optional(),
-  // Display name + address emails are sent from, e.g. "OncoTrace AI <no-reply@shri-ai.org>"
+  // Display name + address emails are sent from, e.g. "Stroke AI <no-reply@shri-ai.org>"
   EMAIL_FROM: z.string().min(1).optional(),
 
   // ── Field-level encryption (PatientProfile PII) ─────────────────────────

@@ -39,3 +39,15 @@ export async function updateProfile(updates) {
 export async function updatePreferences(categories) {
   return apiClient.patch('/profile/preferences', categories)
 }
+
+/**
+ * Update the patient's health history (medical summary + lifestyle fields).
+ * Separate from updateProfile — these are a different task with different
+ * sensitivity from contact/identity details.
+ *
+ * @param {{ knownAllergies?, currentMedications?, existingDiseases?, familyHistory?, previousSurgeries?, smokingStatus?, alcoholStatus?, tobaccoStatus?, physicalActivity?, occupation? }} updates
+ * @returns {{ profile: object }}
+ */
+export async function updateHealthHistory(updates) {
+  return apiClient.patch('/profile/health-history', updates)
+}

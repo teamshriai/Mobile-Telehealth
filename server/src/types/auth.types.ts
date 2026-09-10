@@ -19,15 +19,17 @@ export interface JwtPayload {
 }
 
 /**
- * Role names — must stay in sync with the `role_name` enum in schema.prisma.
+ * Role names.
+ *
+ * Re-exported from the Prisma client rather than hand-mirrored. The previous
+ * hand-written copy was structurally identical but a DIFFERENT TypeScript type,
+ * so every value crossing the Prisma boundary needed a cast — which is exactly
+ * how the two silently drift apart. Aliasing means adding a role to
+ * schema.prisma propagates here on the next `prisma generate`, and a role
+ * removed from the schema becomes a compile error rather than dead runtime code.
  */
-export enum RoleName {
-  Admin = 'Admin',
-  Patient = 'Patient',
-  Doctor = 'Doctor',
-  HealthcareWorker = 'HealthcareWorker',
-  LabTechnician = 'LabTechnician',
-}
+export { RoleName } from '@prisma/client';
+export type { RoleName as RoleNameType } from '@prisma/client';
 
 /**
  * Sanitized user object — safe to return in API responses.

@@ -7,7 +7,6 @@ import {
   User,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   Navigation,
   RotateCcw,
 } from 'lucide-react'
@@ -175,7 +174,7 @@ export default function CommandCentre() {
           <Card padding="lg">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3">
               <h2 className="text-sm font-bold text-[#0F172A]">Dispatch Fan-Out Acknowledgment</h2>
-              <span className="text-[11px] text-[#94A3B8]">One alert, sent to all spokes at once</span>
+              <span className="text-[11px] text-[#64748B]">One alert, sent to all spokes at once</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {selectedCase.nodes.map((n) => (
@@ -211,7 +210,7 @@ export default function CommandCentre() {
         </div>
       </div>
 
-      <p className="text-xs text-[#94A3B8] text-center pt-2">
+      <p className="text-xs text-[#64748B] text-center pt-2">
         All case data on this page is simulated for demonstration purposes.
       </p>
     </DemoLayout>
@@ -235,7 +234,7 @@ function CaseRow({ caseData, selected, onSelect }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-[#0F172A]">Case #{id}</p>
-          <p className={`text-xs mt-0.5 ${isAnonymous ? 'italic text-[#94A3B8]' : 'text-[#64748B]'}`}>
+          <p className={`text-xs mt-0.5 ${isAnonymous ? 'italic text-[#64748B]' : 'text-[#64748B]'}`}>
             {patient}
           </p>
         </div>
@@ -244,7 +243,7 @@ function CaseRow({ caseData, selected, onSelect }) {
         </StatusBadge>
       </div>
       <p className="text-xs text-[#64748B] mt-3 flex items-center gap-1.5">
-        <Navigation size={12} className="text-[#94A3B8]" />
+        <Navigation size={12} className="text-[#64748B]" />
         {stage}
       </p>
     </Card>
@@ -261,7 +260,7 @@ function KpiTile({ tile }) {
 
   return (
     <Card padding="md">
-      <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">{label}</p>
+      <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">{label}</p>
       <p className="text-2xl font-bold text-[#0F172A] mt-1.5">{value}</p>
       <span
         className="inline-flex items-center gap-1 mt-2 rounded-md px-2 py-0.5 text-[11px] font-semibold"
@@ -309,7 +308,7 @@ function Timeline({ stages }) {
                 </p>
                 {stage.status === 'active' && <StatusBadge variant="primary" size="xs">In progress</StatusBadge>}
               </div>
-              <p className="text-xs text-[#94A3B8] mt-0.5 flex items-center gap-1.5">
+              <p className="text-xs text-[#64748B] mt-0.5 flex items-center gap-1.5">
                 <Clock size={11} />
                 {stage.time} · {stage.duration}
               </p>
@@ -345,7 +344,7 @@ function CaseMap({ caseData }) {
     <Card padding="none" className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 pt-4">
         <h2 className="text-sm font-bold text-[#0F172A]">Route Overview — Case #{caseData.id}</h2>
-        <span className="text-[11px] text-[#94A3B8] flex items-center gap-1">
+        <span className="text-[11px] text-[#64748B] flex items-center gap-1">
           <MapPin size={12} /> Stylized illustration, not a live map
         </span>
       </div>
@@ -391,7 +390,7 @@ function MapPinMarker({ icon: Icon, label, sub, left, top, color, bg }) {
       </div>
       <div className="mt-1 rounded-md border border-[#E8EDF2] bg-white px-1.5 py-0.5 text-center shadow-sm">
         <p className="text-[10px] font-bold text-[#0F172A] leading-tight whitespace-nowrap">{label}</p>
-        <p className="text-[9px] text-[#94A3B8] leading-tight whitespace-nowrap">{sub}</p>
+        <p className="text-[9px] text-[#64748B] leading-tight whitespace-nowrap">{sub}</p>
       </div>
     </div>
   )

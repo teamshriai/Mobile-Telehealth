@@ -30,7 +30,11 @@ const getGradient = (name = '') => {
     'linear-gradient(135deg, #DC2626, #EF4444)',
     'linear-gradient(135deg, #0284C7, #38BDF8)',
   ]
-  const index = name.charCodeAt(0) % gradients.length
+  // '' .charCodeAt(0) is NaN, so an empty/falsy name (the default prop value)
+  // previously indexed gradients[NaN] -> undefined -> no background at all.
+  // Falling back to a fixed gradient keeps every avatar visually valid.
+  const code = name ? name.charCodeAt(0) : 0
+  const index = code % gradients.length
   return gradients[index]
 }
 
