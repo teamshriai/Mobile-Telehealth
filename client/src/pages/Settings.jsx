@@ -31,6 +31,7 @@ import { useTheme } from '../hooks/useTheme.js'
 import * as authService from '../services/auth.service.js'
 import * as profileService from '../services/profile.service.js'
 import { useAuth } from '../app/AuthContext.jsx'
+import { useAccessibility } from '../app/AccessibilityContext.jsx'
 
 /* ── Page animation ── */
 const pageVariants = {
@@ -686,16 +687,34 @@ function PrivacySection({ profile, onSave }) {
 }
 
 /* ─────────────────────────────────────────────
-   ACCESSIBILITY SECTION — real, persisted preferences.
+   ACCESSIBILITY SECTION
+
+   Every switch here changes the portal immediately — AccessibilityContext
+   sets a data-* attribute on <html> and index.css does the rest.
+
+   Three earlier switches were removed rather than kept: "Screen Reader
+   Support", "Keyboard Navigation" and "Focus Indicators". The portal has
+   full keyboard operability and visible focus rings unconditionally, and
+   nothing about screen-reader output is toggleable — so those controls
+   could only ever have been decorative, and one of them ("Keyboard
+   Navigation", defaulting to on) implied a user could switch keyboard
+   access OFF. Deleting a promise the product cannot keep is the fix.
 ───────────────────────────────────────────── */
 const ACCESSIBILITY_DEFAULTS = {
   largeText: false, highContrast: false, reduceMotion: false,
-  screenReader: false, keyboardNav: true, focusIndicators: true,
 }
 
 function AccessibilitySection({ profile, onSave }) {
+  const { applyLocal } = useAccessibility()
   const settings = { ...ACCESSIBILITY_DEFAULTS, ...profile?.preferences?.accessibility }
-  const toggle = (key) => onSave('accessibility', { [key]: !settings[key] })
+
+  const toggle = (key) => {
+    const next = !settings[key]
+    // Apply first, persist second: the point of a display setting is that you
+    // see the effect while deciding whether you want it.
+    applyLocal(key, next)
+    onSave('accessibility', { [key]: next })
+  }
 
   return (
     <div className="space-y-5">
@@ -706,7 +725,7 @@ function AccessibilitySection({ profile, onSave }) {
         <SettingsRow icon={Eye} label="Large Text" sub="Increase font size across the portal"
           iconBg="#EFF6FF" iconColor="#2563EB"
           control={<ToggleSwitch enabled={settings.largeText} onToggle={() => toggle('largeText')} />} />
-        <SettingsRow icon={Monitor} label="High Contrast" sub="Enhance visibility for readability"
+        <SettingsRow icon={Monitor} label="High Contrast" sub="Darken text and strengthen borders"
           iconBg="#F1F5F9" iconColor="#64748B"
           control={<ToggleSwitch enabled={settings.highContrast} onToggle={() => toggle('highContrast')} />} />
         <SettingsRow icon={Eye} label="Reduce Motion" sub="Minimize animations and transitions"
@@ -715,16 +734,11 @@ function AccessibilitySection({ profile, onSave }) {
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Interaction</p>
-        <SettingsRow icon={Eye} label="Screen Reader Support" sub="Optimise for assistive technologies"
-          iconBg="#EFF6FF" iconColor="#2563EB"
-          control={<ToggleSwitch enabled={settings.screenReader} onToggle={() => toggle('screenReader')} />} />
-        <SettingsRow icon={Key} label="Keyboard Navigation" sub="Full keyboard control of portal"
-          iconBg="#DCFCE7" iconColor="#16A34A"
-          control={<ToggleSwitch enabled={settings.keyboardNav} onToggle={() => toggle('keyboardNav')} />} />
-        <SettingsRow icon={Eye} label="Focus Indicators" sub="Show visible focus rings on elements"
-          iconBg="#EFF6FF" iconColor="#2563EB"
-          control={<ToggleSwitch enabled={settings.focusIndicators} onToggle={() => toggle('focusIndicators')} />} />
+        <p className="text-sm font-bold text-[#0F172A] mb-1">Always on</p>
+        <p className="mt-1 text-sm leading-relaxed text-[#475569]">
+          Full keyboard navigation, visible focus indicators and screen-reader
+          landmarks are built into every page and cannot be switched off.
+        </p>
       </Card>
     </div>
   )

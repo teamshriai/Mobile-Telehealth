@@ -49,6 +49,42 @@ export const notificationRepository = {
     return count;
   },
 
+  /**
+   * The recipient's notification preferences plus the email address a message
+   * would be sent to — fetched together because `notify()` needs both and
+   * there is no reason to make two round trips for one decision.
+   *
+   * Returns null when the user does not exist. `preferences` is the raw JSON
+   * blob from PatientProfile; the caller interprets it, because the shape is
+   * owned by profile.validator.ts's `preferencesSchema`, not by this module.
+   *
+   * A user with no patient profile (a doctor or admin) has no preferences and
+   * gets `preferences: null`, which the caller treats as "no opt-out recorded".
+   */
+  async findRecipientDeliveryContext(userId: string): Promise<{
+    email: string;
+    isActive: boolean;
+    preferences: unknown;
+  } | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        isActive: true,
+        deletedAt: true,
+        patientProfile: { select: { preferences: true } },
+      },
+    });
+
+    if (user === null || user.deletedAt !== null) return null;
+
+    return {
+      email: user.email,
+      isActive: user.isActive,
+      preferences: user.patientProfile?.preferences ?? null,
+    };
+  },
+
   async create(data: {
     userId: string;
     type: NotificationType;

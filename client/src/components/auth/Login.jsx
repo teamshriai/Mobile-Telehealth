@@ -52,6 +52,10 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const successMessage = location.state?.message || ''
+  // Set by the idle timeout and by apiClient when a session ends
+  // irrecoverably. Without this the user is simply dumped on the login page
+  // with no explanation of why they are no longer signed in.
+  const sessionExpired = location.state?.expired === true
   const { login, loading, error: authError } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
@@ -177,6 +181,22 @@ export default function Login() {
 
           {/* ── RIGHT: form ── */}
           <div className="px-6 py-8 sm:px-10 sm:py-10 md:py-12 flex flex-col justify-center">
+            {/* Explains an involuntary sign-out — idle timeout, or a refresh
+                token that could not be renewed. */}
+            {sessionExpired && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#FBF0E2] border border-[#EBD5AE] rounded-md px-3.5 py-2.5 text-xs sm:text-sm text-[#8A5A1B] flex items-center gap-2 mb-5 shadow-sm font-medium"
+                role="status"
+              >
+                <Shield size={16} className="text-[#8A5A1B] flex-shrink-0" strokeWidth={2} />
+                <span>
+                  You were signed out to protect your information. Please sign in again.
+                </span>
+              </motion.div>
+            )}
+
             {/* Success notification banner from registration */}
             {successMessage && (
               <motion.div

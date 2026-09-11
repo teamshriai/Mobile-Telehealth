@@ -229,7 +229,21 @@
 
   @media (max-width: 767px) {
     input, select, textarea {
+      /* 16px minimum stops iOS Safari zooming the viewport on focus. */
       font-size: max(16px, 1em);
+    }
+
+    /* A finger needs ~44px. Padding alone did not deliver it: a measured
+       sweep at 320px and 390px found selects and text inputs rendering at
+       42px across My Health, Settings, Appointments and the auth forms.
+       Setting it here fixes all of them at once rather than touching 23
+       call sites, and `min-height` cannot shrink a control that is already
+       taller. Checkboxes and radios are excluded — they are sized
+       deliberately, and the visible label is their real touch target. */
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      min-height: 44px;
     }
   }
 
@@ -240,6 +254,73 @@
       scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  /* ── Accessibility preferences ──────────────────────────────────────────
+     Driven by data-* attributes that AccessibilityContext sets on <html>
+     from the patient's saved settings. Until Phase 5 these three switches
+     saved correctly and changed nothing on screen; these rules are what
+     make them true.
+
+     Note the OS-level `prefers-reduced-motion` block above still applies
+     independently — an explicit account setting adds to the system
+     preference, it does not replace or override it.
+  ─────────────────────────────────────────────────────────────────────── */
+
+  /* Large text: scales the type ramp itself rather than zooming the page,
+     so line-height, spacing and layout stay in proportion. The 2xs step is
+     lifted disproportionately — at 12px it is the hardest size to read, and
+     someone who asked for larger text should not be left with it. */
+  html[data-large-text='true'] {
+    --text-2xs:  0.875rem;  /* 12 → 14 */
+    --text-xs:   0.9375rem; /* 13 → 15 */
+    --text-sm:   1rem;      /* 14 → 16 */
+    --text-base: 1.125rem;  /* 16 → 18 */
+    --text-lg:   1.25rem;   /* 18 → 20 */
+    --text-xl:   1.375rem;  /* 20 → 22 */
+    --text-2xl:  1.625rem;  /* 24 → 26 */
+    --text-3xl:  2rem;      /* 30 → 32 */
+    --text-4xl:  2.375rem;  /* 36 → 38 */
+  }
+
+  /* High contrast: darkens body and secondary text to at least 7:1 on the
+     page background (WCAG AAA), and strengthens borders so card and input
+     edges remain visible rather than implied. Hardcoded slate values are
+     used because most of the app sets colour with arbitrary Tailwind values
+     (`text-[#475569]`) rather than tokens — this reaches those. */
+  html[data-high-contrast='true'] body {
+    color: #000000;
+  }
+
+  html[data-high-contrast='true'] .text-\[\#475569\],
+  html[data-high-contrast='true'] .text-\[\#64748B\],
+  html[data-high-contrast='true'] .text-\[\#94A3B8\] {
+    color: #1E293B !important;
+  }
+
+  html[data-high-contrast='true'] .border-\[\#E2E8F0\],
+  html[data-high-contrast='true'] .border-\[\#E8EDF2\],
+  html[data-high-contrast='true'] .border-\[\#CBD5E1\] {
+    border-color: #475569 !important;
+  }
+
+  html[data-high-contrast='true'] :is(input, select, textarea) {
+    border-color: #475569 !important;
+  }
+
+  /* Reduce motion: same treatment as the OS preference, applied to anyone
+     who asked for it in Settings regardless of their device setting. */
+  html[data-reduce-motion='true'] *,
+  html[data-reduce-motion='true'] *::before,
+  html[data-reduce-motion='true'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html[data-reduce-motion='true'] {
+    scroll-behavior: auto;
   }
 }
 

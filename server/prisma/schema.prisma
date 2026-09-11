@@ -151,6 +151,17 @@ enum AuditAction {
   TokenRefreshed
   TokenReuseDetected
   SessionRevoked
+  // ── Patient identity & encounters (Phase 6) ─────────────────────────────
+  PatientRegistered
+  PatientSearched
+  PatientRecordViewed
+  PatientDuplicateDetected
+  PatientDuplicateAcknowledged
+  PatientAccountLinked
+  EncounterCreated
+  EncounterClosed
+  AssessmentCreated
+  AssessmentUpdated
 
   @@map("audit_action")
 }
@@ -321,14 +332,44 @@ model User {
 // =============================================================================
 
 model PatientProfile {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
+  id     String  @id @default(uuid()) @db.Uuid
+  // Nullable as of Phase 6: a staff/field-registered patient (e.g. an
+  // unconscious ambulance arrival) has no email/password and therefore no
+  // User row yet. `link-account` attaches one later. Postgres unique indexes
+  // permit any number of NULLs, so multiple login-less patients coexist
+  // without conflict. All pre-Phase-6 rows keep their non-null userId.
+  userId String? @unique @map("user_id") @db.Uuid
+
+  // ── Platform identity (Phase 6) ────────────────────────────────────────────
+  // Public-facing, stable, non-enumerable identifier. Never the internal
+  // UUID — see server/src/utils/shriId.ts for the generation scheme.
+  shriPatientId String @unique @map("shri_patient_id")
+
+  // Deterministic HMAC-SHA256 blind index of the normalized mobile number
+  // (see server/src/utils/phone.ts + hmacBlindIndex in encryption.ts).
+  // Deliberately NOT @unique: verified against live data, a single mobile
+  // handset is legitimately shared by more than one family member/patient.
+  // A strong signal for duplicate detection, never an identity guarantee.
+  phoneNumberHash String? @map("phone_number_hash")
+
+  registrationSource RegistrationSource @default(SelfRegistered) @map("registration_source")
+  // Set only when registrationSource is Staff/FieldRegistered. The User who
+  // performed the registration — used by the HealthcareWorker care-relationship
+  // grant (see careRelationship.service.ts) since a field worker has no
+  // CareTeamMember row.
+  registeredByUserId String? @map("registered_by_user_id") @db.Uuid
+  identityStatus     IdentityStatus @default(Unverified) @map("identity_status")
 
   // ── Basic Information ─────────────────────────────────────────────────────
   firstName     String        @map("first_name")
   middleName    String?       @map("middle_name")
   lastName      String        @map("last_name")
-  dateOfBirth   DateTime      @map("date_of_birth") @db.Date
+  // Nullable as of Phase 6: an unconscious/unidentified patient may have no
+  // known DOB. dobIsEstimated distinguishes a real recorded value from a
+  // clinician's best guess — never silently treated the same as a confirmed
+  // date (age-based dosing depends on this distinction).
+  dateOfBirth    DateTime?      @map("date_of_birth") @db.Date
+  dobIsEstimated Boolean        @default(false) @map("dob_is_estimated")
   gender        Gender?
   bloodGroup    BloodGroup?   @map("blood_group")
   maritalStatus MaritalStatus? @map("marital_status")
@@ -407,18 +448,59 @@ model PatientProfile {
   updatedAt DateTime @updatedAt      @map("updated_at")
 
   // ── Relations ─────────────────────────────────────────────────────────────
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // Nullable relation to match nullable userId — a login-less patient has no
+  // linked User row until link-account is used.
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   careTeam     CareTeamMember[]
   appointments Appointment[]
+  encounters   Encounter[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
   // [abhaIdHash]: @unique blind-index look-up — abhaId itself is encrypted
   // and can't be looked up or constrained directly (see comment above).
-  // userId: @unique creates the index implicitly — not duplicated.
+  // [phoneNumberHash]: NOT unique — see field comment above.
+  // [dateOfBirth]: supports the name+DOB duplicate-matching signal.
+  // [registrationSource, createdAt]: lets ops queries filter field/staff
+  // registrations without a full table scan.
+  // userId / shriPatientId: @unique creates the index implicitly — not duplicated.
   @@index([lastName, firstName])
+  @@index([phoneNumberHash])
+  @@index([dateOfBirth])
+  @@index([registrationSource, createdAt])
   @@map("patient_profiles")
+}
+
+enum RegistrationSource {
+  /// The existing self-service flow — POST /auth/register. Default value:
+  /// correct for every row that existed before Phase 6.
+  SelfRegistered
+  /// Front-desk / clinic staff registered the patient in person.
+  StaffRegistered
+  /// Ambulance, health camp, or other low-connectivity field registration.
+  FieldRegistered
+  /// Reserved for a future bulk/HMIS import path. Not implemented.
+  Imported
+
+  @@map("registration_source")
+}
+
+enum IdentityStatus {
+  /// Name/DOB given verbally, nothing independently checked.
+  Unverified
+  /// Patient could not identify themselves (e.g. unconscious); a placeholder
+  /// name was recorded. Never used for anything beyond a display flag.
+  Provisional
+  /// ABHA or another document has been checked against this record.
+  Verified
+  /// This record lost a duplicate-merge decision. No code path sets this yet
+  /// — merging is a deliberately unbuilt, destructive operation (see
+  /// patient.identity.service.ts) — but the state has a home in the schema
+  /// for when a real merge workflow is authorized.
+  MergedAway
+
+  @@map("identity_status")
 }
 
 // =============================================================================
@@ -719,6 +801,10 @@ model Appointment {
   patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
   doctor  DoctorProfile? @relation(fields: [doctorId],  references: [id], onDelete: SetNull)
 
+  /// Reverse side of Encounter.appointmentId. At most one encounter links to
+  /// a given appointment (enforced by @unique on that field).
+  encounter Encounter?
+
   @@index([patientId])
   @@index([doctorId])
   @@index([scheduledAt])
@@ -783,4 +869,202 @@ enum NotificationType {
   CareTeam
 
   @@map("notification_type")
+}
+
+// =============================================================================
+// ENCOUNTER (Phase 6)
+//
+// A Patient may have many Encounters — one per visit/episode/contact with the
+// healthcare system. This is deliberately GENERIC: nothing stroke-specific
+// lives here. Stroke intake hangs off an Encounter via StrokeAssessment
+// (below), the same way a future OncologyAssessment or CardiologyAssessment
+// would — each a pure additive table with `encounterId @unique`, requiring
+// zero change to this model or to PatientProfile.
+//
+// onDelete: Restrict on `patient` (not Cascade, unlike Appointment/CareTeam):
+// an encounter is itself a clinical record and must never be silently
+// destroyed as a side effect of another operation.
+// =============================================================================
+model Encounter {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+
+  /// Public, immutable, server-generated. Same Crockford-Base32 scheme as
+  /// shriPatientId (see server/src/utils/shriId.ts) — never updated after
+  /// creation; no repository method exposes a way to change it.
+  visitId String @unique @map("visit_id")
+
+  type   EncounterType
+  status EncounterStatus @default(InProgress)
+
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  /// Free text naming a real place ("Coimbatore field camp, block 3").
+  /// Encrypted at rest — see server/src/encounter/encounter.repository.ts.
+  locationName String? @map("location_name")
+
+  /// Who opened it. Nullable: a future offline/device-originated path may
+  /// have no authenticated user at capture time.
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+
+  /// Optional link to a booked Appointment. SetNull, not Cascade/Restrict —
+  /// losing the appointment (e.g. it is later deleted) must never destroy
+  /// the clinical encounter record.
+  appointmentId String? @unique @map("appointment_id") @db.Uuid
+
+  /// Clinician free text — why the patient presented. Encrypted at rest.
+  chiefComplaint String? @map("chief_complaint")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  strokeAssessment StrokeAssessment?
+
+  @@index([patientId, startedAt])
+  @@index([status])
+  @@index([type, startedAt])
+  @@index([createdByUserId, startedAt])
+  @@map("encounters")
+}
+
+enum EncounterType {
+  ClinicVisit
+  AmbulanceIntake
+  Emergency
+  Telehealth
+  FollowUp
+  Screening
+  FieldRegistration
+
+  @@map("encounter_type")
+}
+
+enum EncounterStatus {
+  InProgress
+  Completed
+  Cancelled
+
+  @@map("encounter_status")
+}
+
+// =============================================================================
+// STROKE DOMAIN MODULE (Phase 6)
+//
+// This is a DOMAIN module, not part of the generic platform. It hangs off
+// Encounter via a one-to-one relation and touches nothing on Patient or
+// Encounter itself. A future OncologyAssessment/CardiologyAssessment is a
+// pure additive CREATE TABLE following this exact shape — no migration to
+// this file, no migration to Encounter or PatientProfile.
+//
+// A polymorphic single "Assessment" table with a domain discriminator and a
+// JSON payload was considered and rejected: it would make future domains
+// "free" at the cost of destroying type safety on values where a wrong entry
+// is a patient-harm event (a JSON key can't be validated by an index, and a
+// mistyped LKW timestamp buried in a blob is much easier to miss than one in
+// a typed, indexed column).
+// =============================================================================
+model StrokeAssessment {
+  id          String @id @default(uuid()) @db.Uuid
+  encounterId String @unique @map("encounter_id") @db.Uuid
+
+  // ── Last Known Well ────────────────────────────────────────────────────────
+  // The single most consequential value in acute stroke care — it gates
+  // thrombolysis eligibility. See StrokeLkwRevision below: every change to
+  // these three fields must be independently, transactionally recorded.
+  lkwAt        DateTime?     @map("lkw_at")
+  lkwCertainty LkwCertainty  @default(Unknown) @map("lkw_certainty")
+  lkwSource    LkwSource?    @map("lkw_source")
+  /// Free text context ("wife last saw him normal at dinner"). Encrypted.
+  lkwNote      String?       @map("lkw_note")
+
+  // ── Symptom flags ──────────────────────────────────────────────────────────
+  // A checklist of REPORTED symptoms, not a diagnosis. The service layer
+  // must never render or log any of this as "patient has stroke" — only as
+  // "potential stroke symptoms identified" (see encounter.service.ts).
+  facialWeakness     Boolean @default(false) @map("facial_weakness")
+  armWeakness        Boolean @default(false) @map("arm_weakness")
+  legWeakness        Boolean @default(false) @map("leg_weakness")
+  speechDifficulty   Boolean @default(false) @map("speech_difficulty")
+  suddenConfusion    Boolean @default(false) @map("sudden_confusion")
+  visionProblem      Boolean @default(false) @map("vision_problem")
+  severeHeadache     Boolean @default(false) @map("severe_headache")
+  balanceProblem     Boolean @default(false) @map("balance_problem")
+  lossOfConsciousness Boolean @default(false) @map("loss_of_consciousness")
+  /// Free text for a symptom not covered above. Encrypted.
+  otherSymptomNote   String? @map("other_symptom_note")
+
+  /// True only when at least one symptom flag above is set AND the encounter
+  /// type indicates urgency. This is a WORKFLOW SIGNAL — routes the patient
+  /// to the right queue faster — never presented as a diagnosis.
+  urgentFlag Boolean @default(false) @map("urgent_flag")
+
+  onAnticoagulants Boolean? @map("on_anticoagulants")
+
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  encounter  Encounter           @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  lkwHistory StrokeLkwRevision[]
+
+  @@index([lkwAt])
+  @@index([urgentFlag])
+  @@map("stroke_assessments")
+}
+
+enum LkwCertainty {
+  /// Witnessed; the clock time is known and trusted.
+  Exact
+  /// A window is known ("around 8pm") but not a precise time.
+  Approximate
+  /// Wake-up stroke — LKW is the time the patient was last seen normal
+  /// before sleep, not the time symptoms were noticed.
+  WakeUp
+  Unknown
+
+  @@map("lkw_certainty")
+}
+
+enum LkwSource {
+  Patient
+  Family
+  Bystander
+  EmergencyServices
+  ClinicalRecord
+
+  @@map("lkw_source")
+}
+
+/// Append-only revision log for Last Known Well. Written in the SAME
+/// transaction as the StrokeAssessment update that changes lkwAt/lkwCertainty
+/// — never relying solely on the fire-and-forget AuditLog, whose own service
+/// explicitly swallows write failures (acceptable for "someone viewed a
+/// page", not acceptable for the value that gates thrombolysis). A generic
+/// AuditLog row is additionally emitted for the security trail — this is the
+/// one place that duplication is deliberate.
+model StrokeLkwRevision {
+  id           String @id @default(uuid()) @db.Uuid
+  assessmentId String @map("assessment_id") @db.Uuid
+
+  previousLkwAt     DateTime?     @map("previous_lkw_at")
+  previousCertainty LkwCertainty? @map("previous_certainty")
+  newLkwAt          DateTime?     @map("new_lkw_at")
+  newCertainty      LkwCertainty  @map("new_certainty")
+  newSource         LkwSource?    @map("new_source")
+
+  /// Why it changed. Required — a change to this value with no stated
+  /// reason is exactly the gap a later incident review would need filled.
+  /// Encrypted at rest.
+  reason          String
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  assessment StrokeAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, createdAt])
+  @@map("stroke_lkw_revisions")
 }

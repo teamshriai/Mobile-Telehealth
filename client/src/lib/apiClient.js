@@ -100,6 +100,10 @@ apiClient.interceptors.response.use(
     err.status = status
     // Zod field errors, so forms can render per-field messages.
     err.fieldErrors = payload?.errors ?? null
+    // Server-issued correlation id, mirrored from the X-Request-Id header.
+    // Surfaced in ErrorState so a patient reporting a failure has a reference
+    // to quote and support has an exact string to grep the logs for.
+    err.requestId = payload?.requestId ?? error.response?.headers?.['x-request-id'] ?? null
     return Promise.reject(err)
   },
 )

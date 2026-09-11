@@ -247,7 +247,8 @@ export default function AppointmentsPage() {
     return appointmentService
       .listAppointments(nextScope)
       .then(setAppointments)
-      .catch((err) => setLoadError(err.message))
+      // Keep the error object so ErrorState can show its support reference.
+      .catch((err) => setLoadError(err))
       .finally(() => setLoading(false))
   }, [])
 
@@ -280,7 +281,7 @@ export default function AppointmentsPage() {
       await appointmentService.cancelAppointment(appointment.id, null)
       await load(scope)
     } catch (err) {
-      setLoadError(err.message)
+      setLoadError(err)
     } finally {
       setCancellingId(null)
     }

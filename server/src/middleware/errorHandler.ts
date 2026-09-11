@@ -44,6 +44,7 @@ export const errorHandler = (
         ApiResponseBuilder.error(
           'Validation failed.',
           err.flatten().fieldErrors as Record<string, string[]>,
+          req.requestId,
         ),
       );
     return;
@@ -51,12 +52,18 @@ export const errorHandler = (
 
   // ── JWT Errors ──────────────────────────────────────────────────────────
   if (err instanceof TokenExpiredError) {
-    res.status(401).json(ApiResponseBuilder.error('Session expired. Please log in again.'));
+    res
+      .status(401)
+      .json(
+        ApiResponseBuilder.error('Session expired. Please log in again.', undefined, req.requestId),
+      );
     return;
   }
 
   if (err instanceof JsonWebTokenError) {
-    res.status(401).json(ApiResponseBuilder.error('Invalid authentication token.'));
+    res
+      .status(401)
+      .json(ApiResponseBuilder.error('Invalid authentication token.', undefined, req.requestId));
     return;
   }
 
@@ -66,20 +73,32 @@ export const errorHandler = (
   if (err.constructor.name === 'PrismaClientKnownRequestError' && 'code' in err) {
     const prismaErr = err as Error & { code: string };
     if (prismaErr.code === 'P2002') {
-      res.status(409).json(ApiResponseBuilder.error('A record with this value already exists.'));
+      res
+        .status(409)
+        .json(
+          ApiResponseBuilder.error(
+            'A record with this value already exists.',
+            undefined,
+            req.requestId,
+          ),
+        );
       return;
     }
     if (prismaErr.code === 'P2025') {
-      res.status(404).json(ApiResponseBuilder.error('Record not found.'));
+      res.status(404).json(ApiResponseBuilder.error('Record not found.', undefined, req.requestId));
       return;
     }
-    res.status(400).json(ApiResponseBuilder.error('Database operation failed.'));
+    res
+      .status(400)
+      .json(ApiResponseBuilder.error('Database operation failed.', undefined, req.requestId));
     return;
   }
 
   // ── Operational Errors (AppError) ───────────────────────────────────────
   if (err instanceof AppError && err.isOperational) {
-    res.status(err.statusCode).json(ApiResponseBuilder.error(err.message));
+    res
+      .status(err.statusCode)
+      .json(ApiResponseBuilder.error(err.message, undefined, req.requestId));
     return;
   }
 
@@ -98,6 +117,8 @@ export const errorHandler = (
         env.NODE_ENV === 'production'
           ? 'An unexpected error occurred. Please try again later.'
           : err.message,
+        undefined,
+        req.requestId,
       ),
     );
 };
@@ -107,5 +128,13 @@ export const errorHandler = (
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const notFoundHandler = (req: Request, res: Response): void => {
-  res.status(404).json(ApiResponseBuilder.error(`Route ${req.method} ${req.url} not found.`));
+  res
+    .status(404)
+    .json(
+      ApiResponseBuilder.error(
+        `Route ${req.method} ${req.url} not found.`,
+        undefined,
+        req.requestId,
+      ),
+    );
 };

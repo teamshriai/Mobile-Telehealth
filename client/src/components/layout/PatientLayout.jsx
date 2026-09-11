@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PatientSidebar from './PatientSidebar.jsx'
 import PatientTopbar from './PatientTopbar.jsx'
 import ErrorBoundary from '../feedback/ErrorBoundary.jsx'
+import IdleWarning from '../feedback/IdleWarning.jsx'
 import { titleForPath } from '../../app/navigation.js'
+import { useAuth } from '../../app/AuthContext.jsx'
+import { useIdleTimeout } from '../../app/useIdleTimeout.js'
 
 /**
  * The single patient portal shell. Every patient route renders inside it —
@@ -16,6 +19,22 @@ import { titleForPath } from '../../app/navigation.js'
 export default function PatientLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { isAuthenticated, role, logout } = useAuth()
+
+  // Mounted here rather than in App so it can only ever run inside the
+  // authenticated shell — an anonymous visitor reading the login page must
+  // not be "signed out" of a session they do not have.
+  const handleIdle = useCallback(async () => {
+    await logout()
+    navigate('/login', { replace: true, state: { expired: true } })
+  }, [logout, navigate])
+
+  const { warning, secondsLeft, stayActive } = useIdleTimeout({
+    enabled: isAuthenticated,
+    role,
+    onIdle: handleIdle,
+  })
 
   const closeMobile = useCallback(() => setMobileOpen(false), [])
   const openMobile = useCallback(() => setMobileOpen(true), [])
@@ -59,6 +78,8 @@ export default function PatientLayout() {
           </div>
         </main>
       </div>
+
+      {warning && <IdleWarning secondsLeft={secondsLeft} onStayActive={stayActive} />}
     </div>
   )
 }

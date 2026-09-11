@@ -21,7 +21,9 @@ export default function CareTeamPage() {
     return careTeamService
       .listCareTeam()
       .then(setMembers)
-      .catch((err) => setError(err.message))
+      // The error object, not just its message: ErrorState reads requestId
+      // off it to show the support reference.
+      .catch((err) => setError(err))
       .finally(() => setLoading(false))
   }
 

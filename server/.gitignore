@@ -36,3 +36,5 @@ coverage/
 *.p12
 *.pfx
 secrets/
+backups/
+.scratch/

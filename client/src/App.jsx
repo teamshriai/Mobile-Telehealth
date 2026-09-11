@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 
 import { AuthProvider, useAuth } from './app/AuthContext.jsx'
+import { AccessibilityProvider } from './app/AccessibilityContext.jsx'
 import { RequireAuth, RequireAnonymous, homeForRole } from './app/guards.jsx'
 import { setSessionExpiredHandler } from './lib/apiClient'
 import ErrorBoundary from './components/feedback/ErrorBoundary.jsx'
@@ -75,79 +76,84 @@ export default function App() {
     <ErrorBoundary label="app-root">
       <BrowserRouter>
         <AuthProvider>
-          <SessionExpiryBridge />
-          <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
-            <Routes>
-              {/* ── Public ── */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/landing" element={<Navigate to="/" replace />} />
+          {/* Inside AuthProvider: it reads the profile the session provides.
+              Above the routes so a preference applies to every page, not just
+              the one the patient happened to be on when they set it. */}
+          <AccessibilityProvider>
+            <SessionExpiryBridge />
+            <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
+              <Routes>
+                {/* ── Public ── */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/landing" element={<Navigate to="/" replace />} />
 
-              <Route path="/login"           element={<RequireAnonymous><Login /></RequireAnonymous>} />
-              <Route path="/register"        element={<RequireAnonymous><Register /></RequireAnonymous>} />
-              <Route path="/forgot-password" element={<RequireAnonymous><ForgotPassword /></RequireAnonymous>} />
-              <Route path="/reset-password"  element={<RequireAnonymous><ResetPassword /></RequireAnonymous>} />
+                <Route path="/login"           element={<RequireAnonymous><Login /></RequireAnonymous>} />
+                <Route path="/register"        element={<RequireAnonymous><Register /></RequireAnonymous>} />
+                <Route path="/forgot-password" element={<RequireAnonymous><ForgotPassword /></RequireAnonymous>} />
+                <Route path="/reset-password"  element={<RequireAnonymous><ResetPassword /></RequireAnonymous>} />
 
-              <Route path="/terms"   element={<LegalPlaceholder title="Terms of Service" />} />
-              <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
+                <Route path="/terms"   element={<LegalPlaceholder title="Terms of Service" />} />
+                <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
 
-              {/* ── Platform demo ── */}
-              <Route path="/demo"                  element={<DemoIndex />} />
-              <Route path="/demo/command-centre"   element={<DemoCommandCentre />} />
-              <Route path="/demo/ambulance"        element={<DemoAmbulance />} />
-              <Route path="/demo/scan-lab"         element={<DemoScanLab />} />
-              <Route path="/demo/ai-radiologist"   element={<DemoAiRadiologist />} />
-              <Route path="/demo/hospital-hub"     element={<DemoHospitalHub />} />
-              <Route path="/demo/telehealth"       element={<DemoTelehealth />} />
+                {/* ── Platform demo ── */}
+                <Route path="/demo"                  element={<DemoIndex />} />
+                <Route path="/demo/command-centre"   element={<DemoCommandCentre />} />
+                <Route path="/demo/ambulance"        element={<DemoAmbulance />} />
+                <Route path="/demo/scan-lab"         element={<DemoScanLab />} />
+                <Route path="/demo/ai-radiologist"   element={<DemoAiRadiologist />} />
+                <Route path="/demo/hospital-hub"     element={<DemoHospitalHub />} />
+                <Route path="/demo/telehealth"       element={<DemoTelehealth />} />
 
-              {/* ── Patient portal (role: Patient) ── */}
-              <Route
-                path="/app"
-                element={
-                  <RequireAuth roles={['Patient']}>
-                    <PatientLayout />
-                  </RequireAuth>
-                }
-              >
-                <Route index                element={<PatientHome />} />
-                <Route path="appointments"  element={<AppointmentsPage />} />
-                <Route path="medicines"     element={<MedicinesRoute />} />
-                <Route path="health"        element={<MyHealthPage />} />
-                <Route path="care-team"     element={<CareTeamPage />} />
-                <Route path="emergency"     element={<EmergencyPage />} />
-                <Route path="profile"       element={<Profile />} />
-                <Route path="settings"      element={<Settings />} />
-              </Route>
+                {/* ── Patient portal (role: Patient) ── */}
+                <Route
+                  path="/app"
+                  element={
+                    <RequireAuth roles={['Patient']}>
+                      <PatientLayout />
+                    </RequireAuth>
+                  }
+                >
+                  <Route index                element={<PatientHome />} />
+                  <Route path="appointments"  element={<AppointmentsPage />} />
+                  <Route path="medicines"     element={<MedicinesRoute />} />
+                  <Route path="health"        element={<MyHealthPage />} />
+                  <Route path="care-team"     element={<CareTeamPage />} />
+                  <Route path="emergency"     element={<EmergencyPage />} />
+                  <Route path="profile"       element={<Profile />} />
+                  <Route path="settings"      element={<Settings />} />
+                </Route>
 
-              {/* ── Doctor portal (role: Doctor, HealthcareWorker, LabTechnician) ── */}
-              <Route
-                path="/clinic/*"
-                element={
-                  <RequireAuth roles={['Doctor', 'HealthcareWorker', 'LabTechnician']}>
-                    <PortalComingSoon portal="Doctor" />
-                  </RequireAuth>
-                }
-              />
+                {/* ── Doctor portal (role: Doctor, HealthcareWorker, LabTechnician) ── */}
+                <Route
+                  path="/clinic/*"
+                  element={
+                    <RequireAuth roles={['Doctor', 'HealthcareWorker', 'LabTechnician']}>
+                      <PortalComingSoon portal="Doctor" />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* ── Admin portal (role: Admin) ── */}
-              <Route
-                path="/admin/*"
-                element={
-                  <RequireAuth roles={['Admin']}>
-                    <PortalComingSoon portal="Admin" />
-                  </RequireAuth>
-                }
-              />
+                {/* ── Admin portal (role: Admin) ── */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <RequireAuth roles={['Admin']}>
+                      <PortalComingSoon portal="Admin" />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Legacy /dashboard/* links (bookmarks, emails) → the new portal.
-                  Removing them outright would 404 every existing bookmark. */}
-              <Route path="/dashboard/profile"  element={<Navigate to="/app/profile" replace />} />
-              <Route path="/dashboard/settings" element={<Navigate to="/app/settings" replace />} />
-              <Route path="/dashboard/*"        element={<RoleHomeRedirect />} />
-              <Route path="/dashboard"          element={<RoleHomeRedirect />} />
+                {/* Legacy /dashboard/* links (bookmarks, emails) → the new portal.
+                    Removing them outright would 404 every existing bookmark. */}
+                <Route path="/dashboard/profile"  element={<Navigate to="/app/profile" replace />} />
+                <Route path="/dashboard/settings" element={<Navigate to="/app/settings" replace />} />
+                <Route path="/dashboard/*"        element={<RoleHomeRedirect />} />
+                <Route path="/dashboard"          element={<RoleHomeRedirect />} />
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </AccessibilityProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

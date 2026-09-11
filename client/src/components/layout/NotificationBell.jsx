@@ -59,7 +59,8 @@ export default function NotificationBell() {
     notificationService
       .listNotifications(10)
       .then(setItems)
-      .catch((err) => setError(err.message))
+      // Keep the error object so ErrorState can show its support reference.
+      .catch((err) => setError(err))
       .finally(() => setLoading(false))
   }, [])
 

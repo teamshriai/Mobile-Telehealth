@@ -16,6 +16,13 @@ export interface ApiErrorResponse {
   success: false;
   message: string;
   errors?: Record<string, string[]> | string[];
+  /**
+   * The per-request correlation id, mirroring the `X-Request-Id` header. Sent
+   * so a patient who hits a failure has something concrete to quote to support
+   * and support has something to grep the logs for. It identifies a request,
+   * not a user, and carries no PHI — safe to display and safe to read aloud.
+   */
+  requestId?: string;
   timestamp: string;
 }
 
@@ -31,11 +38,16 @@ export const ApiResponseBuilder = {
     };
   },
 
-  error(message: string, errors?: Record<string, string[]> | string[]): ApiErrorResponse {
+  error(
+    message: string,
+    errors?: Record<string, string[]> | string[],
+    requestId?: string,
+  ): ApiErrorResponse {
     return {
       success: false,
       message,
       errors,
+      requestId,
       timestamp: new Date().toISOString(),
     };
   },

@@ -1,6 +1,10 @@
 import { type Gender, type Prisma, RoleName } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { encryptFieldOptional } from '../utils/encryption';
+import {
+  withGeneratedShriPatientId,
+  computePhoneNumberHash,
+} from '../services/patientIdentity.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Repository
@@ -97,28 +101,33 @@ export const authRepository = {
       phoneNumber?: string;
     };
   }): Promise<UserWithRole> {
-    return prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email: data.email,
-          passwordHash: data.passwordHash,
-          roleId: data.roleId,
-          passwordChangedAt: new Date(),
-          patientProfile: {
-            create: {
-              firstName: data.profile.firstName,
-              lastName: data.profile.lastName,
-              dateOfBirth: data.profile.dateOfBirth,
-              gender: data.profile.gender,
-              phoneNumber: encryptFieldOptional(data.profile.phoneNumber),
+    return withGeneratedShriPatientId((shriPatientId) =>
+      prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: data.email,
+            passwordHash: data.passwordHash,
+            roleId: data.roleId,
+            passwordChangedAt: new Date(),
+            patientProfile: {
+              create: {
+                shriPatientId,
+                registrationSource: 'SelfRegistered',
+                firstName: data.profile.firstName,
+                lastName: data.profile.lastName,
+                dateOfBirth: data.profile.dateOfBirth,
+                gender: data.profile.gender,
+                phoneNumber: encryptFieldOptional(data.profile.phoneNumber),
+                phoneNumberHash: computePhoneNumberHash(data.profile.phoneNumber),
+              },
             },
           },
-        },
-        select: userWithRoleSelect,
-      });
+          select: userWithRoleSelect,
+        });
 
-      return user;
-    });
+        return user;
+      }),
+    );
   },
 
   /**
@@ -169,11 +178,7 @@ export const authRepository = {
    * Save a SHA-256 token hash to the PasswordResetToken table.
    * Atomically invalidates any active unused reset tokens for the user.
    */
-  async savePasswordResetToken(
-    userId: string,
-    tokenHash: string,
-    expiresAt: Date,
-  ): Promise<void> {
+  async savePasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
     await prisma.$transaction(async (tx) => {
       // Invalidate all existing unused reset tokens for this user
       await tx.passwordResetToken.updateMany({

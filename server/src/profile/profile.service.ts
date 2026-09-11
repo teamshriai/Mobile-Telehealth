@@ -1,12 +1,8 @@
-import type { PatientProfile, Prisma } from '@prisma/client';
+import type { PatientProfile } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { profileRepository } from './profile.repository';
-import type {
-  UpdateProfileDto,
-  UpdateHealthHistoryDto,
-  PreferencesDto,
-} from './profile.validator';
+import type { UpdateProfileDto, UpdateHealthHistoryDto, PreferencesDto } from './profile.validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile Service
@@ -14,7 +10,15 @@ import type {
 
 /** Age is derived from dateOfBirth on every read — never stored, so it can
  * never drift out of sync with the actual date of birth. */
-function calculateAge(dateOfBirth: Date): number {
+/**
+ * Returns null when dateOfBirth is unknown — Phase 6 made this column
+ * nullable for patients registered without a confirmed DOB (e.g. an
+ * unconscious field-registration arrival). A patient's own self-service
+ * profile always carries a DOB (the registration form requires it), but this
+ * function is shared response-shaping code and must not assume that.
+ */
+function calculateAge(dateOfBirth: Date | null): number | null {
+  if (dateOfBirth === null) return null;
   const today = new Date();
   let age = today.getFullYear() - dateOfBirth.getFullYear();
   const hasHadBirthdayThisYear =
@@ -198,13 +202,10 @@ export const profileService = {
       merged[category as keyof PreferencesDto] = {
         ...currentPreferences[category as keyof PreferencesDto],
         ...values,
-      } as never;
+      };
     }
 
-    const updated = await profileRepository.updatePreferences(
-      userId,
-      merged as Prisma.InputJsonValue,
-    );
+    const updated = await profileRepository.updatePreferences(userId, merged);
 
     return toResponseShape(updated);
   },

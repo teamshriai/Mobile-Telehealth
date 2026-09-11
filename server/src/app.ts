@@ -17,6 +17,8 @@ import { appointmentRouter } from './appointment/appointment.routes';
 import { careTeamRouter } from './careteam/careteam.routes';
 import { notificationRouter } from './notification/notification.routes';
 import { doctorRouter } from './doctor/doctor.routes';
+import { patientRouter } from './patient/patient.routes';
+import { encounterRouter } from './encounter/encounter.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Factory
@@ -109,6 +111,8 @@ export function createApp(): Application {
   app.use('/api/v1/care-team', careTeamRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use('/api/v1/doctors', doctorRouter);
+  app.use('/api/v1/patients', patientRouter);
+  app.use('/api/v1/encounters', encounterRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

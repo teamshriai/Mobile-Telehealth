@@ -37,6 +37,38 @@ export const Permission = {
   AppointmentReadAssigned: 'appointment:read:assigned',
   AppointmentManageAssigned: 'appointment:manage:assigned',
 
+  // ── Patient registration & encounters (Phase 6) ─────────────────────────
+  // "any" scope here (not "own"/"assigned") because these act BEFORE a care
+  // relationship exists — you cannot be "assigned" to a patient you are in
+  // the middle of registering. Row-level narrowing for read/manage still
+  // happens in careRelationship.service.requirePatientAccess(); the
+  // permission only answers "may this role ever perform this action at
+  // all", exactly as everywhere else in this file.
+  PatientCreateAny: 'patient:create:any',
+  PatientSearchAny: 'patient:search:any',
+  /**
+   * Unconditional read of ANY patient record, bypassing the care-team/
+   * field-relationship check in careRelationship.service entirely. This is
+   * intentionally granted to NO ROLE below — it exists so the permission
+   * name and the bypass logic that reads it (patient.service.ts,
+   * encounter.service.ts) are already written and in one place, ready for a
+   * genuine future admin break-glass flow. Granting it to any role by
+   * default would mean that role can read every patient in the system with
+   * no relationship check at all — exactly the access
+   * careRelationshipService's own design explicitly argues against for
+   * Admin ("if an admin ever needs clinical access it must be an explicit,
+   * separately audited break-glass flow, never a silent side effect of
+   * being an admin"). The same reasoning applies to every other role.
+   */
+  PatientReadAny: 'patient:read:any',
+  PatientManageAny: 'patient:manage:any',
+  EncounterCreateAny: 'encounter:create:any',
+  EncounterReadOwn: 'encounter:read:own',
+  EncounterReadAssigned: 'encounter:read:assigned',
+  EncounterManageAssigned: 'encounter:manage:assigned',
+  AssessmentReadAssigned: 'assessment:read:assigned',
+  AssessmentWriteAssigned: 'assessment:write:assigned',
+
   // ── Administrative ──────────────────────────────────────────────────────
   UserReadAny: 'user:read:any',
   UserManageAny: 'user:manage:any',
@@ -55,6 +87,7 @@ const PATIENT_PERMISSIONS: PermissionName[] = [
   Permission.AppointmentCancelOwn,
   Permission.NotificationReadOwn,
   Permission.CareTeamReadOwn,
+  Permission.EncounterReadOwn,
 ];
 
 const DOCTOR_PERMISSIONS: PermissionName[] = [
@@ -65,6 +98,19 @@ const DOCTOR_PERMISSIONS: PermissionName[] = [
   Permission.PatientUpdateAssigned,
   Permission.AppointmentReadAssigned,
   Permission.AppointmentManageAssigned,
+  Permission.PatientCreateAny,
+  Permission.PatientSearchAny,
+  Permission.EncounterCreateAny,
+  Permission.EncounterManageAssigned,
+  Permission.AssessmentReadAssigned,
+  Permission.AssessmentWriteAssigned,
+  // Deliberately NOT PatientReadAny: that would let any Doctor read any
+  // patient system-wide, which is exactly the unrestricted clinical-record
+  // access careRelationship.service exists to prevent (the same reasoning
+  // that already denies Admin unconditional access). A Doctor still reads
+  // any patient they have a genuine relationship with — care-team
+  // membership, or having personally registered/opened an encounter on
+  // them — via PatientReadAssigned + careRelationshipService's row check.
 ];
 
 /**
@@ -78,6 +124,10 @@ const HEALTHCARE_WORKER_PERMISSIONS: PermissionName[] = [
   Permission.NotificationReadOwn,
   Permission.PatientReadAssigned,
   Permission.AppointmentReadAssigned,
+  Permission.PatientCreateAny,
+  Permission.PatientSearchAny,
+  Permission.EncounterCreateAny,
+  Permission.EncounterReadAssigned,
 ];
 
 const LAB_TECHNICIAN_PERMISSIONS: PermissionName[] = [
@@ -101,6 +151,7 @@ const ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.RoleAssign,
   Permission.DoctorVerify,
   Permission.AuditRead,
+  Permission.PatientManageAny,
 ];
 
 export const ROLE_PERMISSIONS: Record<RoleName, readonly PermissionName[]> = {

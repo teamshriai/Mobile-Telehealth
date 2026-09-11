@@ -32,6 +32,17 @@ export enum AuditAction {
   TokenRefreshed = 'TokenRefreshed',
   TokenReuseDetected = 'TokenReuseDetected',
   SessionRevoked = 'SessionRevoked',
+  // ── Patient identity & encounters (Phase 6) ─────────────────────────────
+  PatientRegistered = 'PatientRegistered',
+  PatientSearched = 'PatientSearched',
+  PatientRecordViewed = 'PatientRecordViewed',
+  PatientDuplicateDetected = 'PatientDuplicateDetected',
+  PatientDuplicateAcknowledged = 'PatientDuplicateAcknowledged',
+  PatientAccountLinked = 'PatientAccountLinked',
+  EncounterCreated = 'EncounterCreated',
+  EncounterClosed = 'EncounterClosed',
+  AssessmentCreated = 'AssessmentCreated',
+  AssessmentUpdated = 'AssessmentUpdated',
 }
 
 export enum AuditSeverity {

@@ -40,12 +40,19 @@ const VARIANTS = {
   `,
 }
 
+// Every size carries a minimum height, because padding alone does not
+// guarantee one: `sm` rendered at 31px tall, well under the 44px a finger
+// needs. A measured sweep at 320px and 390px found real controls failing this.
+//
+// `xs` is the one deliberate exception — 36px, for controls that sit inside
+// dense table rows and metadata strips where a 44px button would break the
+// line box. Do not use it for a primary action on a touch surface.
 const SIZES = {
-  xs: 'px-3 py-1.5 text-xs rounded-lg gap-1.5',
-  sm: 'px-3 py-1.5 text-xs rounded-lg gap-1.5',
-  md: 'px-4 py-2 text-sm rounded-lg gap-2',
-  lg: 'px-5 py-2.5 text-sm rounded-xl gap-2',
-  xl: 'px-8 py-4 text-base rounded-2xl gap-3',
+  xs: 'min-h-9 px-3 py-1.5 text-xs rounded-lg gap-1.5',
+  sm: 'min-h-11 px-3.5 py-2 text-xs rounded-lg gap-1.5',
+  md: 'min-h-11 px-4 py-2 text-sm rounded-lg gap-2',
+  lg: 'min-h-12 px-5 py-2.5 text-sm rounded-xl gap-2',
+  xl: 'min-h-14 px-8 py-4 text-base rounded-2xl gap-3',
 }
 
 export default function Button({

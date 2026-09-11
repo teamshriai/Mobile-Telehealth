@@ -75,7 +75,9 @@ export const forgotPasswordLimiter = rateLimit({
   max: 5, // 5 requests per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: ApiResponseBuilder.error('Too many password reset requests. Please try again in 15 minutes.'),
+  message: ApiResponseBuilder.error(
+    'Too many password reset requests. Please try again in 15 minutes.',
+  ),
 });
 
 export const verifyTokenLimiter = rateLimit({
@@ -83,7 +85,9 @@ export const verifyTokenLimiter = rateLimit({
   max: 10, // 10 requests per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: ApiResponseBuilder.error('Too many token verification requests. Please try again later.'),
+  message: ApiResponseBuilder.error(
+    'Too many token verification requests. Please try again later.',
+  ),
 });
 
 export const resetPasswordLimiter = rateLimit({
@@ -91,5 +95,24 @@ export const resetPasswordLimiter = rateLimit({
   max: 5, // 5 attempts per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: ApiResponseBuilder.error('Too many password reset attempts. Please try again in 15 minutes.'),
+  message: ApiResponseBuilder.error(
+    'Too many password reset attempts. Please try again in 15 minutes.',
+  ),
+});
+
+/**
+ * Patient search is a different threat model from login: the risk is not
+ * credential guessing but an attacker (or a curious insider) scanning the
+ * patient population by repeated queries. This limiter exists independently
+ * of the search endpoint's own minimum-specificity validation (which refuses
+ * an under-specified query at the schema level) — the two controls address
+ * different attack shapes: specificity stops a single broad query, this
+ * stops many narrow ones run in sequence.
+ */
+export const patientSearchLimiter = rateLimit({
+  windowMs: env.PATIENT_SEARCH_RATE_LIMIT_WINDOW_MS,
+  max: env.PATIENT_SEARCH_RATE_LIMIT_MAX,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: ApiResponseBuilder.error('Too many patient search requests. Please try again later.'),
 });

@@ -88,6 +88,21 @@ export function EmptyState({
 /* ── Error ────────────────────────────────────────────────────────────────── */
 
 /**
+ * The support reference for a failed request. Deliberately understated: it is
+ * useful when someone rings up about a failure and noise the rest of the time.
+ * Monospaced and selectable, because its whole job is being copied accurately.
+ */
+export function ReferenceId({ id, className = '' }) {
+  if (!id) return null
+  return (
+    <p className={`text-xs text-[#94A3B8] ${className}`}>
+      Reference:{' '}
+      <span className="select-all font-mono text-[#64748B]">{id}</span>
+    </p>
+  )
+}
+
+/**
  * Inline error for a failed fetch. `onRetry` renders a retry affordance —
  * always offer one where the action is genuinely repeatable.
  */
@@ -95,8 +110,27 @@ export function ErrorState({
   title = 'Could not load this',
   description = 'Something went wrong. Please try again.',
   onRetry,
+  /**
+   * The server's correlation id for the failed request. Rendered as a quiet
+   * reference line so a patient can quote it to support. It identifies a
+   * request, not a person, and contains no health information — safe to show
+   * on screen and safe to read out over a phone.
+   *
+   * Usually you do not pass this directly: give `description` the caught
+   * error object instead of `err.message` and the id is picked up from it.
+   */
+  requestId,
   className = '',
 }) {
+  // Accepts either a string (the long-standing call style) or the Error that
+  // apiClient rejected with. Taking the object means a page does not have to
+  // hold the requestId in a second piece of state just to display it.
+  const isErrorObject = description !== null && typeof description === 'object'
+  const message = isErrorObject
+    ? (description.message ?? 'Something went wrong. Please try again.')
+    : description
+  const reference = requestId ?? (isErrorObject ? description.requestId : null)
+
   return (
     <div
       role="alert"
@@ -109,7 +143,7 @@ export function ErrorState({
         <AlertTriangle size={22} className="text-[#A33A28]" />
       </span>
       <p className="text-base font-semibold text-[#0F172A]">{title}</p>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#475569]">{description}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#475569]">{message}</p>
       {onRetry && (
         <button
           type="button"
@@ -119,6 +153,7 @@ export function ErrorState({
           <RefreshCw size={14} aria-hidden="true" /> Try again
         </button>
       )}
+      {reference && <ReferenceId id={reference} className="mt-5" />}
     </div>
   )
 }

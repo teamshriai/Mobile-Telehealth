@@ -19,9 +19,32 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [permissions, setPermissions] = useState([])
+  /**
+   * The patient's profile row (name, DOB, etc.) from whichever call last
+   * populated the session — /auth/me on bootstrap, or the response to
+   * login/register/reloadUser. Consumed by AccessibilityContext to read
+   * saved accessibility preferences.
+   *
+   * Bug fix: this field did not exist until now. applySession received a
+   * `nextProfile` argument and used it only to derive `user.name`, then
+   * discarded it — so AccessibilityContext's `const { profile } = useAuth()`
+   * always destructured `undefined`, and a patient's saved largeText/
+   * highContrast/reduceMotion preferences never survived a page reload. The
+   * CSS rules that respond to those preferences were correct; there was
+   * simply nothing feeding them the saved values on mount.
+   */
+  const [profile, setProfile] = useState(null)
   /** 'checking' until the initial silent refresh settles — see bootstrap below. */
   const [status, setStatus] = useState('checking')
   const [error, setError] = useState(null)
+  /**
+   * True while login/register is in flight. Bug fix: Login.jsx and
+   * Register.jsx have always destructured `loading` from this context, but
+   * nothing here ever provided it — so the submit button's spinner/disabled
+   * state never activated, and a slow network let a patient submit a login
+   * or registration form more than once.
+   */
+  const [loading, setLoading] = useState(false)
 
   // Guards against React 18 StrictMode double-invoking the bootstrap effect.
   // Because refresh ROTATES the token, a second concurrent call would replay
@@ -51,6 +74,7 @@ export function AuthProvider({ children }) {
 
     setUser(nextUser ? { ...nextUser, name: displayName } : null)
     setPermissions(nextPermissions ?? [])
+    setProfile(nextProfile ?? null)
     setStatus(nextUser ? 'authenticated' : 'anonymous')
   }, [])
 
@@ -58,6 +82,7 @@ export function AuthProvider({ children }) {
     authService.clearAccessToken()
     setUser(null)
     setPermissions([])
+    setProfile(null)
     setStatus('anonymous')
   }, [])
 
@@ -86,6 +111,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (credentials) => {
     setError(null)
+    setLoading(true)
     try {
       await authService.login(credentials)
       const me = await authService.getMe()
@@ -94,11 +120,14 @@ export function AuthProvider({ children }) {
     } catch (err) {
       setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
       return { success: false, fieldErrors: err.fieldErrors ?? null }
+    } finally {
+      setLoading(false)
     }
   }, [applySession])
 
   const register = useCallback(async (formData) => {
     setError(null)
+    setLoading(true)
     try {
       await authService.register(formData)
       const me = await authService.getMe()
@@ -107,6 +136,8 @@ export function AuthProvider({ children }) {
     } catch (err) {
       setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
       return { success: false, fieldErrors: err.fieldErrors ?? null }
+    } finally {
+      setLoading(false)
     }
   }, [applySession])
 
@@ -134,8 +165,10 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     user,
     permissions,
+    profile,
     status,
     error,
+    loading,
     isAuthenticated: status === 'authenticated',
     isChecking: status === 'checking',
     role: user?.role ?? null,
@@ -146,7 +179,7 @@ export function AuthProvider({ children }) {
     logout,
     reloadUser,
     clearError: () => setError(null),
-  }), [user, permissions, status, error, login, register, logout, reloadUser])
+  }), [user, permissions, profile, status, error, loading, login, register, logout, reloadUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
