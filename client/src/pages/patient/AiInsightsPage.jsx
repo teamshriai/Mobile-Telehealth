@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Sparkles, Send, Plus, MessageSquare, Trash2, Info, X, PanelLeft,
-  Search, Pencil, Check, Copy, ArrowDown,
+  Search, Pencil, Check, Copy, ArrowDown, Siren, Phone, ShieldAlert, Clock,
 } from 'lucide-react'
 import * as aiService from '../../services/ai.service'
 import { Banner, Spinner } from '../../components/feedback/States.jsx'
@@ -24,13 +24,57 @@ import { Banner, Spinner } from '../../components/feedback/States.jsx'
  */
 
 const SUGGESTIONS = [
-  'Summarise my most recent report',
+  'What happened at my last visit?',
   'What is Clopidogrel for?',
   'What do my blood pressure readings mean?',
   'What should I ask at my next appointment?',
 ]
 
 const DAY = 86_400_000
+
+/**
+ * Every assistant turn carries `kind`, set by the server — see
+ * server/prisma/schema.prisma's AiMessageKind. Rendering it distinctly is
+ * what lets a patient always tell what did and did not come from the model:
+ * a fixed safety message must never look identical to a generated answer.
+ */
+const TURN_STYLE = {
+  SafetyInterlock: {
+    icon: Siren,
+    iconClass: 'bg-critical-bg text-critical-fg',
+    wrapClass: 'rounded-lg border border-critical-fg/30 bg-critical-bg px-3.5 py-3 text-critical-fg',
+    role: 'alert',
+    showCallButton: true,
+  },
+  SafetyBlocked: {
+    icon: ShieldAlert,
+    iconClass: 'bg-warning-bg text-warning-fg',
+    wrapClass: 'rounded-lg rounded-bl-sm bg-warning-bg px-3.5 py-2.5 text-warning-fg',
+    role: 'status',
+    showCallButton: false,
+  },
+  BudgetDeferred: {
+    icon: Clock,
+    iconClass: 'bg-surface-2 text-ink-subtle',
+    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-subtle',
+    role: 'status',
+    showCallButton: false,
+  },
+  PolicyBlocked: {
+    icon: Info,
+    iconClass: 'bg-surface-2 text-ink-subtle',
+    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-subtle',
+    role: 'status',
+    showCallButton: false,
+  },
+  Placeholder: {
+    icon: Info,
+    iconClass: 'bg-surface-2 text-ink-muted',
+    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-muted',
+    role: 'status',
+    showCallButton: false,
+  },
+}
 
 function timeOfDay(iso) {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
@@ -429,7 +473,7 @@ export default function AiInsightsPage() {
             </span>
           </h1>
           <p className="mt-0.5 text-sm text-ink-muted">
-            Ask about your reports, medicines and recovery.
+            Ask about your medicines, visits and recovery.
           </p>
         </div>
       </div>
@@ -548,27 +592,40 @@ export default function AiInsightsPage() {
             {!loadingThread &&
               messages.map((m) => {
                 const isUser = m.role === 'User'
+                const special = !isUser ? TURN_STYLE[m.kind] : undefined
                 return (
                   <div key={m.id} className={`flex gap-2.5 ${isUser ? 'justify-end' : ''}`}>
                     {!isUser && (
                       <span
                         aria-hidden="true"
-                        className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-accent-sky text-accent-sky-fg"
+                        className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md ${
+                          special ? special.iconClass : 'bg-accent-sky text-accent-sky-fg'
+                        }`}
                       >
-                        <Sparkles size={13} />
+                        {special ? <special.icon size={13} /> : <Sparkles size={13} />}
                       </span>
                     )}
 
                     <div className={`group/msg min-w-0 max-w-[85%] ${isUser ? 'items-end' : ''}`}>
                       <p
-                        className={`whitespace-pre-wrap break-words px-3.5 py-2.5 text-sm leading-relaxed ${
+                        role={special?.role}
+                        className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
                           isUser
-                            ? 'rounded-lg rounded-br-sm bg-primary-600 text-on-primary'
-                            : 'rounded-lg rounded-bl-sm bg-surface-2 text-ink-muted'
+                            ? 'rounded-lg rounded-br-sm bg-primary-600 px-3.5 py-2.5 text-on-primary'
+                            : (special?.wrapClass ?? 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-muted')
                         }`}
                       >
                         {m.content}
                       </p>
+
+                      {special?.showCallButton && (
+                        <a
+                          href="tel:108"
+                          className="focus-ring mt-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-danger-fg"
+                        >
+                          <Phone size={15} aria-hidden="true" /> Call 108 — Ambulance
+                        </a>
+                      )}
 
                       <div
                         className={`mt-1 flex items-center gap-2 px-0.5 ${isUser ? 'justify-end' : ''}`}
@@ -641,13 +698,13 @@ export default function AiInsightsPage() {
               <details className="min-w-0">
                 <summary className="focus-ring inline-flex cursor-pointer list-none items-center gap-1.5 rounded text-2xs text-ink-subtle hover:text-ink-muted">
                   <Info size={11} aria-hidden="true" />
-                  Not connected yet — what this can and cannot do
+                  What this assistant can and cannot do
                 </summary>
                 <div className="mt-2 space-y-1.5 rounded-md bg-surface-2 p-2.5 text-xs leading-relaxed text-ink-muted">
                   <p>
-                    Your questions are saved, but no model is answering them yet. Once it is
-                    switched on it will read only your own records — reports, medicines, health
-                    history and care-team notes.
+                    It answers only from your own medicines, visits and care-team notes — it
+                    cannot see lab results, scans or uploaded reports, because none exist in this
+                    system yet.
                   </p>
                   <p className="text-critical-fg">
                     It will never diagnose you, judge whether a symptom is serious, or change a

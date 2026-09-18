@@ -25,7 +25,12 @@ export const getConversation = asyncHandler(async (req: Request, res: Response):
 
 export const sendMessage = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { conversationId, content } = sendBodySchema.parse(req.body);
-  const result = await aiService.sendMessage(req.user!.id, conversationId ?? null, { content });
+  const result = await aiService.sendMessage(
+    req.user!.id,
+    conversationId ?? null,
+    { content },
+    req.requestId,
+  );
   res.status(201).json(ApiResponseBuilder.success('Message sent.', result));
 });
 

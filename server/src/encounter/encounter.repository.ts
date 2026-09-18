@@ -20,7 +20,7 @@ import { encryptFieldOptional, decryptFieldOptional } from '../utils/encryption'
 const ENCOUNTER_ENCRYPTED_FIELDS = ['locationName', 'chiefComplaint'] as const;
 const ASSESSMENT_ENCRYPTED_FIELDS = ['lkwNote', 'otherSymptomNote'] as const;
 
-function decryptEncounter<T extends Encounter>(row: T): T {
+export function decryptEncounter<T extends Encounter>(row: T): T {
   const out = { ...row };
   for (const field of ENCOUNTER_ENCRYPTED_FIELDS) {
     out[field] = decryptFieldOptional(row[field]) as never;
@@ -28,7 +28,7 @@ function decryptEncounter<T extends Encounter>(row: T): T {
   return out;
 }
 
-function decryptAssessment<T extends StrokeAssessment>(row: T): T {
+export function decryptAssessment<T extends StrokeAssessment>(row: T): T {
   const out = { ...row };
   for (const field of ASSESSMENT_ENCRYPTED_FIELDS) {
     out[field] = decryptFieldOptional(row[field]) as never;

@@ -36,67 +36,102 @@ export type EmergencyMatch = {
  * and must still fire, as must a caregiver's "my husband can't speak".
  */
 const STROKE_RULES: { id: string; patterns: RegExp[] }[] = [
-  { id: 'befast.face', patterns: [
-    /\bface (is )?(droop|drooping|dropping|numb|paralys)/,
-    /\b(one|left|right) side of (my|his|her|their|the) face\b/,
-    /\bmouth (is )?(droop|drooping|crooked|twisted)/,
-  ] },
-  { id: 'befast.arm', patterns: [
-    /\barm (is )?(weak|weakness|numb|heavy|limp|dead)\b/,
-    /\b(can'?t|cannot|unable to) (lift|raise|move|feel) (my|his|her|their|the) (arm|hand|leg)\b/,
-    /\b(arm|leg) (went|going|has gone) numb\b/,
-    /\bnumb(ness)? (on|down) (one|the left|the right) side\b/,
-    /\b(one|left|right) side (is|feels|has gone) (weak|numb|paralys)/,
-  ] },
-  { id: 'befast.speech', patterns: [
-    /\bslurr(ed|ing) (my )?(speech|words)\b/,
-    /\bspeech (is )?(slurred|slurring|strange|gone|difficult|difficulty)\b/,
-    /\bdifficulty (speaking|with speech|talking)\b/,
-    /\b(can'?t|cannot|unable to) (speak|talk|get (my )?words out)\b/,
-    /\b(can'?t|cannot) find (my|his|her|the) words\b/,
-    /\bwords (are )?(not )?com(e|ing) out (wrong|right)?\b/,
-  ] },
-  { id: 'befast.eyes', patterns: [
-    /\bsudden(ly)? (lost|loss of|blurred|double) vision\b/,
-    /\b(lost|losing) (my )?(vision|sight)\b/,
-    /\bcan'?t see (out of|from)\b/,
-    /\bsudden(ly)? (can'?t|cannot) see\b/,
-  ] },
-  { id: 'befast.balance', patterns: [
-    /\bsudden(ly)? (lost|loss of) balance\b/,
-    /\b(can'?t|cannot|unable to) (walk|stand|stay upright)\b/,
-    /\b(keep )?(falling|collaps(ed|ing)) over\b/,
-  ] },
-  { id: 'befast.headache', patterns: [
-    /\bworst headache\b/,
-    /\bsudden(ly)? (severe|terrible|blinding|thunderclap) headache\b/,
-    /\bthunderclap\b/,
-  ] },
-  { id: 'stroke.explicit', patterns: [
-    /\b(having|have|had) a stroke (right )?now\b/,
-    /\bi think (i|he|she|they|my \w+) (am|is|are)? ?having a stroke\b/,
-    /\bstroke (is )?happening\b/,
-  ] },
+  {
+    id: 'befast.face',
+    patterns: [
+      /\bface (is )?(droop|drooping|dropping|numb|paralys)/,
+      /\b(one|left|right) side of (my|his|her|their|the) face\b/,
+      /\bmouth (is )?(droop|drooping|crooked|twisted)/,
+    ],
+  },
+  {
+    id: 'befast.arm',
+    patterns: [
+      /\barm (is )?(weak|weakness|numb|heavy|limp|dead)\b/,
+      /\b(can'?t|cannot|unable to) (lift|raise|move|feel) (my|his|her|their|the) (arm|hand|leg)\b/,
+      /\b(arm|leg) (went|going|has gone) numb\b/,
+      /\bnumb(ness)? (on|down) (one|the left|the right) side\b/,
+      /\b(one|left|right) side (is|feels|has gone) (weak|numb|paralys)/,
+    ],
+  },
+  {
+    id: 'befast.speech',
+    patterns: [
+      /\bslurr(ed|ing) (my )?(speech|words)\b/,
+      /\bspeech (is )?(slurred|slurring|strange|gone|difficult|difficulty)\b/,
+      /\bdifficulty (speaking|with speech|talking)\b/,
+      /\b(can'?t|cannot|unable to) (speak|talk|get (my )?words out)\b/,
+      /\b(can'?t|cannot) find (my|his|her|the) words\b/,
+      /\bwords (are )?(not )?com(e|ing) out (wrong|right)?\b/,
+    ],
+  },
+  {
+    id: 'befast.eyes',
+    patterns: [
+      /\bsudden(ly)? (lost|loss of|blurred|double) vision\b/,
+      /\b(lost|losing) (my )?(vision|sight)\b/,
+      /\bcan'?t see (out of|from)\b/,
+      /\bsudden(ly)? (can'?t|cannot) see\b/,
+    ],
+  },
+  {
+    id: 'befast.balance',
+    patterns: [
+      /\bsudden(ly)? (lost|loss of) balance\b/,
+      /\b(can'?t|cannot|unable to) (walk|stand|stay upright)\b/,
+      /\b(keep )?(falling|collaps(ed|ing)) over\b/,
+    ],
+  },
+  {
+    id: 'befast.headache',
+    patterns: [
+      /\bworst headache\b/,
+      /\bsudden(ly)? (severe|terrible|blinding|thunderclap) headache\b/,
+      /\bthunderclap\b/,
+    ],
+  },
+  {
+    id: 'stroke.explicit',
+    patterns: [
+      /\b(having|have|had) a stroke (right )?now\b/,
+      /\bi think (i|he|she|they|my \w+) (am|is|are)? ?having a stroke\b/,
+      /\bstroke (is )?happening\b/,
+    ],
+  },
 ];
 
 /** Non-stroke emergencies a stroke patient plausibly reports here. */
 const MEDICAL_RULES: { id: string; patterns: RegExp[] }[] = [
-  { id: 'acute.chest', patterns: [
-    /\bchest pain\b/, /\bcrushing (pain|chest)\b/, /\bpain in (my|his|her) chest\b/,
-    /\bseene mein dard\b/,
-  ] },
-  { id: 'acute.breathing', patterns: [
-    /\b(can'?t|cannot|struggling to|trouble) breath(e|ing)\b/,
-    /\bshort(ness)? of breath\b/, /\bsaans (nahi|nhi)\b/,
-  ] },
-  { id: 'acute.consciousness', patterns: [
-    /\b(unconscious|unresponsive|passed out|blacked out|fainted|collapsed)\b/,
-    /\bwon'?t wake up\b/, /\bbehosh\b/,
-  ] },
+  {
+    id: 'acute.chest',
+    patterns: [
+      /\bchest pain\b/,
+      /\bcrushing (pain|chest)\b/,
+      /\bpain in (my|his|her) chest\b/,
+      /\bseene mein dard\b/,
+    ],
+  },
+  {
+    id: 'acute.breathing',
+    patterns: [
+      /\b(can'?t|cannot|struggling to|trouble) breath(e|ing)\b/,
+      /\bshort(ness)? of breath\b/,
+      /\bsaans (nahi|nhi)\b/,
+    ],
+  },
+  {
+    id: 'acute.consciousness',
+    patterns: [
+      /\b(unconscious|unresponsive|passed out|blacked out|fainted|collapsed)\b/,
+      /\bwon'?t wake up\b/,
+      /\bbehosh\b/,
+    ],
+  },
   { id: 'acute.seizure', patterns: [/\b(seizure|fitting|convulsion|convulsing)\b/] },
-  { id: 'acute.bleeding', patterns: [
-    /\bbleeding (won'?t|will not|doesn'?t) stop\b/, /\bheavy bleeding\b/,
-  ] },
+  {
+    id: 'acute.bleeding',
+    patterns: [/\bbleeding (won'?t|will not|doesn'?t) stop\b/, /\bheavy bleeding\b/],
+  },
 ];
 
 /**
@@ -104,11 +139,18 @@ const MEDICAL_RULES: { id: string; patterns: RegExp[] }[] = [
  * glaring gap. Routed to the same interlock with different copy.
  */
 const SELF_HARM_RULES: { id: string; patterns: RegExp[] }[] = [
-  { id: 'selfharm.intent', patterns: [
-    /\b(kill|killing) myself\b/, /\bsuicid(e|al)\b/, /\bend (my|it all|my life)\b/,
-    /\b(want|going) to die\b/, /\bno (point|reason) (in )?(living|going on)\b/,
-    /\bharm myself\b/, /\bhurt myself\b/,
-  ] },
+  {
+    id: 'selfharm.intent',
+    patterns: [
+      /\b(kill|killing) myself\b/,
+      /\bsuicid(e|al)\b/,
+      /\bend (my|it all|my life)\b/,
+      /\b(want|going) to die\b/,
+      /\bno (point|reason) (in )?(living|going on)\b/,
+      /\bharm myself\b/,
+      /\bhurt myself\b/,
+    ],
+  },
 ];
 
 /**
@@ -119,12 +161,21 @@ const SELF_HARM_RULES: { id: string; patterns: RegExp[] }[] = [
  */
 const SUPPRESSORS: RegExp[] = [
   // Hypothetical / reference / educational framing
-  /\bwhat (is|are|does|do)\b/, /\bwhat'?s\b/,
+  /\bwhat (is|are|does|do)\b/,
+  /\bwhat'?s\b/,
   /\bhow (do|would|can) i (know|tell)\b/,
-  /\bis (that|this|it) a sign\b/, /\bsigns? of\b/, /\bsymptoms? of\b/,
-  /\bwhy (does|do|is)\b/, /\bmeaning of\b/, /\bwhat should i (ask|do if)\b/,
-  /\bexplain\b/, /\btell me about\b/, /\bdefine\b/,
-  /\bmy doctor said\b/, /\bi read\b/, /\bi was told\b/,
+  /\bis (that|this|it) a sign\b/,
+  /\bsigns? of\b/,
+  /\bsymptoms? of\b/,
+  /\bwhy (does|do|is)\b/,
+  /\bmeaning of\b/,
+  /\bwhat should i (ask|do if)\b/,
+  /\bexplain\b/,
+  /\btell me about\b/,
+  /\bdefine\b/,
+  /\bmy doctor said\b/,
+  /\bi read\b/,
+  /\bi was told\b/,
   // Negation — two shapes, both narrower than a blanket "no|not", which
   // over-suppressed: "the bleeding will NOT STOP" is itself the emergency
   // phrase (the symptom IS the inability to stop), not a negated symptom.
@@ -135,9 +186,14 @@ const SUPPRESSORS: RegExp[] = [
   /\b(no|not|never|don'?t|doesn'?t|didn'?t|haven'?t|hasn'?t|isn'?t|wasn'?t) (have|having|had|felt|feel|noticed|experienced|seen|any)\b/,
   /\bwithout any\b/,
   // Past / historical
-  /\bsince my stroke\b/, /\bafter my stroke\b/, /\bwhen i had\b/,
-  /\blast (year|month|week|time)\b/, /\bin \d{4}\b/, /\bused to\b/,
-  /\bat the time\b/, /\bback then\b/,
+  /\bsince my stroke\b/,
+  /\bafter my stroke\b/,
+  /\bwhen i had\b/,
+  /\blast (year|month|week|time)\b/,
+  /\bin \d{4}\b/,
+  /\bused to\b/,
+  /\bat the time\b/,
+  /\bback then\b/,
 ];
 
 /** Lowercase, fold punctuation, collapse space. NFKC so unicode look-alikes

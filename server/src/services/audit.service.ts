@@ -43,6 +43,15 @@ export enum AuditAction {
   EncounterClosed = 'EncounterClosed',
   AssessmentCreated = 'AssessmentCreated',
   AssessmentUpdated = 'AssessmentUpdated',
+  // ── AI Insights (Phase 8) ───────────────────────────────────────────────
+  AiMessageSent = 'AiMessageSent',
+  AiResponseGenerated = 'AiResponseGenerated',
+  AiEmergencyInterlockTriggered = 'AiEmergencyInterlockTriggered',
+  AiOutputBlocked = 'AiOutputBlocked',
+  AiBudgetExceeded = 'AiBudgetExceeded',
+  AiPolicyBlocked = 'AiPolicyBlocked',
+  AiProviderError = 'AiProviderError',
+  AiConversationDeleted = 'AiConversationDeleted',
 }
 
 export enum AuditSeverity {

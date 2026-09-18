@@ -30,7 +30,7 @@ export type AppointmentWithDoctor = Appointment & {
   doctor: Prisma.DoctorProfileGetPayload<{ select: typeof DOCTOR_SELECT }> | null;
 };
 
-function decryptAppointment<T extends Appointment>(row: T): T {
+export function decryptAppointment<T extends Appointment>(row: T): T {
   const out = { ...row };
   for (const field of ENCRYPTED_FIELDS) {
     out[field] = decryptFieldOptional(row[field]) as never;

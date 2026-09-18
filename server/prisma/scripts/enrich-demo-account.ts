@@ -207,8 +207,8 @@ async function main(): Promise<void> {
         status: EncounterStatus.Completed,
         startedAt: at(-84, 7, 40),
         endedAt: at(-84, 14, 10),
-        locationName: 'IndoStates Health Hospital — Emergency',
-        chiefComplaint: 'Sudden right-sided weakness and slurred speech',
+        locationName: encryptField('IndoStates Health Hospital — Emergency'),
+        chiefComplaint: encryptField('Sudden right-sided weakness and slurred speech'),
       },
     });
 
@@ -218,14 +218,14 @@ async function main(): Promise<void> {
         lkwAt: at(-84, 6, 15),
         lkwCertainty: LkwCertainty.Approximate,
         lkwSource: LkwSource.Family,
-        lkwNote: 'Family last saw her well at about 6:15am before breakfast.',
+        lkwNote: encryptField('Family last saw her well at about 6:15am before breakfast.'),
         facialWeakness: true,
         armWeakness: true,
         speechDifficulty: true,
         balanceProblem: true,
         urgentFlag: true,
         onAnticoagulants: false,
-        otherSymptomNote: 'Right arm drift on examination; speech slurred but comprehension intact.',
+        otherSymptomNote: encryptField('Right arm drift on examination; speech slurred but comprehension intact.'),
       },
     });
     console.log('✓ encounter + stroke assessment created');

@@ -5,6 +5,18 @@
 # then ship only production dependencies + compiled output. Keeps the final
 # image free of TypeScript/dev tooling.
 #
+# Base image is Debian slim (glibc), NOT Alpine (musl) — changed in Phase 8.
+# The AI Insights retrieval pipeline uses onnxruntime-node (via
+# @huggingface/transformers) to run a local embedding model, and
+# onnxruntime-node ships NO musl-compatible prebuilt binary. On Alpine it
+# would fail at container START, not at build — the image builds cleanly and
+# then crashes the first time retrieval actually runs. There is no working
+# WASM fallback under Node either: transformers.js's browser/WASM build
+# expects to fetch local model files as URLs, which fails outright against a
+# real filesystem path (verified directly, not assumed). Matching the base
+# image's libc to the native binary is the standard, supported fix — a
+# slightly larger image is the entire cost.
+#
 # Migrations are NOT run automatically on container start — see the note
 # above CMD. Run `npx prisma migrate deploy` as its own step (CI/CD job or
 # init container) before rolling out a new version, especially with more
@@ -12,7 +24,7 @@
 # race condition waiting to happen.
 # ─────────────────────────────────────────────────────────────────────────────
 
-FROM node:20-alpine AS build
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -26,7 +38,7 @@ COPY src ./src
 RUN npm run build
 
 # ── Production runtime ──────────────────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:20-bookworm-slim AS production
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -38,8 +50,15 @@ RUN npx prisma generate
 
 COPY --from=build /app/dist ./dist
 
+# The vendored embedding model (server/models/) — see
+# prisma/scripts/vendor-embedding-model.ts. Never downloaded at runtime;
+# it ships in the image so a container can run fully offline and so the
+# model a deployment uses is exactly the one pinned in models/manifest.json.
+COPY models ./models
+
 # Runs as a non-root user — never run a production Node process as root.
-RUN addgroup -S strokeai && adduser -S strokeai -G strokeai
+# Debian's useradd/groupadd, not Alpine's busybox addgroup/adduser.
+RUN groupadd --system strokeai && useradd --system --gid strokeai --no-create-home strokeai
 USER strokeai
 
 EXPOSE 5000

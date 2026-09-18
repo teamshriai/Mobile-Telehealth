@@ -62,7 +62,7 @@ export const PATIENT_NAV = [
     label: 'AI Insights',
     path: '/app/ai-insights',
     icon: Sparkles,
-    description: 'Ask about your reports and medicines',
+    description: 'Ask about your medicines and visits',
   },
   {
     label: 'My Care Team',
