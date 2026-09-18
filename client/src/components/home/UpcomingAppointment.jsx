@@ -39,27 +39,27 @@ export default function UpcomingAppointment({ appointment }) {
     // column; used here it gave the "nothing to see" case more vertical room
     // than a real appointment gets, which reads as a broken layout.
     return (
-      <section aria-labelledby="next-heading">
-        <h2 id="next-heading" className="text-sm font-semibold text-[#0F172A]">
+      <section aria-labelledby="next-heading" className="flex h-full flex-col">
+        <h2 id="next-heading" className="text-sm font-semibold text-ink">
           Your next appointment
         </h2>
-        <div className="mt-3.5 rounded-xl border border-[#E8EDF2] bg-white p-4 sm:p-5">
+        <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <span
               aria-hidden="true"
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#F1F5F9]"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-surface-2"
             >
-              <CalendarPlus size={19} className="text-[#64748B]" />
+              <CalendarPlus size={19} className="text-ink-subtle" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[#0F172A]">No appointments scheduled</p>
-              <p className="mt-0.5 text-sm leading-relaxed text-[#64748B]">
+              <p className="text-sm font-semibold text-ink">No appointments scheduled</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-ink-subtle">
                 When you book a visit or video consultation, it will appear here.
               </p>
             </div>
             <Link
               to="/app/appointments"
-              className="focus-ring inline-flex min-h-11 flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1D4ED8]"
+              className="focus-ring inline-flex min-h-11 flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-700"
             >
               Book an appointment
             </Link>
@@ -79,64 +79,64 @@ export default function UpcomingAppointment({ appointment }) {
     : (appointment.locationName ?? appointment.modeLabel ?? 'In person')
 
   return (
-    <section aria-labelledby="next-heading">
+    <section aria-labelledby="next-heading" className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="next-heading" className="text-sm font-semibold text-[#0F172A]">
+        <h2 id="next-heading" className="text-sm font-semibold text-ink">
           Your next appointment
         </h2>
         <Link
           to="/app/appointments"
-          className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-[#2563EB] hover:underline"
+          className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-primary-700 hover:underline"
         >
           All appointments <ArrowRight size={14} aria-hidden="true" />
         </Link>
       </div>
 
-      <div className="mt-3.5 rounded-xl border border-[#DBEAFE] bg-white p-4 sm:p-5">
+      <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           {/* Calendar block — a date is read as a date faster than as prose. */}
           <div
             aria-hidden="true"
-            className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#EFF6FF]"
+            className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-primary-50"
           >
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#1D4ED8]">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary-700">
               {MONTHS[when.getMonth()]}
             </span>
-            <span className="text-2xl font-semibold leading-none text-[#0F172A]">
+            <span className="text-2xl font-semibold leading-none text-ink">
               {when.getDate()}
             </span>
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-base font-semibold text-[#0F172A]">
+              <p className="text-base font-semibold text-ink">
                 {appointment.doctor?.name ?? 'Your clinician'}
               </p>
               {relative && (
-                <span className="rounded-md bg-[#EFF6FF] px-2 py-0.5 text-xs font-semibold text-[#1D4ED8]">
+                <span className="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
                   {relative}
                 </span>
               )}
             </div>
 
             {appointment.doctor?.specialty && (
-              <p className="mt-0.5 text-sm text-[#64748B]">{appointment.doctor.specialty}</p>
+              <p className="mt-0.5 text-sm text-ink-subtle">{appointment.doctor.specialty}</p>
             )}
 
             {/* Date and time spelled out for screen readers, since the
                 calendar block above is aria-hidden. */}
-            <p className="mt-2 text-sm text-[#475569]">
+            <p className="mt-2 text-sm text-ink-muted">
               {when.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
               {' · '}{formatTime(when)}
             </p>
 
-            <p className="mt-1.5 flex items-center gap-1.5 text-sm text-[#475569]">
-              <ModeIcon size={14} aria-hidden="true" className="flex-shrink-0 text-[#64748B]" />
+            <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-muted">
+              <ModeIcon size={14} aria-hidden="true" className="flex-shrink-0 text-ink-subtle" />
               <span className="min-w-0">{where}</span>
             </p>
 
             {appointment.reason && (
-              <p className="mt-2 text-sm leading-relaxed text-[#64748B]">{appointment.reason}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-subtle">{appointment.reason}</p>
             )}
           </div>
         </div>

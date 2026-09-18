@@ -14,24 +14,24 @@ export default function ModulePlaceholder({ title, description, whatsComing = []
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">{title}</h1>
-        {description && <p className="mt-1.5 text-sm text-[#475569]">{description}</p>}
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h1>
+        {description && <p className="mt-1.5 text-sm text-ink-muted">{description}</p>}
       </div>
 
-      <div className="rounded-xl border border-[#E8EDF2] bg-white p-6">
+      <div className="rounded-xl border border-border-soft bg-surface-1 p-6">
         <div className="flex items-start gap-3.5">
           <span
             aria-hidden="true"
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#FBF0E2]"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-warning-bg"
           >
-            <Construction size={19} className="text-[#8A5A1B]" />
+            <Construction size={19} className="text-warning-fg" />
           </span>
 
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-[#0F172A]">
+            <h2 className="text-base font-semibold text-ink">
               This section is being built
             </h2>
-            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[#475569]">
+            <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-muted">
               It is not connected to your records yet. Rather than show you sample
               information that looks real, we are leaving it empty until it works
               properly. Your care team remains your source of truth in the meantime.
@@ -39,11 +39,11 @@ export default function ModulePlaceholder({ title, description, whatsComing = []
 
             {whatsComing.length > 0 && (
               <>
-                <p className="mt-4 text-sm font-semibold text-[#0F172A]">What will be here</p>
+                <p className="mt-4 text-sm font-semibold text-ink">What will be here</p>
                 <ul className="mt-2 space-y-1.5">
                   {whatsComing.map((item) => (
-                    <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-[#475569]">
-                      <span aria-hidden="true" className="mt-[7px] h-1 w-1 flex-shrink-0 rounded-full bg-[#94A3B8]" />
+                    <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-ink-muted">
+                      <span aria-hidden="true" className="mt-[7px] h-1 w-1 flex-shrink-0 rounded-full bg-border-strong" />
                       {item}
                     </li>
                   ))}

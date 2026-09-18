@@ -58,7 +58,7 @@ export default function PatientLayout() {
   useEffect(() => { document.title = `${title} · Stroke AI` }, [title])
 
   return (
-    <div className="min-h-screen bg-[#FAFBFC] text-[#0F172A]">
+    <div className="min-h-screen bg-bg text-ink">
       {/* First tab stop on every page: jump past the nav straight to content. */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
@@ -69,7 +69,7 @@ export default function PatientLayout() {
         <PatientTopbar title={title} sidebarOpen={mobileOpen} onOpenSidebar={openMobile} />
 
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-x-hidden">
-          <div className="mx-auto w-full max-w-[1280px] px-4 py-5 sm:px-6 sm:py-6">
+          <div className="w-full px-4 py-5 sm:px-6 sm:py-6 2xl:px-8">
             {/* Keyed to the path so a thrown error on one page does not leave
                 the boundary latched when the user navigates away. */}
             <ErrorBoundary key={location.pathname} label={`patient:${location.pathname}`}>

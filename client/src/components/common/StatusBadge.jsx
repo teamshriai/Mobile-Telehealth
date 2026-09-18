@@ -1,29 +1,29 @@
 const VARIANTS = {
-  success: 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]',
-  danger:  'bg-[#FEE2E2] text-[#DC2626] border-[#FECACA]',
-  warning: 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]',
-  info:    'bg-[#E0F2FE] text-[#0284C7] border-[#BAE6FD]',
-  primary: 'bg-[#EFF6FF] text-[#2563EB] border-[#BFDBFE]',
-  muted:   'bg-[#F1F5F9] text-[#64748B] border-[#E8EDF2]',
-  purple:  'bg-[#EDE9FE] text-[#7C3AED] border-[#DDD6FE]',
-  dark:    'bg-[#0F172A] text-white border-transparent',
+  success: 'bg-success-bg text-success-fg border-success-fg/25',
+  danger:  'bg-critical-bg text-critical-fg border-critical-fg/25',
+  warning: 'bg-warning-bg text-warning-fg border-warning-fg/25',
+  info:    'bg-info-bg text-info-fg border-info-fg/25',
+  primary: 'bg-primary-50 text-primary-700 border-primary-200',
+  muted:   'bg-surface-2 text-ink-subtle border-border-soft',
+  purple:  'bg-therapy-bg text-therapy-fg border-therapy-fg/25',
+  dark:    'bg-ink text-ink-inverse border-transparent',
 }
 
 const SIZES = {
-  xs: 'px-2 py-0.5 text-[10px] rounded-md gap-1',
+  xs: 'px-2 py-0.5 text-2xs rounded-md gap-1',
   sm: 'px-2.5 py-1 text-xs rounded-lg gap-1.5',
   md: 'px-3 py-1.5 text-xs rounded-xl gap-1.5',
 }
 
 const DOT_COLORS = {
-  success: 'bg-[#16A34A]',
-  danger:  'bg-[#DC2626]',
-  warning: 'bg-[#D97706]',
-  info:    'bg-[#0284C7]',
-  primary: 'bg-[#2563EB]',
-  muted:   'bg-[#64748B]',
-  purple:  'bg-[#7C3AED]',
-  dark:    'bg-white',
+  success: 'bg-success-fg',
+  danger:  'bg-critical-fg',
+  warning: 'bg-warning-fg',
+  info:    'bg-info-fg',
+  primary: 'bg-primary-600',
+  muted:   'bg-ink-subtle',
+  purple:  'bg-therapy-fg',
+  dark:    'bg-ink-inverse',
 }
 
 export default function StatusBadge({

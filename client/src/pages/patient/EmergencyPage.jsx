@@ -45,18 +45,18 @@ export default function EmergencyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">Emergency</h1>
-        <p className="mt-1.5 text-sm text-[#475569]">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Emergency</h1>
+        <p className="mt-1.5 text-sm text-ink-muted">
           If you think you are having a stroke, get help now. Do not wait to see if it passes.
         </p>
       </div>
 
       {/* ── Call first. Always the primary action, before any checklist. ── */}
-      <section aria-labelledby="call-heading" className="rounded-xl border border-[#F0C8C0] bg-[#FBEAE7] p-5">
-        <h2 id="call-heading" className="flex items-center gap-2 text-base font-semibold text-[#A33A28]">
+      <section aria-labelledby="call-heading" className="rounded-xl border border-critical-fg/30 bg-critical-bg p-5">
+        <h2 id="call-heading" className="flex items-center gap-2 text-base font-semibold text-critical-fg">
           <Siren size={18} aria-hidden="true" /> Call for an ambulance
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-[#7A3020]">
+        <p className="mt-1.5 text-sm leading-relaxed text-critical-fg">
           Stroke treatment works best within the first hours. Calling an ambulance is
           faster than travelling to hospital yourself — treatment can begin on the way.
         </p>
@@ -64,13 +64,13 @@ export default function EmergencyPage() {
         <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
           <a
             href="tel:108"
-            className="focus-ring inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#DC2626] px-5 text-base font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+            className="focus-ring inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-danger px-5 text-base font-semibold text-on-primary transition-colors hover:bg-danger-fg"
           >
             <Phone size={18} aria-hidden="true" /> Call 108 — Ambulance
           </a>
           <a
             href="tel:112"
-            className="focus-ring inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#D8A99E] bg-white px-5 text-base font-semibold text-[#A33A28] transition-colors hover:bg-[#FBEAE7]"
+            className="focus-ring inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-critical-fg/40 bg-surface-1 px-5 text-base font-semibold text-critical-fg transition-colors hover:bg-critical-bg"
           >
             <Phone size={18} aria-hidden="true" /> Call 112 — Emergency
           </a>
@@ -78,11 +78,11 @@ export default function EmergencyPage() {
       </section>
 
       {/* ── BE-FAST ── */}
-      <section aria-labelledby="befast-heading" className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-        <h2 id="befast-heading" className="text-base font-semibold text-[#0F172A]">
+      <section aria-labelledby="befast-heading" className="rounded-xl border border-border-soft bg-surface-1 p-5">
+        <h2 id="befast-heading" className="text-base font-semibold text-ink">
           Check for stroke signs (BE-FAST)
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-[#475569]">
+        <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
           Tick anything you notice. This is a guide to help you decide — it is not a
           diagnosis, and it does not contact anyone.
         </p>
@@ -95,8 +95,8 @@ export default function EmergencyPage() {
               return (
                 <li key={sign.key}>
                   <label
-                    className={`focus-within:ring-2 focus-within:ring-[#2563EB] flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-colors ${
-                      isOn ? 'border-[#D8A99E] bg-[#FBEAE7]' : 'border-[#E8EDF2] bg-white hover:bg-[#FAFBFC]'
+                    className={`focus-within:ring-2 focus-within:ring-primary-600 flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 transition-colors ${
+                      isOn ? 'border-critical-fg/40 bg-critical-bg' : 'border-border bg-surface-1 hover:border-border-strong hover:bg-surface-2'
                     }`}
                   >
                     <input
@@ -108,16 +108,16 @@ export default function EmergencyPage() {
                     <span
                       aria-hidden="true"
                       className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                        isOn ? 'border-[#A33A28] bg-[#A33A28]' : 'border-[#CBD5E1] bg-white'
+                        isOn ? 'border-critical-fg bg-critical-fg' : 'border-border bg-surface-1'
                       }`}
                     >
-                      {isOn && <Check size={13} className="text-white" strokeWidth={3} />}
+                      {isOn && <Check size={13} className="text-on-primary" strokeWidth={3} />}
                     </span>
                     <span className="min-w-0">
-                      <span className={`block text-sm font-semibold ${isOn ? 'text-[#A33A28]' : 'text-[#0F172A]'}`}>
+                      <span className={`block text-sm font-semibold ${isOn ? 'text-critical-fg' : 'text-ink'}`}>
                         {sign.label}
                       </span>
-                      <span className="mt-0.5 block text-sm leading-relaxed text-[#475569]">
+                      <span className="mt-0.5 block text-sm leading-relaxed text-ink-muted">
                         {sign.hint}
                       </span>
                     </span>
@@ -142,12 +142,12 @@ export default function EmergencyPage() {
       </section>
 
       {/* ── Time of onset: the single most treatment-critical fact ── */}
-      <section aria-labelledby="time-heading" className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-        <h2 id="time-heading" className="flex items-center gap-2 text-base font-semibold text-[#0F172A]">
-          <AlertTriangle size={17} aria-hidden="true" className="text-[#8A5A1B]" />
+      <section aria-labelledby="time-heading" className="rounded-xl border border-border-soft bg-surface-1 p-5">
+        <h2 id="time-heading" className="flex items-center gap-2 text-base font-semibold text-ink">
+          <AlertTriangle size={17} aria-hidden="true" className="text-warning-fg" />
           Remember when it started
         </h2>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[#475569]">
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-ink-muted">
           The time symptoms began — or the last time the person was completely well —
           decides which treatments are safe to give. Tell the ambulance crew and the
           hospital this time. If you are not sure, say when the person was last seen

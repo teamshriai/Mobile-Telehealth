@@ -145,9 +145,13 @@ export const patientRepository = {
     return this.paginatedSearch({ shriPatientId, deletedAt: null }, page, pageSize);
   },
 
-  /** Prefix-insensitive name match, using the existing [lastName, firstName]
-   *  index. Caller (the validator) guarantees at least a surname plus one
-   *  more signal before this is ever called. */
+  /** Prefix-insensitive name match. NOTE: `mode: 'insensitive'` compiles to
+   *  ILIKE, which cannot use the plain B-tree [lastName, firstName] index —
+   *  an earlier version of this comment claimed it did. The functional
+   *  lower(last_name)/lower(first_name) indexes added in
+   *  20260917090000_query_performance_indexes are what actually serve it.
+   *  Caller (the validator) guarantees at least a surname plus one more
+   *  signal before this is ever called. */
   async searchByName(
     lastName: string,
     firstName: string | undefined,

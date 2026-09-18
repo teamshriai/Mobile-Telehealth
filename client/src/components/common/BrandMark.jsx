@@ -8,7 +8,7 @@ export default function BrandMark({ size = 18, rounded = 'rounded-lg' }) {
       style={{
         width: size + 14,
         height: size + 14,
-        background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+        background: 'linear-gradient(135deg, var(--color-primary-900) 0%, var(--color-primary-600) 100%)',
       }}
     >
       <svg width={size} height={size} viewBox="0 0 18 18" fill="none">

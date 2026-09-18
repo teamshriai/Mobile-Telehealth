@@ -15,7 +15,7 @@ export function Spinner({ size = 20, className = '' }) {
   return (
     <span
       aria-hidden="true"
-      className={`inline-block animate-spin rounded-full border-[2.5px] border-[#E8EDF2] border-t-[#2563EB] ${className}`}
+      className={`inline-block animate-spin rounded-full border-[2.5px] border-border-soft border-t-primary-600 ${className}`}
       style={{ width: size, height: size }}
     />
   )
@@ -30,7 +30,7 @@ export function LoadingState({ label = 'Loading…', className = '' }) {
       className={`flex flex-col items-center justify-center gap-3 px-6 py-12 text-center ${className}`}
     >
       <Spinner size={26} />
-      <p className="text-sm font-medium text-[#475569]">{label}</p>
+      <p className="text-sm font-medium text-ink-muted">{label}</p>
     </div>
   )
 }
@@ -72,13 +72,13 @@ export function EmptyState({
     <div className={`flex flex-col items-center justify-center px-6 py-14 text-center ${className}`}>
       <span
         aria-hidden="true"
-        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#F1F5F9]"
+        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2"
       >
-        <Icon size={22} className="text-[#64748B]" />
+        <Icon size={22} className="text-ink-subtle" />
       </span>
-      <p className="text-base font-semibold text-[#0F172A]">{title}</p>
+      <p className="text-base font-semibold text-ink">{title}</p>
       {description && (
-        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#475569]">{description}</p>
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-ink-muted">{description}</p>
       )}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -95,9 +95,9 @@ export function EmptyState({
 export function ReferenceId({ id, className = '' }) {
   if (!id) return null
   return (
-    <p className={`text-xs text-[#94A3B8] ${className}`}>
+    <p className={`text-xs text-ink-subtle ${className}`}>
       Reference:{' '}
-      <span className="select-all font-mono text-[#64748B]">{id}</span>
+      <span className="select-all font-mono text-ink-subtle">{id}</span>
     </p>
   )
 }
@@ -138,17 +138,17 @@ export function ErrorState({
     >
       <span
         aria-hidden="true"
-        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#FBEAE7]"
+        className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-critical-bg"
       >
-        <AlertTriangle size={22} className="text-[#A33A28]" />
+        <AlertTriangle size={22} className="text-critical-fg" />
       </span>
-      <p className="text-base font-semibold text-[#0F172A]">{title}</p>
-      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-[#475569]">{message}</p>
+      <p className="text-base font-semibold text-ink">{title}</p>
+      <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-ink-muted">{message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="focus-ring mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-4 text-sm font-semibold text-[#475569] transition-colors hover:bg-[#F1F5F9]"
+          className="focus-ring mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 text-sm font-semibold text-ink-muted transition-colors hover:bg-surface-2"
         >
           <RefreshCw size={14} aria-hidden="true" /> Try again
         </button>
@@ -160,13 +160,16 @@ export function ErrorState({
 
 /* ── Inline banners ───────────────────────────────────────────────────────── */
 
+// Classes, not inline `style`: an inline colour cannot follow a CSS variable,
+// so the previous version of this map was invisible to the theme and would
+// have stayed light-on-light in dark mode.
 const BANNER_TONES = {
   // Note: `error` uses the critical palette, not the emergency red. Red is
   // reserved for the emergency action so it does not become wallpaper.
-  error:   { bg: '#FBEAE7', fg: '#A33A28', Icon: AlertTriangle, role: 'alert' },
-  success: { bg: '#E6F0EE', fg: '#2F6B5E', Icon: CheckCircle2,  role: 'status' },
-  warning: { bg: '#FBF0E2', fg: '#8A5A1B', Icon: AlertTriangle, role: 'status' },
-  info:    { bg: '#E8EFF6', fg: '#33608A', Icon: Info,          role: 'status' },
+  error:   { cls: 'bg-critical-bg text-critical-fg', Icon: AlertTriangle, role: 'alert'  },
+  success: { cls: 'bg-success-bg  text-success-fg',  Icon: CheckCircle2,  role: 'status' },
+  warning: { cls: 'bg-warning-bg  text-warning-fg',  Icon: AlertTriangle, role: 'status' },
+  info:    { cls: 'bg-info-bg     text-info-fg',     Icon: Info,          role: 'status' },
 }
 
 /**
@@ -177,17 +180,16 @@ const BANNER_TONES = {
  * "Save" received no confirmation at all.
  */
 export function Banner({ tone = 'info', title, children, className = '' }) {
-  const { bg, fg, Icon, role } = BANNER_TONES[tone] ?? BANNER_TONES.info
+  const { cls, Icon, role } = BANNER_TONES[tone] ?? BANNER_TONES.info
 
   return (
     <div
       role={role}
       aria-live={tone === 'error' ? 'assertive' : 'polite'}
-      className={`flex items-start gap-2.5 rounded-lg px-3.5 py-3 ${className}`}
-      style={{ background: bg }}
+      className={`flex items-start gap-2.5 rounded-lg px-3.5 py-3 ${cls} ${className}`}
     >
-      <Icon size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0" style={{ color: fg }} />
-      <div className="min-w-0 text-sm leading-relaxed" style={{ color: fg }}>
+      <Icon size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+      <div className="min-w-0 text-sm leading-relaxed">
         {title && <p className="font-semibold">{title}</p>}
         {children && <div className={title ? 'mt-0.5' : ''}>{children}</div>}
       </div>

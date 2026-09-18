@@ -14,21 +14,21 @@ const SIZES = {
 }
 
 const STATUS_COLORS = {
-  online:  'bg-[#16A34A]',
-  away:    'bg-[#F59E0B]',
-  busy:    'bg-[#DC2626]',
-  offline: 'bg-[#94A3B8]',
+  online:  'bg-success-fg',
+  away:    'bg-warning-fg',
+  busy:    'bg-danger',
+  offline: 'bg-border-strong',
 }
 
 /* Generate a consistent gradient from a string */
 const getGradient = (name = '') => {
   const gradients = [
-    'linear-gradient(135deg, #2563EB, #3B82F6)',
-    'linear-gradient(135deg, #7C3AED, #8B5CF6)',
-    'linear-gradient(135deg, #059669, #10B981)',
-    'linear-gradient(135deg, #D97706, #F59E0B)',
-    'linear-gradient(135deg, #DC2626, #EF4444)',
-    'linear-gradient(135deg, #0284C7, #38BDF8)',
+    'linear-gradient(135deg, var(--color-accent-sky-fg), var(--color-primary-500))',
+    'linear-gradient(135deg, var(--color-therapy-fg), var(--color-accent-clay-fg))',
+    'linear-gradient(135deg, var(--color-accent-teal-fg), var(--color-success-fg))',
+    'linear-gradient(135deg, var(--color-accent-sand-fg), var(--color-warning-fg))',
+    'linear-gradient(135deg, var(--color-accent-clay-fg), var(--color-critical-fg))',
+    'linear-gradient(135deg, var(--color-info-fg), var(--color-accent-sky-fg))',
   ]
   // '' .charCodeAt(0) is NaN, so an empty/falsy name (the default prop value)
   // previously indexed gradients[NaN] -> undefined -> no background at all.
@@ -73,7 +73,7 @@ export default function Avatar({
           className={`
             ${container} ${radiusClass}
             flex items-center justify-center
-            text-white font-bold select-none
+            text-on-primary font-bold select-none
             ${text}
           `}
           style={{ background: getGradient(name) }}
@@ -88,7 +88,7 @@ export default function Avatar({
           className={`
             absolute bottom-0 right-0
             w-2.5 h-2.5 rounded-full
-            border-2 border-white
+            border-2 border-surface-1
             ${STATUS_COLORS[status] || STATUS_COLORS.offline}
           `}
         />

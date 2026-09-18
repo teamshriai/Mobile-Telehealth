@@ -35,20 +35,20 @@ export default function IdleWarning({ secondsLeft, onStayActive }) {
       aria-describedby="idle-warning-body"
       className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 sm:left-auto sm:right-6 sm:bottom-6 sm:px-0 sm:pb-0"
     >
-      <div className="mx-auto w-full max-w-sm rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-lg sm:mx-0">
+      <div className="mx-auto w-full max-w-sm rounded-xl border border-border-soft bg-surface-1 p-4 shadow-lg sm:mx-0">
         <div className="flex items-start gap-3">
           <span
             aria-hidden="true"
-            className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#FBF0E2]"
+            className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-warning-bg"
           >
-            <Clock size={18} className="text-[#8A5A1B]" />
+            <Clock size={18} className="text-warning-fg" />
           </span>
 
           <div className="min-w-0 flex-1">
-            <p id="idle-warning-title" className="text-sm font-semibold text-[#0F172A]">
+            <p id="idle-warning-title" className="text-sm font-semibold text-ink">
               You&rsquo;ll be signed out shortly
             </p>
-            <p id="idle-warning-body" className="mt-1 text-sm leading-relaxed text-[#475569]">
+            <p id="idle-warning-body" className="mt-1 text-sm leading-relaxed text-ink-muted">
               For your privacy, we sign you out after a period of inactivity.
               {' '}
               {secondsLeft > 0
@@ -60,7 +60,7 @@ export default function IdleWarning({ secondsLeft, onStayActive }) {
               ref={buttonRef}
               type="button"
               onClick={onStayActive}
-              className="focus-ring mt-3 inline-flex min-h-11 items-center rounded-lg bg-[#2563EB] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#1D4ED8]"
+              className="focus-ring mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-700"
             >
               Stay signed in
             </button>

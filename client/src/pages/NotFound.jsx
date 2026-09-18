@@ -6,13 +6,13 @@ export default function NotFound() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-[#FAFBFC] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
 
       {/* Background dot grid */}
       <div
         className="fixed inset-0 opacity-40 pointer-events-none"
         style={{
-          backgroundImage: 'radial-gradient(circle, #E8EDF2 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(circle, var(--color-border) 1px, transparent 1px)',
           backgroundSize: '28px 28px',
         }}
       />
@@ -35,7 +35,7 @@ export default function NotFound() {
             style={{
               fontFamily: 'DM Sans, Inter, sans-serif',
               letterSpacing: '-0.05em',
-              background: 'linear-gradient(135deg, #E8EDF2 0%, #CBD5E1 100%)',
+              background: 'linear-gradient(135deg, var(--color-surface-3) 0%, var(--color-border) 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -53,7 +53,7 @@ export default function NotFound() {
             <div
               className="w-20 h-20 rounded-xl flex items-center justify-center"
               style={{
-                background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+                background: 'linear-gradient(135deg, var(--color-primary-900) 0%, var(--color-primary-600) 100%)',
                 boxShadow: '0 20px 60px 0 rgba(37,99,235,0.3)',
               }}
             >
@@ -91,12 +91,12 @@ export default function NotFound() {
           className="space-y-3 mb-8"
         >
           <h1
-            className="text-2xl font-bold text-[#0F172A]"
+            className="text-2xl font-bold text-ink"
             style={{ fontFamily: 'DM Sans, Inter, sans-serif', letterSpacing: '-0.02em' }}
           >
             Page not found
           </h1>
-          <p className="text-sm text-[#64748B] leading-relaxed max-w-sm">
+          <p className="text-sm text-ink-subtle leading-relaxed max-w-sm">
             The page you're looking for doesn't exist or has been moved.
             Return to your dashboard to continue managing your care.
           </p>
@@ -112,8 +112,8 @@ export default function NotFound() {
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 px-5 py-3 rounded-xl
-                       border border-[#E8EDF2] bg-white text-sm font-semibold
-                       text-[#64748B] hover:text-[#0F172A] hover:border-[#94A3B8]
+                       border border-border-soft bg-surface-1 text-sm font-semibold
+                       text-ink-subtle hover:text-ink hover:border-border-strong
                        transition-all duration-200 active:scale-[0.97]"
             style={{ boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)' }}
           >
@@ -124,8 +124,8 @@ export default function NotFound() {
           <button
             onClick={() => navigate('/')}
             className="flex items-center gap-2 px-5 py-3 rounded-xl
-                       bg-[#2563EB] text-white text-sm font-semibold
-                       hover:bg-[#1D4ED8] transition-all duration-200
+                       bg-primary-600 text-on-primary text-sm font-semibold
+                       hover:bg-primary-700 transition-all duration-200
                        active:scale-[0.97]"
             style={{ boxShadow: '0 4px 16px 0 rgba(37,99,235,0.3)' }}
           >
@@ -139,7 +139,7 @@ export default function NotFound() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="mt-10 text-xs text-[#64748B] font-medium"
+          className="mt-10 text-xs text-ink-subtle font-medium"
         >
           Stroke AI — Patient Portal
         </motion.p>

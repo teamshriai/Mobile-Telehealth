@@ -8,60 +8,72 @@
 
 @import "tailwindcss";
 
-@theme {
+@theme static {
   /* ═══════════════════════════════════════════════════════════════════════
      STROKE AI — DESIGN TOKENS (single source of truth)
 
-     Phase 2 consolidation. Previously four token systems coexisted (this
-     file, landing/theme.js, landing/hero/heroTheme.js, and an undocumented
-     block copy-pasted across the four auth pages) and seven font families
-     loaded through three mechanisms.
+     `static` (not plain `@theme`): Tailwind 4 tree-shakes theme variables no
+     generated utility references, which would silently drop the accent and
+     on-* tokens that are read from JS and from `color-mix()` below. `static`
+     emits all of them.
 
-     Now: two families, one scale, one palette. The landing page keeps its
-     editorial serif — that is a deliberate marketing voice, not drift — but
-     it is expressed here rather than in a parallel system.
+     NEVER `@theme inline` — that substitutes literal values into utilities and
+     would defeat the `.dark` redefinition this whole file depends on.
+
+     Light is the source of truth here; `:root.dark` further down redefines the
+     same names. Because non-inline `@theme` emits `var()` references, every
+     `bg-surface-1` / `text-ink` / `border-border` in the app flips with it,
+     with no `dark:` variant at the call site.
   ═══════════════════════════════════════════════════════════════════════ */
 
   /* ── Type families ─────────────────────────────────────────────────────
      Two, total. Plus Jakarta Sans carries the entire application; Playfair
-     is reserved for landing display headings. Helvetica/Aether/Inter were
-     dropped — they added ~600KB of self-hosted faces for no design gain. */
+     is reserved for landing display headings. */
   --font-sans:   'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-serif:  'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-lato:   'Lato', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: var(--font-sans);
 
-  /* ── Landing ground (marketing surface only) ──────────────────────────── */
-  --color-sa-cream: #F7F5EF;
-  --color-sa-paper: #FFFDF8;
-  --color-sa-ink:   #16160F;
-  --color-sa-body:  #55554D;
-  --color-sa-rule:  rgba(22, 22, 15, 0.13);
 
-  /* ── Surfaces (canvas → soft → elevated) ──────────────────────────────── */
-  --color-surface-1: #FAFBFC;
-  --color-surface-2: #F1F5F9;
-  --color-surface-3: #E8EDF2;
+  /* ── Grounds & surfaces ────────────────────────────────────────────────
+     `bg` is the page ground; `surface-1` is the card sitting on it. They are
+     deliberately distinct (1.18:1) so a container reads as a container, and
+     every card also carries a `border` — a tint delta alone is not a crisp
+     edge, which is what the brief asked for.
+
+       surface-1  card / panel / input
+       surface-2  a fill INSIDE a card (chip, row, input rest)
+       surface-3  sunken — track, hover well
+  */
+  --color-bg:        #E8EDF4;
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F4F7FA;
+  --color-surface-3: #E4EAF2;
+
+  /* Modal / drawer scrim. A token, because an ink-tinted scrim is nearly
+     invisible over a dark ground and needs its own dark value. */
+  --color-scrim: rgba(15, 23, 42, 0.45);
 
   /* ── Ink scale ─────────────────────────────────────────────────────────
-     WCAG contrast on white, measured:
-       ink        #0F172A → 16.9:1  AAA
-       ink-muted  #475569 →  7.4:1  AAA   ← body copy
-       ink-subtle #64748B →  4.8:1  AA    ← metadata, never below 14px
+     Measured on the card (#FFFFFF) and on the ground (#E8EDF4):
+       ink        17.85 / 15.18  AAA
+       ink-muted   8.46 /  7.19  AAA   ← body copy
+       ink-subtle  5.77 /  4.91  AA    ← metadata, never below 14px
 
-     #94A3B8 (2.8:1) and #CBD5E1 (1.7:1) were used 153 and 26 times as TEXT
-     and both fail AA. They are retained ONLY as non-text tokens (borders,
-     disabled glyphs) under explicit names so the failing values cannot be
-     reached accidentally via a text utility. */
+     ink-muted and ink-subtle were DARKENED from #475569 / #64748B. The old
+     ink-subtle measures 4.20:1 on this tinted ground — it fails AA the moment
+     the ground stops being near-white, so keeping it would have shipped a
+     real regression across ~60 call sites. */
   --color-ink:         #0F172A;
-  --color-ink-muted:   #475569;
-  --color-ink-subtle:  #64748B;
+  --color-ink-muted:   #3F4E63;
+  --color-ink-subtle:  #57677C;
   --color-ink-inverse: #FFFFFF;
 
-  /* Non-text only. Never apply to text — see the note above. */
-  --color-border-strong: #94A3B8;
-  --color-border:        #CBD5E1;
-  --color-border-soft:   #E8EDF2;
+  /* Non-text only. Never apply to text.
+       border-soft    a rule INSIDE a card
+       border         the card's own edge (1.60:1 on the card)
+       border-strong  an interactive edge — 3.47:1, clears WCAG 1.4.11 */
+  --color-border-soft:   #D9E1EA;
+  --color-border:        #C2CEDB;
+  --color-border-strong: #7C8BA0;
 
   /* ── Primary (actions, links, navigation) ─────────────────────────────── */
   --color-primary-50:  #EFF6FF;
@@ -70,19 +82,27 @@
   --color-primary-300: #93C5FD;
   --color-primary-400: #60A5FA;
   --color-primary-500: #3B82F6;
-  --color-primary-600: #2563EB;  /* 4.5:1 on white — the action colour */
+  --color-primary-600: #2563EB;  /* the action colour */
   --color-primary-700: #1D4ED8;
   --color-primary-800: #1E40AF;
   --color-primary-900: #1E3A8A;
 
+  /* Text/icon colour ON a filled action. Distinct from surface white so it
+     does NOT flip in dark mode — a filled blue button keeps light text. */
+  --color-on-primary: #FFFFFF;
+  --color-on-danger:  #FFFFFF;
+
+  /* The focus indicator. Its own token because primary-600 is a fill colour:
+     in dark it sits at #2F5FBF, too dark to read as a ring against the
+     ground. Dark redefines this to the light primary-500 instead. */
+  --color-focus: #2563EB;
+
   /* ── Semantic status ───────────────────────────────────────────────────
      Muted on purpose. Each `-fg` clears 4.5:1 on its own `-bg`.
 
-     `danger` is RESERVED FOR EMERGENCY. Using red for ordinary validation
-     errors is what turns the emergency affordance into wallpaper on a
-     product whose whole premise is that a stroke is time-critical. Form
-     errors use `--color-critical-*` instead, which reads as serious
-     without competing with the emergency button. */
+     `danger` is RESERVED FOR EMERGENCY. Ordinary validation errors use
+     `critical`, which reads as serious without competing with the emergency
+     affordance on a product whose premise is that a stroke is time-critical. */
   --color-success-bg: #E6F0EE;
   --color-success-fg: #2F6B5E;
   --color-warning-bg: #FBF0E2;
@@ -97,6 +117,22 @@
   /* Emergency only. Not a status colour. */
   --color-danger:    #DC2626;
   --color-danger-fg: #B91C1C;
+
+  /* ── Pastel accents ────────────────────────────────────────────────────
+     For category colour-coding (a tile, a chip, an icon well) — never for
+     state, which `success`/`warning`/`critical`/`info` already own. Derived
+     from the landing page's TINT set so the two surfaces share a family.
+     Every `-fg` clears 4.9:1 on its own `-bg` in light, 7.4:1 in dark. */
+  --color-accent-sky:     #E8EFF6;
+  --color-accent-sky-fg:  #3A6288;
+  --color-accent-teal:    #E6F0EE;
+  --color-accent-teal-fg: #3C6B63;
+  --color-accent-sand:    #F4EDE0;
+  --color-accent-sand-fg: #7E6128;
+  --color-accent-clay:    #F6E9E4;
+  --color-accent-clay-fg: #8B5544;
+  --color-accent-sage:    #E9F0E6;
+  --color-accent-sage-fg: #4C6B46;
 
   /* ── Type scale ────────────────────────────────────────────────────────
      One step larger than a typical consumer app. The stroke population
@@ -113,8 +149,7 @@
   --text-3xl:   1.875rem;  /* 30px — page titles */
   --text-4xl:   2.25rem;   /* 36px */
 
-  /* ── Radius ────────────────────────────────────────────────────────────
-     Restrained. No pills on anything that is not a status chip. */
+  /* ── Radius ──────────────────────────────────────────────────────────── */
   --radius-sm:   0.25rem;
   --radius-md:   0.5rem;
   --radius-lg:   0.75rem;
@@ -145,19 +180,110 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* ═════════════════════════════════════════════════════════════════════════
+   THEME OVERRIDES — deliberately UNLAYERED.
+
+   `@theme` emits into `@layer theme`, and `@variant dark` resolves through
+   `:where()`, which contributes zero specificity. An unlayered rule beats
+   every layer unconditionally, so this is the one placement that cannot be
+   accidentally out-specified later.
+
+   Order matters: high-contrast comes AFTER dark, or dark wins the tie.
+═════════════════════════════════════════════════════════════════════════ */
+
+:root { color-scheme: light; }
+
+:root.dark {
+  color-scheme: dark;
+
+  /* Ground is #14181F, never #000 — pure black raises halation for readers
+     with astigmatism and removes any room for a sunken surface below it. */
+  --color-bg:        #14181F;
+  --color-surface-1: #1D232D;
+  --color-surface-2: #262E39;
+  --color-surface-3: #303945;
+
+  /* An ink-tinted scrim vanishes over a dark ground; this one is near-black. */
+  --color-scrim: rgba(0, 0, 0, 0.66);
+
+  /* Measured on the card (#1D232D) / on the ground (#14181F):
+       ink        13.30 / 14.99  AAA
+       ink-muted   8.39 /  9.46  AAA
+       ink-subtle  5.58 /  6.29  AA
+     ink is #E7ECF3, not #FFF: full-white body text on a dark ground is the
+     other half of the halation problem. */
+  --color-ink:         #E7ECF3;
+  --color-ink-muted:   #B3BECD;
+  --color-ink-subtle:  #8D9BAD;
+  --color-ink-inverse: #14181F;
+
+  --color-border-soft:   #2B333E;
+  --color-border:        #3A4450;  /* 1.60:1 on the card — same crispness as light */
+  --color-border-strong: #6E7A8C;  /* 3.63:1 — clears WCAG 1.4.11 */
+
+  /* The ramp inverts: a "50" tint is a deep wash in dark, and hover goes
+     lighter rather than darker. */
+  --color-primary-50:  #1E2A3D;
+  --color-primary-100: #24344B;
+  --color-primary-500: #7FA9F0;  /* primary-as-text, and the focus ring */
+  --color-primary-600: #2F5FBF;  /* fill */
+  --color-primary-700: #3A6ACC;  /* hover — lighter, not darker */
+  --color-on-primary:  #F2F6FF;
+  --color-focus:       #7FA9F0;
+
+  --color-danger:    #C0322D;
+  --color-danger-fg: #FF9A8F;
+  --color-on-danger: #FFFFFF;
+
+  --color-success-bg: #1A2B29;  --color-success-fg: #93C6BC;
+  --color-warning-bg: #2A2519;  --color-warning-fg: #D7BE86;
+  --color-critical-bg:#33201C;  --color-critical-fg:#F0A99A;
+  --color-info-bg:    #1E2A38;  --color-info-fg:    #9CC0E8;
+  --color-therapy-bg: #262238;  --color-therapy-fg: #BCB0E0;
+
+  --color-accent-sky:     #1E2A38;  --color-accent-sky-fg:  #9CC0E8;
+  --color-accent-teal:    #1A2B29;  --color-accent-teal-fg: #93C6BC;
+  --color-accent-sand:    #2A2519;  --color-accent-sand-fg: #D7BE86;
+  --color-accent-clay:    #2E211C;  --color-accent-clay-fg: #DBA895;
+  --color-accent-sage:    #1F2A1D;  --color-accent-sage-fg: #A9C79F;
+
+  /* Non-optional. The light shadows are rgba(15,23,42,0.04) — over #1D232D
+     that is literally invisible, which would leave cards with no separation
+     from the ground beyond the 1.13:1 tint. */
+  --shadow-card:    0 1px 2px 0 rgba(0,0,0,0.40), 0 1px 3px 0 rgba(0,0,0,0.30);
+  --shadow-card-md: 0 2px 8px 0 rgba(0,0,0,0.45), 0 1px 3px 0 rgba(0,0,0,0.30);
+  --shadow-card-lg: 0 4px 16px 0 rgba(0,0,0,0.50), 0 2px 6px 0 rgba(0,0,0,0.35);
+  --shadow-glow:    0 0 0 3px rgba(127,169,240,0.22);
+}
+
+/* ── High contrast ──────────────────────────────────────────────────────
+   Driven by the account preference AccessibilityContext writes onto <html>.
+
+   This used to target the literal escaped utility selectors the app happened
+   to be written with (`.text-\[\#475569\]` and five siblings). Those classes
+   no longer exist now that the app uses tokens, so the old block would have
+   kept parsing and silently done nothing. Overriding the tokens instead is
+   both durable and strictly wider: it reaches inline styles and `color-mix`
+   surfaces too, and needs no `!important`. */
+html[data-high-contrast='true'] {
+  --color-ink:           #000000;
+  --color-ink-muted:     #1E293B;
+  --color-ink-subtle:    #1E293B;
+  --color-border-soft:   #475569;
+  --color-border:        #475569;
+  --color-border-strong: #334155;
+}
+
+html[data-high-contrast='true']:root.dark {
+  --color-ink:           #FFFFFF;
+  --color-ink-muted:     #E2E8F0;
+  --color-ink-subtle:    #CBD5E1;
+  --color-border-soft:   #8D9BAD;
+  --color-border:        #8D9BAD;
+  --color-border-strong: #B3BECD;
+}
+
 @layer base {
-  /* ── Local: Archivo Variable (hero + ticker only — see landing/hero/heroTheme.js).
-     Self-hosted per the hero spec's performance budget: one variable file
-     carries both the weight axis (400-700 used) and the width axis (the
-     display sizes lean on font-stretch instead of a second static family). */
-  @font-face {
-    font-family: 'Archivo Variable';
-    src: url('/fonts/archivo/archivo-variable.woff2') format('woff2-variations');
-    font-weight: 100 900;
-    font-stretch: 62% 125%;
-    font-style: normal;
-    font-display: swap;
-  }
 
 
 
@@ -173,8 +299,12 @@
     /* `clip`, not `hidden`: `hidden` makes body a scroll container in some
        engines, which breaks `position: sticky` descendants (the pinned hero). */
     overflow-x: clip;
-    background: #f8fafc;
-    color: #111827;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    /* Softens the theme flip. The reduce-motion blocks below already clamp
+       every transition to 0.01ms, so this is opt-out by default for anyone
+       who asked for less motion. */
+    transition: background-color 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth);
     /* Plus Jakarta Sans throughout. Weight 400, not 300: hairline weights
        on clinical text are a legibility cost with no compensating benefit. */
     font-family: var(--font-sans);
@@ -196,32 +326,6 @@
     line-height: 1.05;
   }
 
-  /* ── Landing page scope ──────────────────────────────────────────────
-     The marketing page runs its own editorial pairing (Playfair display over
-     Lato text) without disturbing the app shell, which keeps the global
-     Helvetica/Plus Jakarta rules above. Display faces are reserved for h1/h2;
-     h3 and below stay sans, matching the reference's bold sans sub-labels. */
-  .sa-landing {
-    font-family: var(--font-lato);
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  .sa-landing h1,
-  .sa-landing h2 {
-    font-family: var(--font-serif);
-    font-weight: 400;
-    letter-spacing: -0.012em;
-  }
-
-  .sa-landing h3,
-  .sa-landing h4,
-  .sa-landing h5,
-  .sa-landing h6 {
-    font-family: var(--font-lato);
-    font-weight: 700;
-    letter-spacing: 0;
-  }
 
   button, a {
     -webkit-tap-highlight-color: transparent;
@@ -283,29 +387,11 @@
     --text-4xl:  2.375rem;  /* 36 → 38 */
   }
 
-  /* High contrast: darkens body and secondary text to at least 7:1 on the
-     page background (WCAG AAA), and strengthens borders so card and input
-     edges remain visible rather than implied. Hardcoded slate values are
-     used because most of the app sets colour with arbitrary Tailwind values
-     (`text-[#475569]`) rather than tokens — this reaches those. */
-  html[data-high-contrast='true'] body {
-    color: #000000;
-  }
-
-  html[data-high-contrast='true'] .text-\[\#475569\],
-  html[data-high-contrast='true'] .text-\[\#64748B\],
-  html[data-high-contrast='true'] .text-\[\#94A3B8\] {
-    color: #1E293B !important;
-  }
-
-  html[data-high-contrast='true'] .border-\[\#E2E8F0\],
-  html[data-high-contrast='true'] .border-\[\#E8EDF2\],
-  html[data-high-contrast='true'] .border-\[\#CBD5E1\] {
-    border-color: #475569 !important;
-  }
-
+  /* High contrast now works by overriding the colour tokens themselves —
+     see the unlayered block above. All that is left here is the form-control
+     edge, which is not otherwise token-driven. */
   html[data-high-contrast='true'] :is(input, select, textarea) {
-    border-color: #475569 !important;
+    border-color: var(--color-border-strong);
   }
 
   /* Reduce motion: same treatment as the OS preference, applied to anyone
@@ -325,38 +411,47 @@
 }
 
 @layer components {
+  /* Was written against the built-in palette (`border-slate-200 bg-white/80
+     text-slate-900 focus:ring-blue-100`), which is invisible to any grep over
+     the JSX and would never have themed. */
   .auth-input {
-    @apply w-full rounded-xl border border-slate-200 bg-white/80 py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100;
+    @apply w-full rounded-xl border border-border bg-surface-1/80 py-3 pl-10 pr-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface-1 focus:ring-4;
+    --tw-ring-color: color-mix(in oklab, var(--color-focus) 22%, transparent);
   }
 
   /* ── Material hierarchy: Level 3 (selective glass/elevated surfaces) ──
      Used deliberately, not as a default container — see Card's `glass` variant. */
   .glass {
-    background: rgba(255, 255, 255, 0.72);
+    background: color-mix(in oklab, var(--color-surface-1) 72%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(232, 237, 242, 0.8);
+    border: 1px solid color-mix(in oklab, var(--color-border-soft) 80%, transparent);
   }
 
   .page-card {
-    background: rgba(255, 255, 255, 0.88);
+    background: color-mix(in oklab, var(--color-surface-1) 88%, transparent);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(226, 232, 240, 0.75);
-    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+    border: 1px solid color-mix(in oklab, var(--color-border) 75%, transparent);
+    box-shadow: var(--shadow-card-lg);
   }
 
   .card-hover {
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.25s var(--ease-premium), box-shadow 0.25s var(--ease-premium);
     will-change: transform;
   }
   .card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 24px 0 rgba(15,23,42,0.08), 0 1px 4px 0 rgba(15,23,42,0.04);
+    box-shadow: var(--shadow-card-lg);
   }
 
   .skeleton {
-    background: linear-gradient(90deg, #F1F5F9 25%, #E8EDF2 50%, #F1F5F9 75%);
+    background: linear-gradient(
+      90deg,
+      var(--color-surface-2) 25%,
+      var(--color-surface-3) 50%,
+      var(--color-surface-2) 75%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
     border-radius: 0.75rem;
@@ -368,9 +463,9 @@
      box-shadow-only focus style leaves those users with no focus indicator
      at all. */
   .focus-ring:focus-visible {
-    outline: 2px solid var(--color-primary-600);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus) 22%, transparent);
   }
 
   /* Global baseline: anything interactive gets a visible focus state even if
@@ -381,7 +476,7 @@
   select:focus-visible,
   textarea:focus-visible,
   [tabindex]:focus-visible {
-    outline: 2px solid var(--color-primary-600);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
 
@@ -416,7 +511,7 @@
     padding: 0.625rem 1rem;
     border-radius: var(--radius-md);
     background: var(--color-primary-600);
-    color: #fff;
+    color: var(--color-on-primary);
     font-size: var(--text-sm);
     font-weight: 600;
     transition: top 0.15s var(--ease-smooth);

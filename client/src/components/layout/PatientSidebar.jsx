@@ -30,11 +30,11 @@ function NavItem({ item, onNavigate }) {
           'focus-ring group flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
           isEmergency
             ? isActive
-              ? 'bg-[#FBEAE7] text-[#A33A28]'
-              : 'text-[#A33A28] hover:bg-[#FBEAE7]'
+              ? 'bg-critical-bg text-critical-fg'
+              : 'text-critical-fg hover:bg-critical-bg'
             : isActive
-              ? 'bg-[#EFF6FF] text-[#1D4ED8]'
-              : 'text-[#475569] hover:bg-[#F1F5F9] hover:text-[#0F172A]',
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
         ].join(' ')
       }
     >
@@ -127,7 +127,7 @@ export default function PatientSidebar({ mobileOpen, onMobileClose }) {
           type="button"
           aria-label="Close navigation menu"
           onClick={onMobileClose}
-          className="fixed inset-0 z-30 bg-slate-900/40 lg:hidden"
+          className="fixed inset-0 z-30 bg-scrim lg:hidden"
         />
       )}
 
@@ -135,22 +135,22 @@ export default function PatientSidebar({ mobileOpen, onMobileClose }) {
         id="patient-sidebar"
         ref={asideRef}
         className={[
-          'fixed left-0 top-0 z-40 flex h-screen w-[86vw] max-w-[272px] flex-col border-r border-[#E8EDF2] bg-white',
+          'fixed left-0 top-0 z-40 flex h-screen w-[86vw] max-w-[272px] flex-col border-r border-border-soft bg-surface-1',
           'transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
           'lg:w-[248px] lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
       >
         {/* ── Brand ── */}
-        <div className="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-[#E8EDF2] px-4">
+        <div className="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-border-soft px-4">
           <BrandMark size={16} />
-          <span className="text-[15px] font-bold tracking-tight text-[#0F172A]">Stroke AI</span>
+          <span className="text-[15px] font-bold tracking-tight text-ink">Stroke AI</span>
 
           <button
             type="button"
             onClick={onMobileClose}
             aria-label="Close navigation menu"
-            className="focus-ring tap-target ml-auto rounded-lg text-[#475569] hover:bg-[#F1F5F9] lg:hidden"
+            className="focus-ring tap-target ml-auto rounded-lg text-ink-muted hover:bg-surface-2 lg:hidden"
           >
             <X size={19} aria-hidden="true" />
           </button>
@@ -167,8 +167,8 @@ export default function PatientSidebar({ mobileOpen, onMobileClose }) {
           </ul>
 
           {/* ── Account ── */}
-          <div className="mt-6 border-t border-[#E8EDF2] pt-4">
-            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+          <div className="mt-6 border-t border-border-soft pt-4">
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
               Account
             </p>
             <ul className="space-y-1">

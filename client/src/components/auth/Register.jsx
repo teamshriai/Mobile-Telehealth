@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
-  ArrowLeft,
   Eye,
   EyeOff,
   Mail,
@@ -17,6 +16,7 @@ import {
 import { useAuth } from '../../app/AuthContext.jsx'
 import { homeForRole } from '../../app/guards.jsx'
 import BrandMark from '../common/BrandMark.jsx'
+import AuthShell from './AuthShell.jsx'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -27,39 +27,8 @@ const fadeIn = {
   }),
 }
 
-/* ─── Landing-page design tokens (see LandingHeader.jsx / LandingFooter.jsx) ───
-   Card content is retheme'd to match the landing page's palette + typography;
-   the page background (dot-grid + blobs) is left exactly as-is. ─── */
-const DISPLAY = { fontFamily: "'Plus Jakarta Sans', sans-serif" }
-const INK = '#1a2e3b'
-const LINK = '#1a6fa8'
-const MUTED = '#4a6a7a'
-const ACCENT_BAR = 'linear-gradient(90deg, #4f7fb8 0%, #e8935a 50%, #7fbf6a 100%)'
 
 /* ─── Dot-grid SVG background ─── */
-function DotGrid() {
-  return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <pattern
-          id="dots"
-          x="0"
-          y="0"
-          width="24"
-          height="24"
-          patternUnits="userSpaceOnUse"
-        >
-          <circle cx="1.5" cy="1.5" r="1.2" fill="#b0bec5" fillOpacity="0.4" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#dots)" />
-    </svg>
-  )
-}
-
 /* ─── Password strength checker ─── */
 const getPasswordStrength = (password) => {
   if (!password) return { score: 0, label: '', color: '' }
@@ -70,10 +39,10 @@ const getPasswordStrength = (password) => {
   if (/[^A-Za-z0-9]/.test(password)) score++
 
   const map = {
-    1: { label: 'Weak', color: '#DC2626' },
-    2: { label: 'Fair', color: '#F59E0B' },
-    3: { label: 'Good', color: '#3B82F6' },
-    4: { label: 'Strong', color: '#16A34A' },
+    1: { label: 'Weak', color: 'var(--color-critical-fg)' },
+    2: { label: 'Fair', color: 'var(--color-warning-fg)' },
+    3: { label: 'Good', color: 'var(--color-primary-500)' },
+    4: { label: 'Strong', color: 'var(--color-success-fg)' },
   }
   return { score, ...map[score] }
 }
@@ -199,46 +168,7 @@ export default function Register() {
   }
 
   return (
-    <main
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden font-sans p-3 sm:p-4 lg:p-6"
-      style={{ background: '#f0f4f8' }}
-    >
-      {/* ── Dot-grid background ── */}
-      <DotGrid />
-
-      {/* ── Gradient blobs ── */}
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-40 pointer-events-none
-                   w-64 h-64 sm:w-80 sm:h-80 lg:w-[420px] lg:h-[420px]
-                   -top-20 -left-20"
-        style={{
-          background: 'radial-gradient(circle, #a78bfa 0%, #818cf8 40%, #6366f1 100%)',
-        }}
-        animate={{ scale: [1, 1.08, 1], x: [0, 10, 0], y: [0, -6, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-35 pointer-events-none
-                   w-52 h-52 sm:w-64 sm:h-64 lg:w-[340px] lg:h-[340px]
-                   -bottom-14 -right-14"
-        style={{
-          background: 'radial-gradient(circle, #2dd4bf 0%, #38bdf8 50%, #6366f1 100%)',
-        }}
-        animate={{ scale: [1, 1.12, 1], x: [0, -12, 0], y: [0, 8, 0] }}
-        transition={{ duration: 10, delay: 1, repeat: Infinity, ease: 'easeInOut' }}
-      />
-
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-25 pointer-events-none
-                   w-36 h-36 sm:w-48 sm:h-48 lg:w-64 lg:h-64
-                   top-1/2 -right-8"
-        style={{
-          background: 'radial-gradient(circle, #f9a8d4 0%, #fbcfe8 100%)',
-        }}
-        animate={{ scale: [1, 1.06, 1], y: [0, -10, 0] }}
-        transition={{ duration: 7, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
-      />
+    <AuthShell>
 
       {/* ── Main registration card — horizontal rectangle: identity left, form right ── */}
       <motion.div
@@ -246,7 +176,7 @@ export default function Register() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 w-full max-w-[960px]
-                   bg-white rounded-lg shadow-2xl border border-white/80
+                   bg-surface-1 rounded-lg shadow-2xl border border-surface-1/80
                    overflow-hidden"
         style={{
           boxShadow:
@@ -255,40 +185,32 @@ export default function Register() {
       >
         {/* Card top accent bar */}
         <div
-          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg z-10"
-          style={{ background: ACCENT_BAR }}
+          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg z-10 bg-gradient-to-r from-primary-600 via-accent-clay-fg to-accent-sage-fg"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1.3fr] md:max-h-[820px]">
           {/* ── LEFT: identity / heading ── */}
-          <div className="px-6 py-8 sm:px-10 sm:py-10 md:py-12 md:border-r md:border-gray-100 flex flex-col justify-between">
+          <div className="px-6 py-8 sm:px-10 sm:py-10 md:py-12 md:border-r md:border-border-soft flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2.5 mb-8">
                 <BrandMark size={18} />
-                <span className="text-lg font-bold tracking-tight" style={{ ...DISPLAY, color: INK }}>
+                <span className="text-lg font-bold tracking-tight text-ink">
                   Stroke AI
                 </span>
               </div>
 
               <div className="mb-5">
-                <Link
-                  to="/landing"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#1a6fa8] transition-colors"
-                >
-                  <ArrowLeft size={14} />
-                  <span>Back to Home</span>
-                </Link>
               </div>
 
-              <h2 className="text-2xl md:text-[28px] font-bold tracking-tight" style={{ ...DISPLAY, color: INK }}>
+              <h2 className="text-2xl md:text-[28px] font-bold tracking-tight text-ink">
                 Create your account
               </h2>
-              <p className="mt-2 text-sm" style={{ color: MUTED }}>
+              <p className="mt-2 text-sm text-ink-muted">
                 Get started with your healthcare journey
               </p>
             </div>
 
-            <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 mt-10">
+            <div className="hidden md:flex items-center gap-2 text-xs text-ink-subtle mt-10">
               <Shield size={13} strokeWidth={2} />
               <span>Your data is encrypted and private</span>
             </div>
@@ -301,10 +223,10 @@ export default function Register() {
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-emerald-50 border border-emerald-200 rounded-md px-4 py-3 text-xs sm:text-sm text-emerald-800 flex items-center gap-2.5 mb-5 shadow-sm font-medium"
+                className="bg-success-bg border border-success-fg/25 rounded-md px-4 py-3 text-xs sm:text-sm text-success-fg flex items-center gap-2.5 mb-5 shadow-sm font-medium"
                 role="status"
               >
-                <Check size={16} className="text-emerald-600 flex-shrink-0" strokeWidth={2.5} />
+                <Check size={16} className="text-success-fg flex-shrink-0" strokeWidth={2.5} />
                 <span>{successBanner}</span>
               </motion.div>
             )}
@@ -314,7 +236,7 @@ export default function Register() {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="bg-red-50 border border-red-200 rounded-md px-4 py-3 text-xs sm:text-sm text-red-700 mb-5 font-medium"
+                className="bg-critical-bg border border-critical-fg/25 rounded-md px-4 py-3 text-xs sm:text-sm text-critical-fg mb-5 font-medium"
                 role="alert"
               >
                 {authError?.message || errors.global}
@@ -383,10 +305,10 @@ export default function Register() {
               {/* Mobile Number */}
               <motion.div custom={4} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-gray-700">
+                  <label className="text-xs sm:text-sm font-medium text-ink-muted">
                     Mobile number
                   </label>
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border" style={{ color: LINK, backgroundColor: '#eaf3f8', borderColor: '#cfe3ec' }}>
+                  <span className="text-2xs font-medium px-2 py-0.5 rounded-full border text-primary-700 bg-primary-50 border-primary-200">
                     India (+91)
                   </span>
                 </div>
@@ -394,13 +316,13 @@ export default function Register() {
                   <Phone
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
-                               transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none z-10"
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle
+                               transition-colors group-focus-within:text-primary-700 pointer-events-none z-10"
                   />
-                  <div className="absolute left-9 sm:left-10 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none z-10 text-xs sm:text-sm font-semibold text-gray-700">
+                  <div className="absolute left-9 sm:left-10 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none z-10 text-xs sm:text-sm font-semibold text-ink-muted">
                     <span>🇮🇳</span>
                     <span>+91</span>
-                    <span className="text-gray-300 font-normal">|</span>
+                    <span className="text-ink-subtle font-normal">|</span>
                   </div>
                   <input
                     type="tel"
@@ -411,20 +333,20 @@ export default function Register() {
                     inputMode="numeric"
                     maxLength={11}
                     autoComplete="tel-national"
-                    className={`w-full border bg-white rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-500
+                    className={`w-full border bg-surface-1 rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
+                               text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
-                               focus:bg-white transition-all duration-200 hover:border-gray-300
+                               focus:bg-surface-1 transition-all duration-200 hover:border-border
                                ${errors.phoneNumber
-                        ? 'border-red-300 focus:ring-red-400'
-                        : 'border-gray-200 focus:ring-[#1a6fa8]/35'
+                        ? 'border-critical-fg/40 focus:ring-critical-fg/40'
+                        : 'border-border-soft focus:ring-primary-700/35'
                       }`}
                   />
                 </div>
                 {errors.phoneNumber ? (
-                  <p className="mt-1 text-xs text-red-600">{errors.phoneNumber}</p>
+                  <p className="mt-1 text-xs text-critical-fg">{errors.phoneNumber}</p>
                 ) : (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-ink-subtle">
                     Enter your 10-digit Indian mobile number
                   </p>
                 )}
@@ -434,14 +356,14 @@ export default function Register() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-4.5">
               <motion.div custom={5} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-gray-700">Password</label>
+                  <label className="text-xs sm:text-sm font-medium text-ink-muted">Password</label>
                 </div>
                 <div className="relative group">
                   <Lock
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
-                               transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle
+                               transition-colors group-focus-within:text-primary-700 pointer-events-none"
                   />
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -450,20 +372,20 @@ export default function Register() {
                     onChange={handleChange}
                     placeholder="Min. 8 characters"
                     autoComplete="new-password"
-                    className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-500
+                    className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
+                               text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
-                               focus:bg-white transition-all duration-200 hover:border-gray-300
+                               focus:bg-surface-1 transition-all duration-200 hover:border-border
                                ${errors.password
-                        ? 'border-red-300 focus:ring-red-400'
-                        : 'border-gray-200 focus:ring-[#1a6fa8]/35'
+                        ? 'border-critical-fg/40 focus:ring-critical-fg/40'
+                        : 'border-border-soft focus:ring-primary-700/35'
                       }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -483,7 +405,7 @@ export default function Register() {
                           className="flex-1 h-1 rounded-full transition-all duration-300"
                           style={{
                             backgroundColor:
-                              strength.score >= level ? strength.color : '#E5E7EB',
+                              strength.score >= level ? strength.color : 'var(--color-surface-3)',
                           }}
                         />
                       ))}
@@ -494,14 +416,14 @@ export default function Register() {
                   </div>
                 )}
                 {errors.password && (
-                  <p className="mt-1 text-xs text-red-600">{errors.password}</p>
+                  <p className="mt-1 text-xs text-critical-fg">{errors.password}</p>
                 )}
               </motion.div>
 
               {/* Confirm Password */}
               <motion.div custom={6} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-gray-700">
+                  <label className="text-xs sm:text-sm font-medium text-ink-muted">
                     Confirm password
                   </label>
                 </div>
@@ -509,8 +431,8 @@ export default function Register() {
                   <Lock
                     size={16}
                     strokeWidth={2}
-                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
-                               transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
+                    className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle
+                               transition-colors group-focus-within:text-primary-700 pointer-events-none"
                   />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -519,20 +441,20 @@ export default function Register() {
                     onChange={handleChange}
                     placeholder="Repeat your password"
                     autoComplete="new-password"
-                    className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
-                               text-sm text-gray-900 placeholder:text-gray-500
+                    className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
+                               text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
-                               focus:bg-white transition-all duration-200 hover:border-gray-300
+                               focus:bg-surface-1 transition-all duration-200 hover:border-border
                                ${errors.confirmPassword
-                        ? 'border-red-300 focus:ring-red-400'
-                        : 'border-gray-200 focus:ring-[#1a6fa8]/35'
+                        ? 'border-critical-fg/40 focus:ring-critical-fg/40'
+                        : 'border-border-soft focus:ring-primary-700/35'
                       }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
                   >
                     {showConfirmPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -545,12 +467,12 @@ export default function Register() {
                     form.password === form.confirmPassword &&
                     !errors.confirmPassword && (
                       <div className="absolute right-11 top-1/2 -translate-y-1/2">
-                        <Check size={16} className="text-green-600" strokeWidth={2.5} />
+                        <Check size={16} className="text-success-fg" strokeWidth={2.5} />
                       </div>
                     )}
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>
+                  <p className="mt-1 text-xs text-critical-fg">{errors.confirmPassword}</p>
                 )}
               </motion.div>
               </div>
@@ -574,35 +496,37 @@ export default function Register() {
                     />
                     <div
                       className={`w-4.5 h-4.5 rounded flex items-center justify-center border-2 transition-all duration-200
-                                  ${form.agreed ? '' : 'bg-white border-gray-300 group-hover:border-[#1a6fa8]'}`}
-                      style={form.agreed ? { background: INK, borderColor: INK } : undefined}
+                                  ${form.agreed ? '' : 'bg-surface-1 border-border group-hover:border-primary-700'}`}
+                      style={
+                        form.agreed
+                          ? { background: 'var(--color-primary-600)', borderColor: 'var(--color-primary-600)' }
+                          : undefined
+                      }
                     >
                       {form.agreed && (
-                        <Check size={11} className="text-white" strokeWidth={3} />
+                        <Check size={11} className="text-on-primary" strokeWidth={3} />
                       )}
                     </div>
                   </div>
-                  <span className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                  <span className="text-xs sm:text-sm text-ink-muted leading-relaxed">
                     I agree to the{' '}
                     <Link
                       to="/terms"
-                      className="font-medium hover:underline transition-colors"
-                      style={{ color: LINK }}
+                      className="font-medium hover:underline transition-colors text-primary-700"
                     >
                       Terms of Service
                     </Link>{' '}
                     and{' '}
                     <Link
                       to="/privacy"
-                      className="font-medium hover:underline transition-colors"
-                      style={{ color: LINK }}
+                      className="font-medium hover:underline transition-colors text-primary-700"
                     >
                       Privacy Policy
                     </Link>
                   </span>
                 </label>
                 {errors.agreed && (
-                  <p className="text-xs text-red-600 pl-7">{errors.agreed}</p>
+                  <p className="text-xs text-critical-fg pl-7">{errors.agreed}</p>
                 )}
               </motion.div>
 
@@ -616,10 +540,10 @@ export default function Register() {
                 disabled={loading}
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
-                className="group relative w-full text-white px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-full
+                className="group relative w-full text-on-primary px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-full
                            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
                            flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:opacity-90 mt-1"
-                style={{ background: loading ? MUTED : INK }}
+                style={{ background: loading ? 'var(--color-ink-subtle)' : 'var(--color-primary-600)' }}
               >
                 {loading ? (
                   <Spinner />
@@ -642,21 +566,20 @@ export default function Register() {
               variants={fadeIn}
               initial="initial"
               animate="animate"
-              className="mt-4 lg:mt-5 text-center text-xs sm:text-sm text-gray-600"
+              className="mt-4 lg:mt-5 text-center text-xs sm:text-sm text-ink-muted"
             >
               Already have an account?{' '}
               <Link
                 to="/login"
-                className="font-semibold hover:opacity-80 transition-opacity"
-                style={{ color: LINK }}
+                className="font-semibold hover:opacity-80 transition-opacity text-primary-700"
               >
                 Sign in
               </Link>
             </motion.p>
 
             {/* Footer info — mobile only; desktop shows it in the left column */}
-            <div className="md:hidden mt-4 pt-4 border-t border-gray-100">
-              <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+            <div className="md:hidden mt-4 pt-4 border-t border-border-soft">
+              <div className="flex items-center justify-center gap-2 text-xs text-ink-subtle">
                 <Shield size={13} strokeWidth={2} />
                 <span>Your data is encrypted and private</span>
               </div>
@@ -664,7 +587,7 @@ export default function Register() {
           </div>
         </div>
       </motion.div>
-    </main>
+    </AuthShell>
   )
 }
 
@@ -681,30 +604,30 @@ function InputField({
   return (
     <motion.div custom={index} variants={fadeIn} initial="initial" animate="animate">
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-xs sm:text-sm font-medium text-gray-700">{label}</label>
+        <label className="text-xs sm:text-sm font-medium text-ink-muted">{label}</label>
         {action}
       </div>
       <div className="relative group">
         <Icon
           size={16}
           strokeWidth={2}
-          className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-gray-500
-                     transition-colors group-focus-within:text-[#1a6fa8] pointer-events-none"
+          className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle
+                     transition-colors group-focus-within:text-primary-700 pointer-events-none"
         />
         <input
           {...inputProps}
-          className={`w-full border bg-white rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
-                     text-sm text-gray-900 placeholder:text-gray-500
+          className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
+                     text-sm text-ink placeholder:text-ink-subtle
                      focus:outline-none focus:ring-2 focus:border-transparent
-                     focus:bg-white transition-all duration-200 hover:border-gray-300
+                     focus:bg-surface-1 transition-all duration-200 hover:border-border
                      ${error
-              ? 'border-red-300 focus:ring-red-400'
-              : 'border-gray-200 focus:ring-[#1a6fa8]/35'
+              ? 'border-critical-fg/40 focus:ring-critical-fg/40'
+              : 'border-border-soft focus:ring-primary-700/35'
             }`}
         />
         {rightElement}
       </div>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-critical-fg">{error}</p>}
     </motion.div>
   )
 }

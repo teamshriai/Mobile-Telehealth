@@ -120,13 +120,13 @@ export default function NotificationBell() {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="focus-ring tap-target relative rounded-lg text-[#475569] hover:bg-[#F1F5F9]"
+        className="focus-ring tap-target relative rounded-lg text-ink-muted hover:bg-surface-2"
       >
         <Bell size={19} aria-hidden="true" />
         {unread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#DC2626] px-1 text-[10px] font-bold leading-none text-white"
+            className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-on-primary"
           >
             {unread > 9 ? '9+' : unread}
           </span>
@@ -138,15 +138,15 @@ export default function NotificationBell() {
           ref={panelRef}
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-[calc(100%+6px)] z-30 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-[#E8EDF2] bg-white shadow-[0_4px_16px_0_rgba(15,23,42,0.08)]"
+          className="absolute right-0 top-[calc(100%+6px)] z-30 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-xl border border-border-soft bg-surface-1 shadow-[0_4px_16px_0_rgba(15,23,42,0.08)]"
         >
-          <div className="flex items-center justify-between border-b border-[#E8EDF2] px-3.5 py-3">
-            <p className="text-sm font-semibold text-[#0F172A]">Notifications</p>
+          <div className="flex items-center justify-between border-b border-border-soft px-3.5 py-3">
+            <p className="text-sm font-semibold text-ink">Notifications</p>
             {items && items.some((n) => !n.isRead) && (
               <button
                 type="button"
                 onClick={handleMarkAll}
-                className="focus-ring rounded px-1.5 py-1 text-xs font-medium text-[#2563EB] hover:underline"
+                className="focus-ring rounded px-1.5 py-1 text-xs font-medium text-primary-700 hover:underline"
               >
                 Mark all read
               </button>
@@ -174,25 +174,25 @@ export default function NotificationBell() {
                       <button
                         type="button"
                         onClick={() => handleItemClick(n)}
-                        className={`focus-ring flex w-full items-start gap-2.5 border-b border-[#F1F5F9] px-3.5 py-3 text-left transition-colors last:border-b-0 hover:bg-[#F8FAFC] ${
-                          !n.isRead ? 'bg-[#EFF6FF]/40' : ''
+                        className={`focus-ring flex w-full items-start gap-2.5 border-b border-border-soft px-3.5 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-2 ${
+                          !n.isRead ? 'bg-primary-50/40' : ''
                         }`}
                       >
-                        <Icon size={15} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-[#64748B]" />
+                        <Icon size={15} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-ink-subtle" />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-[#0F172A]">{n.title}</span>
+                            <span className="text-sm font-semibold text-ink">{n.title}</span>
                             {/* Unread is never colour-only — the word "New" carries it too. */}
                             {!n.isRead && (
-                              <span className="rounded-full bg-[#DBEAFE] px-1.5 py-0.5 text-[10px] font-bold text-[#1D4ED8]">
+                              <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">
                                 New
                               </span>
                             )}
                           </span>
                           {n.body && (
-                            <span className="mt-0.5 block text-sm leading-snug text-[#475569]">{n.body}</span>
+                            <span className="mt-0.5 block text-sm leading-snug text-ink-muted">{n.body}</span>
                           )}
-                          <span className="mt-1 block text-xs text-[#94A3B8]">{timeAgo(n.createdAt)}</span>
+                          <span className="mt-1 block text-xs text-ink-subtle">{timeAgo(n.createdAt)}</span>
                         </span>
                       </button>
                     </li>

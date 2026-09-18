@@ -28,20 +28,20 @@ function AppointmentCard({ appointment, onCancel, cancelling }) {
   })
 
   const STATUS_TONE = {
-    Requested: 'bg-[#FBF0E2] text-[#8A5A1B]',
-    Confirmed: 'bg-[#E6F0EE] text-[#2F6B5E]',
-    Completed: 'bg-[#F1F5F9] text-[#475569]',
-    Cancelled: 'bg-[#F1F5F9] text-[#64748B]',
-    NoShow: 'bg-[#FBEAE7] text-[#A33A28]',
+    Requested: 'bg-warning-bg text-warning-fg',
+    Confirmed: 'bg-success-bg text-success-fg',
+    Completed: 'bg-surface-2 text-ink-muted',
+    Cancelled: 'bg-surface-2 text-ink-subtle',
+    NoShow: 'bg-critical-bg text-critical-fg',
   }
 
   return (
-    <li className="rounded-xl border border-[#E8EDF2] bg-white p-4">
+    <li className="rounded-xl border border-border-soft bg-surface-1 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-[#0F172A]">
-              <Clock size={15} aria-hidden="true" className="text-[#64748B]" />
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+              <Clock size={15} aria-hidden="true" className="text-ink-subtle" />
               {when}
             </span>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_TONE[appointment.status] ?? STATUS_TONE.Requested}`}>
@@ -49,13 +49,13 @@ function AppointmentCard({ appointment, onCancel, cancelling }) {
             </span>
           </div>
 
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-[#475569]">
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
             <Icon size={14} aria-hidden="true" />
             {appointment.modeLabel}
           </p>
 
           {appointment.doctor && (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-[#475569]">
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
               <Stethoscope size={14} aria-hidden="true" />
               {appointment.doctor.name}
               {appointment.doctor.specialty && ` — ${appointment.doctor.specialty}`}
@@ -63,19 +63,19 @@ function AppointmentCard({ appointment, onCancel, cancelling }) {
           )}
 
           {appointment.reason && (
-            <p className="mt-2 text-sm leading-relaxed text-[#0F172A]">{appointment.reason}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink">{appointment.reason}</p>
           )}
 
           {/* Honest state: no video provider is integrated, so no Join button
               is ever shown — only what a patient can actually rely on. */}
           {appointment.isVideo && !appointment.cancelledAt && (
-            <p className="mt-2 text-xs italic text-[#64748B]">
+            <p className="mt-2 text-xs italic text-ink-subtle">
               The joining link will appear here closer to the appointment time.
             </p>
           )}
 
           {appointment.cancelReason && (
-            <p className="mt-2 text-xs text-[#64748B]">Reason for cancellation: {appointment.cancelReason}</p>
+            <p className="mt-2 text-xs text-ink-subtle">Reason for cancellation: {appointment.cancelReason}</p>
           )}
         </div>
 
@@ -84,7 +84,7 @@ function AppointmentCard({ appointment, onCancel, cancelling }) {
             type="button"
             onClick={() => onCancel(appointment)}
             disabled={cancelling}
-            className="focus-ring tap-target inline-flex flex-shrink-0 items-center gap-1.5 self-start rounded-lg border border-[#E8EDF2] px-3 text-sm font-medium text-[#475569] transition-colors hover:border-[#F0C8C0] hover:bg-[#FBEAE7] hover:text-[#A33A28] disabled:opacity-50 sm:self-auto"
+            className="focus-ring tap-target inline-flex flex-shrink-0 items-center gap-1.5 self-start rounded-lg border border-border-soft px-3 text-sm font-medium text-ink-muted transition-colors hover:border-critical-fg/30 hover:bg-critical-bg hover:text-critical-fg disabled:opacity-50 sm:self-auto"
           >
             <X size={14} aria-hidden="true" />
             {cancelling ? 'Cancelling…' : 'Cancel'}
@@ -115,9 +115,9 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
   const todayStr = new Date().toISOString().slice(0, 10)
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-      <h2 className="text-base font-semibold text-[#0F172A]">Request an appointment</h2>
-      <p className="mt-1 text-sm text-[#475569]">
+    <form onSubmit={handleSubmit} className="rounded-xl border border-border-soft bg-surface-1 p-5">
+      <h2 className="text-base font-semibold text-ink">Request an appointment</h2>
+      <p className="mt-1 text-sm text-ink-muted">
         Your care team will confirm the exact time. This is a request, not a booking.
       </p>
 
@@ -127,14 +127,14 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="appt-doctor" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
-            Clinician <span className="font-normal text-[#64748B]">(optional)</span>
+          <label htmlFor="appt-doctor" className="mb-1.5 block text-sm font-medium text-ink">
+            Clinician <span className="font-normal text-ink-subtle">(optional)</span>
           </label>
           <select
             id="appt-doctor"
             value={doctorId}
             onChange={(e) => setDoctorId(e.target.value)}
-            className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           >
             <option value="">No preference — care team will assign</option>
             {doctors.map((d) => (
@@ -144,14 +144,14 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
         </div>
 
         <div>
-          <label htmlFor="appt-mode" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
+          <label htmlFor="appt-mode" className="mb-1.5 block text-sm font-medium text-ink">
             How would you like to meet?
           </label>
           <select
             id="appt-mode"
             value={mode}
             onChange={(e) => setMode(e.target.value)}
-            className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           >
             <option value="InPerson">In person</option>
             <option value="Video">Video consultation</option>
@@ -160,7 +160,7 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
         </div>
 
         <div>
-          <label htmlFor="appt-date" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
+          <label htmlFor="appt-date" className="mb-1.5 block text-sm font-medium text-ink">
             Preferred date
           </label>
           <input
@@ -170,12 +170,12 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
             min={todayStr}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           />
         </div>
 
         <div>
-          <label htmlFor="appt-time" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
+          <label htmlFor="appt-time" className="mb-1.5 block text-sm font-medium text-ink">
             Preferred time
           </label>
           <input
@@ -184,12 +184,12 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
             required
             value={time}
             onChange={(e) => setTime(e.target.value)}
-            className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           />
         </div>
 
         <div className="sm:col-span-2">
-          <label htmlFor="appt-reason" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
+          <label htmlFor="appt-reason" className="mb-1.5 block text-sm font-medium text-ink">
             Reason for visit
           </label>
           <textarea
@@ -200,7 +200,7 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Follow-up on speech therapy progress"
-            className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           />
         </div>
       </div>
@@ -209,14 +209,14 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }) {
         <button
           type="button"
           onClick={onClose}
-          className="focus-ring tap-target rounded-lg border border-[#CBD5E1] px-4 text-sm font-semibold text-[#475569] hover:bg-[#F1F5F9]"
+          className="focus-ring tap-target rounded-lg border border-border px-4 text-sm font-semibold text-ink-muted hover:bg-surface-2"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="focus-ring tap-target rounded-lg bg-[#2563EB] px-4 text-sm font-semibold text-white hover:bg-[#1D4ED8] disabled:opacity-60"
+          className="focus-ring tap-target rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary hover:bg-primary-700 disabled:opacity-60"
         >
           {submitting ? 'Sending request…' : 'Send request'}
         </button>
@@ -302,13 +302,13 @@ export default function AppointmentsPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">Appointments</h1>
-          <p className="mt-1.5 text-sm text-[#475569]">Your visits and video consultations.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Appointments</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">Your visits and video consultations.</p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-4 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
+          className="focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary hover:bg-primary-700"
         >
           <Plus size={16} aria-hidden="true" />
           {showForm ? 'Close' : 'Request appointment'}
@@ -325,7 +325,7 @@ export default function AppointmentsPage() {
         />
       )}
 
-      <div className="flex gap-1 border-b border-[#E8EDF2]" role="tablist" aria-label="Appointment period">
+      <div className="flex gap-1 border-b border-border-soft" role="tablist" aria-label="Appointment period">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -334,8 +334,8 @@ export default function AppointmentsPage() {
             onClick={() => setScope(tab.key)}
             className={`focus-ring -mb-px min-h-11 border-b-2 px-3 text-sm font-medium transition-colors ${
               scope === tab.key
-                ? 'border-[#2563EB] text-[#2563EB]'
-                : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
+                ? 'border-primary-600 text-primary-700'
+                : 'border-transparent text-ink-subtle hover:text-ink'
             }`}
           >
             {tab.label}
@@ -357,7 +357,7 @@ export default function AppointmentsPage() {
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                className="focus-ring tap-target rounded-lg bg-[#2563EB] px-4 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
+                className="focus-ring tap-target rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary hover:bg-primary-700"
               >
                 Request your first appointment
               </button>

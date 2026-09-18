@@ -10,8 +10,8 @@ export default function ProgressRing({
   max        = 100,
   size       = 80,
   strokeWidth = 6,
-  color      = '#2563EB',
-  trackColor = '#E8EDF2',
+  color      = 'var(--color-primary-600)',
+  trackColor = 'var(--color-surface-3)',
   label,
   sublabel,
   animate    = true,
@@ -72,17 +72,17 @@ export default function ProgressRing({
       {(showValue || label) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {showValue && (
-            <span className={`font-bold text-[#0F172A] leading-none ${fontSize}`}>
+            <span className={`font-bold text-ink leading-none ${fontSize}`}>
               {Math.round(value)}
             </span>
           )}
           {label && (
-            <span className="text-[10px] text-[#64748B] font-medium mt-0.5 leading-none">
+            <span className="text-[10px] text-ink-subtle font-medium mt-0.5 leading-none">
               {label}
             </span>
           )}
           {sublabel && (
-            <span className="text-[9px] text-[#64748B] mt-0.5">
+            <span className="text-[9px] text-ink-subtle mt-0.5">
               {sublabel}
             </span>
           )}

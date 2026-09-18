@@ -127,6 +127,23 @@ export const profileRepository = {
    * are responsible for merging categories into the existing value first,
    * since this is a plain replace, not a deep merge at the DB level.
    */
+  /**
+   * The preferences JSON only. `preferences` is an unencrypted column, so this
+   * skips both the ~50-column row fetch and the ~20 AES-GCM decrypts that
+   * findByUserId pays — which matters because every preference save is a
+   * read-modify-write, and the theme switch is a preference save.
+   *
+   * Returns `undefined` when there is no profile at all, which the service
+   * distinguishes from a profile whose preferences are null.
+   */
+  async findPreferencesByUserId(userId: string): Promise<Prisma.JsonValue | null | undefined> {
+    const row = await prisma.patientProfile.findUnique({
+      where: { userId },
+      select: { preferences: true },
+    });
+    return row === null ? undefined : row.preferences;
+  },
+
   async updatePreferences(
     userId: string,
     preferences: Prisma.InputJsonValue,

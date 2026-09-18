@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Shield } from 'lucide-react'
 import apiClient from '../../lib/apiClient'
 import BrandMark from '../common/BrandMark.jsx'
+import AuthShell from './AuthShell.jsx'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -15,29 +16,6 @@ const fadeIn = {
 }
 
 /* ─── Dot-grid SVG background ─── */
-function DotGrid() {
-  return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <pattern
-          id="dots-fp"
-          x="0"
-          y="0"
-          width="24"
-          height="24"
-          patternUnits="userSpaceOnUse"
-        >
-          <circle cx="1.5" cy="1.5" r="1.2" fill="#b0bec5" fillOpacity="0.55" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#dots-fp)" />
-    </svg>
-  )
-}
-
 /* ─── Spinner ─── */
 function Spinner() {
   return (
@@ -100,44 +78,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <main
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden font-sans p-4"
-      style={{ background: '#f0f4f8' }}
-    >
-      {/* ── Dot-grid background ── */}
-      <DotGrid />
-
-      {/* ── Gradient blobs (identical palette to Login) ── */}
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-50 pointer-events-none
-                   w-72 h-72 sm:w-96 sm:h-96 lg:w-[460px] lg:h-[460px]
-                   -top-24 -left-24"
-        style={{ background: 'radial-gradient(circle, #a78bfa 0%, #818cf8 40%, #6366f1 100%)' }}
-        animate={{ scale: [1, 1.1, 1], x: [0, 12, 0], y: [0, -8, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-45 pointer-events-none
-                   w-56 h-56 sm:w-72 sm:h-72 lg:w-[380px] lg:h-[380px]
-                   -bottom-16 -right-16"
-        style={{ background: 'radial-gradient(circle, #2dd4bf 0%, #38bdf8 50%, #6366f1 100%)' }}
-        animate={{ scale: [1, 1.15, 1], x: [0, -14, 0], y: [0, 10, 0] }}
-        transition={{ duration: 10, delay: 1, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-30 pointer-events-none
-                   w-40 h-40 sm:w-56 sm:h-56 lg:w-72 lg:h-72 top-1/2 -right-10"
-        style={{ background: 'radial-gradient(circle, #f9a8d4 0%, #fbcfe8 100%)' }}
-        animate={{ scale: [1, 1.08, 1], y: [0, -12, 0] }}
-        transition={{ duration: 7, delay: 2, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      <motion.div
-        className="absolute rounded-full blur-3xl opacity-25 pointer-events-none
-                   w-36 h-36 sm:w-48 sm:h-48 bottom-10 left-10"
-        style={{ background: 'radial-gradient(circle, #86efac 0%, #34d399 100%)' }}
-        animate={{ scale: [1, 1.12, 1], x: [0, 10, 0] }}
-        transition={{ duration: 8, delay: 3, repeat: Infinity, ease: 'easeInOut' }}
-      />
+    <AuthShell>
 
       {/* ── Main card ── */}
       <motion.div
@@ -145,7 +86,7 @@ export default function ForgotPassword() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 w-full max-w-[1000px]
-                   bg-white rounded-xl shadow-2xl border border-white/80
+                   bg-surface-1 rounded-xl shadow-2xl border border-surface-1/80
                    overflow-hidden"
         style={{
           boxShadow: '0 8px 40px 0 rgba(99,102,241,0.10), 0 2px 8px 0 rgba(0,0,0,0.06)',
@@ -154,7 +95,7 @@ export default function ForgotPassword() {
         {/* Top accent bar */}
         <div
           className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
-          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #38bdf8 50%, #2dd4bf 100%)' }}
+          style={{ background: 'linear-gradient(90deg, var(--color-primary-600) 0%, var(--color-accent-sky-fg) 50%, var(--color-accent-teal-fg) 100%)' }}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
@@ -162,7 +103,7 @@ export default function ForgotPassword() {
           <div
             className="relative px-8 py-10 sm:px-12 sm:py-14 lg:px-14 lg:py-16
                         flex flex-col justify-between overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%)' }}
+            style={{ background: 'linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-700) 50%, var(--color-primary-800) 100%)' }}
           >
             {/* Decorative overlay */}
             <div
@@ -178,15 +119,15 @@ export default function ForgotPassword() {
                 <div className="shadow-lg rounded-xl">
                   <BrandMark size={26} />
                 </div>
-                <span className="text-2xl font-bold tracking-tight text-white">Stroke AI</span>
+                <span className="text-2xl font-bold tracking-tight text-on-primary">Stroke AI</span>
               </div>
 
               {/* Content */}
               <div className="space-y-6">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-on-primary leading-tight">
                   Account Recovery
                 </h1>
-                <p className="text-lg text-indigo-100 leading-relaxed">
+                <p className="text-lg text-on-primary/90 leading-relaxed">
                   Reset your password securely. We'll send a one-time link to your registered email.
                 </p>
 
@@ -205,10 +146,10 @@ export default function ForgotPassword() {
                       transition={{ delay: 0.6 + i * 0.1, duration: 0.4 }}
                       className="flex items-center gap-3"
                     >
-                      <div className="w-6 h-6 rounded-full bg-white/20 border border-white/30 flex items-center justify-center flex-shrink-0">
-                        <Shield size={13} className="text-white" strokeWidth={2.5} />
+                      <div className="w-6 h-6 rounded-full bg-surface-1/20 border border-surface-1/30 flex items-center justify-center flex-shrink-0">
+                        <Shield size={13} className="text-on-primary" strokeWidth={2.5} />
                       </div>
-                      <p className="text-indigo-100 text-sm">{item}</p>
+                      <p className="text-on-primary/90 text-sm">{item}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -216,7 +157,7 @@ export default function ForgotPassword() {
             </div>
 
             <div className="relative z-10">
-              <p className="text-indigo-200 text-xs">
+              <p className="text-on-primary/75 text-xs">
                 Encrypted, private account recovery
               </p>
             </div>
@@ -241,28 +182,28 @@ export default function ForgotPassword() {
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
                       className="w-20 h-20 rounded-full flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, #d1fae5, #a7f3d0)' }}
+                      style={{ background: 'linear-gradient(135deg, var(--color-success-bg), var(--color-success-bg))' }}
                     >
-                      <CheckCircle size={40} className="text-emerald-600" strokeWidth={1.5} />
+                      <CheckCircle size={40} className="text-success-fg" strokeWidth={1.5} />
                     </motion.div>
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
                       Check your inbox
                     </h2>
-                    <p className="text-sm text-gray-500 leading-relaxed max-w-xs mx-auto">
-                      If <span className="font-medium text-gray-700">{email}</span> is registered,
+                    <p className="text-sm text-ink-subtle leading-relaxed max-w-xs mx-auto">
+                      If <span className="font-medium text-ink-muted">{email}</span> is registered,
                       you'll receive a password reset link shortly.
                     </p>
                   </div>
 
                   <div
-                    className="rounded-xl px-5 py-4 text-sm text-indigo-700 border border-indigo-100"
-                    style={{ background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)' }}
+                    className="rounded-xl px-5 py-4 text-sm text-primary-700 border border-primary-200"
+                    style={{ background: 'linear-gradient(135deg, var(--color-primary-50), var(--color-primary-100))' }}
                   >
                     <p className="font-medium mb-1">Didn't receive the email?</p>
-                    <ul className="text-indigo-600 text-xs space-y-1 list-disc list-inside text-left">
+                    <ul className="text-primary-700 text-xs space-y-1 list-disc list-inside text-left">
                       <li>Check your spam or junk folder</li>
                       <li>Ensure you used the correct email</li>
                       <li>Wait up to 2 minutes for delivery</li>
@@ -272,16 +213,16 @@ export default function ForgotPassword() {
                   <div className="space-y-3">
                     <button
                       onClick={() => { setSubmitted(false); setEmail(''); setError('') }}
-                      className="w-full text-sm font-medium text-indigo-600 hover:text-indigo-800
-                                 transition-colors py-2 rounded-xl border border-indigo-200
-                                 hover:border-indigo-400 hover:bg-indigo-50"
+                      className="w-full text-sm font-medium text-primary-700 hover:text-primary-800
+                                 transition-colors py-2 rounded-xl border border-primary-200
+                                 hover:border-primary-500 hover:bg-primary-50"
                     >
                       Try a different email
                     </button>
                     <Link
                       to="/login"
                       className="flex items-center justify-center gap-2 w-full text-sm
-                                 text-gray-500 hover:text-gray-700 transition-colors"
+                                 text-ink-subtle hover:text-ink-muted transition-colors"
                     >
                       <ArrowLeft size={15} strokeWidth={2} />
                       Back to sign in
@@ -299,10 +240,10 @@ export default function ForgotPassword() {
                 >
                   {/* Heading */}
                   <div className="mb-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 leading-tight">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink leading-tight">
                       Forgot password?
                     </h2>
-                    <p className="mt-2 text-sm text-gray-500">
+                    <p className="mt-2 text-sm text-ink-subtle">
                       Enter your email and we'll send you a reset link
                     </p>
                   </div>
@@ -311,15 +252,15 @@ export default function ForgotPassword() {
                   <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                     {/* Email field */}
                     <motion.div custom={0} variants={fadeIn} initial="initial" animate="animate">
-                      <label className="block text-sm font-medium text-gray-800 mb-1.5">
+                      <label className="block text-sm font-medium text-ink mb-1.5">
                         Email address
                       </label>
                       <div className="relative group">
                         <Mail
                           size={17}
                           strokeWidth={2}
-                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500
-                                     transition-colors group-focus-within:text-indigo-500 pointer-events-none"
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle
+                                     transition-colors group-focus-within:text-primary-600 pointer-events-none"
                         />
                         <input
                           id="forgot-email"
@@ -329,13 +270,13 @@ export default function ForgotPassword() {
                           onChange={(e) => { setEmail(e.target.value); if (error) setError('') }}
                           autoComplete="email"
                           placeholder="you@example.com"
-                          className={`w-full border bg-gray-50 rounded-xl pl-11 pr-4 py-3
-                                     text-sm text-gray-900 placeholder:text-gray-500
+                          className={`w-full border bg-surface-2 rounded-xl pl-11 pr-4 py-3
+                                     text-sm text-ink placeholder:text-ink-subtle
                                      focus:outline-none focus:ring-2 focus:border-transparent
-                                     focus:bg-white transition-all duration-200
+                                     focus:bg-surface-1 transition-all duration-200
                                      ${error
-                                       ? 'border-red-300 focus:ring-red-400'
-                                       : 'border-gray-200 focus:ring-indigo-400'
+                                       ? 'border-critical-fg/40 focus:ring-critical-fg/40'
+                                       : 'border-border-soft focus:ring-primary-600/40'
                                      }`}
                           aria-describedby={error ? 'email-error' : undefined}
                           aria-invalid={!!error}
@@ -348,7 +289,7 @@ export default function ForgotPassword() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="mt-2 flex items-center gap-1.5 text-xs text-red-600"
+                            className="mt-2 flex items-center gap-1.5 text-xs text-critical-fg"
                             role="alert"
                           >
                             <AlertCircle size={13} strokeWidth={2} />
@@ -369,13 +310,13 @@ export default function ForgotPassword() {
                       disabled={loading}
                       whileHover={{ scale: loading ? 1 : 1.015 }}
                       whileTap={{ scale: loading ? 1 : 0.985 }}
-                      className="group relative w-full text-white px-4 py-3.5 text-sm font-semibold rounded-xl
+                      className="group relative w-full text-on-primary px-4 py-3.5 text-sm font-semibold rounded-xl
                                  transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
                                  flex items-center justify-center gap-2 shadow-md"
                       style={{
                         background: loading
-                          ? '#818cf8'
-                          : 'linear-gradient(90deg, #6366f1 0%, #38bdf8 100%)',
+                          ? 'var(--color-primary-500)'
+                          : 'linear-gradient(90deg, var(--color-primary-600) 0%, var(--color-accent-sky-fg) 100%)',
                       }}
                     >
                       {loading ? (
@@ -395,9 +336,9 @@ export default function ForgotPassword() {
 
                   {/* Divider */}
                   <div className="flex items-center gap-3 my-6">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-gray-500 font-medium">or</span>
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="flex-1 h-px bg-border-soft" />
+                    <span className="text-xs text-ink-subtle font-medium">or</span>
+                    <div className="flex-1 h-px bg-border-soft" />
                   </div>
 
                   {/* Back to login */}
@@ -411,8 +352,8 @@ export default function ForgotPassword() {
                     <Link
                       to="/login"
                       id="back-to-login"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500
-                                 hover:text-indigo-600 transition-colors"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-ink-subtle
+                                 hover:text-primary-700 transition-colors"
                     >
                       <ArrowLeft size={15} strokeWidth={2} />
                       Back to sign in
@@ -424,12 +365,12 @@ export default function ForgotPassword() {
                     variants={fadeIn}
                     initial="initial"
                     animate="animate"
-                    className="mt-6 text-center text-sm text-gray-500"
+                    className="mt-6 text-center text-sm text-ink-subtle"
                   >
                     Don&apos;t have an account?{' '}
                     <Link
                       to="/register"
-                      className="font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                      className="font-semibold text-primary-700 hover:text-primary-800 transition-colors"
                     >
                       Create account
                     </Link>
@@ -440,6 +381,6 @@ export default function ForgotPassword() {
           </div>
         </div>
       </motion.div>
-    </main>
+    </AuthShell>
   )
 }

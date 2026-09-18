@@ -142,6 +142,15 @@ export const preferencesSchema = z
       })
       .partial()
       .optional(),
+    // Display theme. Applied from localStorage first so it works on the
+    // sign-in page (where there is no session yet); stored here purely so the
+    // choice follows the patient to another device.
+    appearance: z
+      .object({
+        theme: z.enum(['light', 'dark', 'system']).optional(),
+      })
+      .partial()
+      .optional(),
   })
   .strict();
 

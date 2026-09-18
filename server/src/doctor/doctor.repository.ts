@@ -24,6 +24,9 @@ const PUBLIC_SELECT = {
 
 export type PublicDoctor = Prisma.DoctorProfileGetPayload<{ select: typeof PUBLIC_SELECT }>;
 
+/** Ceiling on the bookable-clinician directory. */
+const MAX_BOOKABLE = 200;
+
 export const doctorRepository = {
   /**
    * Only verified, non-deleted clinicians appear. An unverified DoctorProfile
@@ -34,6 +37,10 @@ export const doctorRepository = {
       where: { deletedAt: null, isVerified: true },
       select: PUBLIC_SELECT,
       orderBy: [{ specialty: 'asc' }, { lastName: 'asc' }],
+      // The directory is rendered as a single picker, so it was unbounded by
+      // omission rather than by intent. The partial index added in
+      // 20260917090000_query_performance_indexes covers the predicate.
+      take: MAX_BOOKABLE,
     });
   },
 };

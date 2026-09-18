@@ -15,6 +15,8 @@ import { authenticate } from '../middleware/authenticate';
 import {
   authLimiter,
   authSlowDown,
+  loginLimiter,
+  loginSlowDown,
   refreshLimiter,
   forgotPasswordLimiter,
   verifyTokenLimiter,
@@ -32,7 +34,7 @@ const router = Router();
 
 // ── Public ────────────────────────────────────────────────────────────────────
 router.post('/register', authSlowDown, authLimiter, register);
-router.post('/login', authSlowDown, authLimiter, login);
+router.post('/login', loginSlowDown, loginLimiter, login);
 
 // Refresh is public — the caller has no valid access token by definition.
 // Authentication comes from the httpOnly refresh cookie. Rate-limited because

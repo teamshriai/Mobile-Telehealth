@@ -27,7 +27,7 @@ import Card from '../components/common/Card.jsx'
 import Button from '../components/common/Button.jsx'
 import Avatar from '../components/common/Avatar.jsx'
 import Modal from '../components/common/Modal.jsx'
-import { useTheme } from '../hooks/useTheme.js'
+import { useTheme } from '../app/ThemeContext.jsx'
 import * as authService from '../services/auth.service.js'
 import * as profileService from '../services/profile.service.js'
 import { useAuth } from '../app/AuthContext.jsx'
@@ -104,7 +104,7 @@ export default function Settings() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div role="status" className="flex items-center gap-2.5 text-sm text-[#64748B]">
+        <div role="status" className="flex items-center gap-2.5 text-sm text-ink-subtle">
           <Loader2 size={18} className="animate-spin" />
           Loading settings…
         </div>
@@ -185,8 +185,8 @@ function SideNavItem({ section, isActive, onClick }) {
         focus-ring group flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5
         text-left transition-colors duration-200
         ${isActive
-          ? 'bg-[#EFF6FF] text-[#2563EB]'
-          : 'text-[#64748B] hover:bg-[#F8FAFC] hover:text-[#0F172A]'
+          ? 'bg-primary-50 text-primary-700'
+          : 'text-ink-subtle hover:bg-surface-2 hover:text-ink'
         }
       `}
     >
@@ -194,19 +194,19 @@ function SideNavItem({ section, isActive, onClick }) {
         className={`
           w-8 h-8 rounded-lg flex items-center justify-center transition-colors
           ${isActive
-            ? 'bg-[#DBEAFE]'
-            : 'bg-[#F1F5F9] group-hover:bg-[#E8EDF2]'
+            ? 'bg-primary-100'
+            : 'bg-surface-2 group-hover:bg-surface-3'
           }
         `}
       >
         <Icon
           size={15}
-          className={isActive ? 'text-[#2563EB]' : 'text-[#64748B]'}
+          className={isActive ? 'text-primary-700' : 'text-ink-subtle'}
         />
       </div>
       <span className="text-sm font-medium">{label}</span>
       {isActive && (
-        <ChevronRight size={13} className="ml-auto text-[#2563EB]" />
+        <ChevronRight size={13} className="ml-auto text-primary-700" />
       )}
     </button>
   )
@@ -225,14 +225,14 @@ function ToggleSwitch({ enabled, onToggle, label }) {
       aria-label={label}
       className={`
         focus-ring tap-target relative w-11 rounded-full transition-colors duration-300 flex-shrink-0
-        ${enabled ? 'bg-[#2563EB]' : 'bg-[#E8EDF2]'}
+        ${enabled ? 'bg-primary-600' : 'bg-surface-3'}
       `}
       style={{ height: '1.5rem' }}
     >
       <motion.div
         animate={{ x: enabled ? 20 : 2 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+        className="absolute top-1 w-4 h-4 bg-surface-1 rounded-full shadow-sm"
       />
     </motion.button>
   )
@@ -241,13 +241,23 @@ function ToggleSwitch({ enabled, onToggle, label }) {
 /* ─────────────────────────────────────────────
    SETTINGS ROW
 ───────────────────────────────────────────── */
+/* Token class pairs rather than inline hex, so the row icons follow the
+   theme. `tone` replaced the old iconBg/iconColor prop pair: two free-form
+   colour strings per call site was how the saturated one-off greens and
+   ambers got in here in the first place. */
+const ROW_TONES = {
+  muted:   'bg-surface-2 text-ink-subtle',
+  primary: 'bg-primary-50 text-primary-700',
+  success: 'bg-success-bg text-success-fg',
+  warning: 'bg-warning-bg text-warning-fg',
+}
+
 function SettingsRow({
   icon: Icon,
   label,
   sub,
   control,
-  iconBg    = '#F1F5F9',
-  iconColor = '#64748B',
+  tone = 'muted',
 }) {
   // The row's own label doubles as the accessible name for a ToggleSwitch
   // control — every ToggleSwitch in this file is used exactly this way, so
@@ -256,18 +266,19 @@ function SettingsRow({
     control?.type === ToggleSwitch ? { ...control, props: { ...control.props, label } } : control
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#F1F5F9] py-4 last:border-0">
+    <div className="flex items-center justify-between gap-4 border-b border-border-soft py-4 last:border-0">
       <div className="flex min-w-0 items-center gap-3">
         <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
-          style={{ backgroundColor: iconBg }}
+          className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${
+            ROW_TONES[tone] ?? ROW_TONES.muted
+          }`}
         >
-          <Icon size={15} style={{ color: iconColor }} />
+          <Icon size={15} aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#0F172A]">{label}</p>
+          <p className="text-sm font-semibold text-ink">{label}</p>
           {sub && (
-            <p className="mt-0.5 truncate text-xs text-[#64748B]">{sub}</p>
+            <p className="mt-0.5 truncate text-xs text-ink-subtle">{sub}</p>
           )}
         </div>
       </div>
@@ -291,7 +302,7 @@ function SettingsInput({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-[#0F172A]">
+      <label className="block text-sm font-medium text-ink">
         {label}
       </label>
       <input
@@ -301,15 +312,15 @@ function SettingsInput({
         onChange={onChange}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full px-4 py-3 rounded-lg border bg-white text-sm text-[#0F172A]
-                   placeholder-[#64748B] focus:outline-none focus:ring-4
-                   hover:border-[#94A3B8] transition-all duration-200 disabled:opacity-60
+        className={`w-full px-4 py-3 rounded-lg border bg-surface-1 text-sm text-ink
+                   placeholder-ink-subtle focus:outline-none focus:ring-4
+                   hover:border-border-strong transition-all duration-200 disabled:opacity-60
                    ${error
-                     ? 'border-[#F0C8C0] focus:border-[#A33A28] focus:ring-[#A33A28]/10'
-                     : 'border-[#E8EDF2] focus:border-[#2563EB] focus:ring-[#2563EB]/10'
+                     ? 'border-critical-fg/30 focus:border-critical-fg focus:ring-critical-fg/10'
+                     : 'border-border-soft focus:border-primary-600 focus:ring-primary-600/10'
                    }`}
       />
-      {error && <p role="alert" className="text-xs text-[#A33A28]">{error}</p>}
+      {error && <p role="alert" className="text-xs text-critical-fg">{error}</p>}
     </div>
   )
 }
@@ -334,13 +345,13 @@ function ProfileSection({ storedUser, profile }) {
         <div className="flex items-center gap-5">
           <Avatar name={fullName || 'Patient'} size="xl" rounded="xl" />
           <div className="flex-1 min-w-0">
-            <p className="text-base font-bold text-[#0F172A] truncate">{fullName || 'Patient'}</p>
+            <p className="text-base font-bold text-ink truncate">{fullName || 'Patient'}</p>
             <div className="mt-2 space-y-1">
-              <div className="flex items-center gap-2 text-xs text-[#64748B]">
+              <div className="flex items-center gap-2 text-xs text-ink-subtle">
                 <Mail size={12} />
                 <span className="truncate">{storedUser?.email || '—'}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[#64748B]">
+              <div className="flex items-center gap-2 text-xs text-ink-subtle">
                 <Phone size={12} className="flex-shrink-0" />
                 <span className="truncate">{profile?.phoneNumber || 'Not provided'}</span>
               </div>
@@ -352,9 +363,9 @@ function ProfileSection({ storedUser, profile }) {
         </div>
       </Card>
 
-      <p className="text-xs text-[#64748B]">
+      <p className="text-xs text-ink-subtle">
         Personal, identification, and address details are managed on the{' '}
-        <button onClick={() => navigate('/app/profile')} className="font-medium text-[#2563EB] hover:underline">
+        <button onClick={() => navigate('/app/profile')} className="font-medium text-primary-700 hover:underline">
           Profile
         </button>{' '}
         page — everything you enter there is stored encrypted.
@@ -430,10 +441,10 @@ function SecuritySection() {
       />
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-5">Change Password</p>
+        <p className="text-sm font-bold text-ink mb-5">Change Password</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           {globalError && (
-            <div className="rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] px-3.5 py-2.5 text-sm text-[#A33A28]" role="alert">
+            <div className="rounded-lg border border-critical-fg/30 bg-critical-bg px-3.5 py-2.5 text-sm text-critical-fg" role="alert">
               {globalError}
             </div>
           )}
@@ -477,7 +488,7 @@ function SecuritySection() {
               {saving ? 'Updating…' : 'Update Password'}
             </Button>
           </div>
-          <p className="text-xs text-[#64748B]">
+          <p className="text-xs text-ink-subtle">
             Changing your password signs you out of this session — you'll need to sign in again.
           </p>
         </form>
@@ -485,8 +496,8 @@ function SecuritySection() {
 
       <Card variant="ghost" padding="md">
         <div className="flex items-start gap-3">
-          <Shield size={16} className="text-[#64748B] flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-[#64748B] leading-relaxed">
+          <Shield size={16} className="text-ink-subtle flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-ink-subtle leading-relaxed">
             Two-factor authentication and active-session management are planned for a
             future update — they aren't implemented yet, so they're not shown here rather
             than presenting a control that wouldn't actually do anything.
@@ -518,41 +529,41 @@ function NotificationsSection({ storedUser, profile, onSave }) {
       />
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Clinical Alerts</p>
+        <p className="text-sm font-bold text-ink mb-1">Clinical Alerts</p>
         <SettingsRow icon={Calendar} label="Appointment Reminders" sub="24h and 2h before appointments"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.apptReminders} onToggle={() => toggle('apptReminders')} />} />
         <SettingsRow icon={Bell} label="Lab Results Available" sub="When new results are ready to view"
-          iconBg="#DCFCE7" iconColor="#16A34A"
+          tone="success"
           control={<ToggleSwitch enabled={settings.labResults} onToggle={() => toggle('labResults')} />} />
         <SettingsRow icon={Bell} label="AI Insights Generated" sub="When new AI recommendations are ready"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.aiInsights} onToggle={() => toggle('aiInsights')} />} />
         <SettingsRow icon={Bell} label="Report Reviews" sub="When a physician reviews your report"
-          iconBg="#FEF3C7" iconColor="#D97706"
+          tone="warning"
           control={<ToggleSwitch enabled={settings.reportReviews} onToggle={() => toggle('reportReviews')} />} />
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Delivery Channels</p>
+        <p className="text-sm font-bold text-ink mb-1">Delivery Channels</p>
         <SettingsRow icon={Mail} label="Email Notifications" sub={storedUser?.email ? `Sent to ${storedUser.email}` : undefined}
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.emailNotifs} onToggle={() => toggle('emailNotifs')} />} />
         <SettingsRow icon={Phone} label="SMS Notifications" sub={profile?.phoneNumber ? `Sent to ${profile.phoneNumber}` : 'No mobile number on file'}
-          iconBg="#DCFCE7" iconColor="#16A34A"
+          tone="success"
           control={<ToggleSwitch enabled={settings.smsNotifs} onToggle={() => toggle('smsNotifs')} />} />
         <SettingsRow icon={Volume2} label="Push Notifications" sub="In-browser alerts when portal is open"
-          iconBg="#FEF3C7" iconColor="#D97706"
+          tone="warning"
           control={<ToggleSwitch enabled={settings.pushNotifs} onToggle={() => toggle('pushNotifs')} />} />
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Digest &amp; Marketing</p>
+        <p className="text-sm font-bold text-ink mb-1">Digest &amp; Marketing</p>
         <SettingsRow icon={Mail} label="Weekly Health Digest" sub="Summary of your health activity each week"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.weeklyDigest} onToggle={() => toggle('weeklyDigest')} />} />
         <SettingsRow icon={Mail} label="Research &amp; Updates" sub="Clinical trial matches and platform news"
-          iconBg="#F1F5F9" iconColor="#64748B"
+          tone="muted"
           control={<ToggleSwitch enabled={settings.marketingEmails} onToggle={() => toggle('marketingEmails')} />} />
       </Card>
     </div>
@@ -584,7 +595,7 @@ function PrivacySection({ profile, onSave }) {
     setDeleteError('')
     try {
       await authService.deleteAccount(password)
-      navigate('/landing', { replace: true })
+      navigate('/login', { replace: true })
     } catch (err) {
       setDeleteError(err.message || 'Could not delete your account. Please try again.')
     } finally {
@@ -600,38 +611,38 @@ function PrivacySection({ profile, onSave }) {
       />
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Data Sharing</p>
+        <p className="text-sm font-bold text-ink mb-1">Data Sharing</p>
         <SettingsRow icon={Shield} label="Share with Care Team" sub="Allow your physicians to access your data"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.dataSharing} onToggle={() => toggle('dataSharing')} />} />
         <SettingsRow icon={Globe} label="Anonymized Research" sub="Contribute anonymized data to stroke care research"
-          iconBg="#DCFCE7" iconColor="#16A34A"
+          tone="success"
           control={<ToggleSwitch enabled={settings.researchOpt} onToggle={() => toggle('researchOpt')} />} />
         <SettingsRow icon={Monitor} label="Platform Analytics" sub="Help improve Stroke AI with usage data"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.analytics} onToggle={() => toggle('analytics')} />} />
         <SettingsRow icon={AlertTriangle} label="Third-Party Integrations" sub="Allow connected apps to access your data"
-          iconBg="#FEF3C7" iconColor="#D97706"
+          tone="warning"
           control={<ToggleSwitch enabled={settings.thirdParty} onToggle={() => toggle('thirdParty')} />} />
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="mb-1 text-sm font-bold text-[#0F172A]">Data Management</p>
+        <p className="mb-1 text-sm font-bold text-ink">Data Management</p>
         <div className="mt-4">
           {/* Uses the critical palette, not emergency red — red is reserved
               for the emergency action, so an ordinary (if serious) account
               action does not compete with it visually. */}
-          <div className="flex flex-col gap-3 rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-lg border border-critical-fg/30 bg-critical-bg p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#A33A28]">Delete Account</p>
-              <p className="mt-0.5 text-xs text-[#8A5A1B]">
+              <p className="text-sm font-semibold text-critical-fg">Delete Account</p>
+              <p className="mt-0.5 text-xs text-warning-fg">
                 Permanently delete your account and all data
               </p>
             </div>
             <button
               type="button"
               onClick={() => setDeleteModalOpen(true)}
-              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-[#F0C8C0] bg-white px-3.5 text-sm font-semibold text-[#A33A28] transition-colors hover:bg-[#FBEAE7] sm:self-auto"
+              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 self-start rounded-lg border border-critical-fg/30 bg-surface-1 px-3.5 text-sm font-semibold text-critical-fg transition-colors hover:bg-critical-bg sm:self-auto"
             >
               <Trash2 size={14} aria-hidden="true" />
               Delete
@@ -655,7 +666,7 @@ function PrivacySection({ profile, onSave }) {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#A33A28] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#8A2F20] disabled:opacity-60"
+              className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 rounded-lg bg-critical-fg px-4 text-sm font-semibold text-on-primary transition-colors hover:opacity-90 disabled:opacity-60"
             >
               <Trash2 size={14} aria-hidden="true" />
               {deleting ? 'Deleting…' : 'Delete Account'}
@@ -664,9 +675,9 @@ function PrivacySection({ profile, onSave }) {
         }
       >
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-lg border border-[#F0C8C0] bg-[#FBEAE7] p-4">
-            <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-[#A33A28]" />
-            <p className="text-sm leading-relaxed text-[#A33A28]">
+          <div className="flex items-start gap-3 rounded-lg border border-critical-fg/30 bg-critical-bg p-4">
+            <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-critical-fg" />
+            <p className="text-sm leading-relaxed text-critical-fg">
               Deleting your account will deactivate it immediately and remove your access.
               This cannot be undone from the portal — contact support if you change your mind.
             </p>
@@ -721,21 +732,21 @@ function AccessibilitySection({ profile, onSave }) {
       <SectionTitle title="Accessibility" subtitle="Customize your portal experience" />
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Display</p>
+        <p className="text-sm font-bold text-ink mb-1">Display</p>
         <SettingsRow icon={Eye} label="Large Text" sub="Increase font size across the portal"
-          iconBg="#EFF6FF" iconColor="#2563EB"
+          tone="primary"
           control={<ToggleSwitch enabled={settings.largeText} onToggle={() => toggle('largeText')} />} />
         <SettingsRow icon={Monitor} label="High Contrast" sub="Darken text and strengthen borders"
-          iconBg="#F1F5F9" iconColor="#64748B"
+          tone="muted"
           control={<ToggleSwitch enabled={settings.highContrast} onToggle={() => toggle('highContrast')} />} />
         <SettingsRow icon={Eye} label="Reduce Motion" sub="Minimize animations and transitions"
-          iconBg="#FEF3C7" iconColor="#D97706"
+          tone="warning"
           control={<ToggleSwitch enabled={settings.reduceMotion} onToggle={() => toggle('reduceMotion')} />} />
       </Card>
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-1">Always on</p>
-        <p className="mt-1 text-sm leading-relaxed text-[#475569]">
+        <p className="text-sm font-bold text-ink mb-1">Always on</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-muted">
           Full keyboard navigation, visible focus indicators and screen-reader
           landmarks are built into every page and cannot be switched off.
         </p>
@@ -771,12 +782,12 @@ function LanguageSection({ profile, onSave }) {
       <Card variant="default" padding="lg">
         <div className="space-y-5">
           <div className="space-y-2">
-            <label htmlFor="settings-language" className="block text-sm font-medium text-[#0F172A]">Display Language</label>
+            <label htmlFor="settings-language" className="block text-sm font-medium text-ink">Display Language</label>
             <select
               id="settings-language"
               value={settings.language}
               onChange={(e) => update('language', e.target.value)}
-              className="focus-ring w-full min-h-11 rounded-lg border border-[#E8EDF2] bg-white px-4 py-3 text-sm text-[#0F172A]"
+              className="focus-ring w-full min-h-11 rounded-lg border border-border-soft bg-surface-1 px-4 py-3 text-sm text-ink"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>{l.label}</option>
@@ -785,12 +796,12 @@ function LanguageSection({ profile, onSave }) {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="settings-timezone" className="block text-sm font-medium text-[#0F172A]">Timezone</label>
+            <label htmlFor="settings-timezone" className="block text-sm font-medium text-ink">Timezone</label>
             <select
               id="settings-timezone"
               value={settings.timezone}
               onChange={(e) => update('timezone', e.target.value)}
-              className="focus-ring w-full min-h-11 rounded-lg border border-[#E8EDF2] bg-white px-4 py-3 text-sm text-[#0F172A]"
+              className="focus-ring w-full min-h-11 rounded-lg border border-border-soft bg-surface-1 px-4 py-3 text-sm text-ink"
             >
               <option value="Asia/Kolkata">India Standard Time (IST)</option>
               <option value="America/Los_Angeles">Pacific Time (PT)</option>
@@ -802,7 +813,7 @@ function LanguageSection({ profile, onSave }) {
           </div>
 
           <div className="space-y-2">
-            <span className="block text-sm font-medium text-[#0F172A]">Date Format</span>
+            <span className="block text-sm font-medium text-ink">Date Format</span>
             {/* grid rather than an unwrapped flex row — three ~10-char labels
                 in a flex-1 row clip below ~360px; the grid keeps every option
                 fully readable down to a 320px viewport. */}
@@ -815,8 +826,8 @@ function LanguageSection({ profile, onSave }) {
                   aria-pressed={settings.dateFormat === fmt}
                   className={`focus-ring tap-target rounded-lg border text-xs font-semibold transition-colors
                     ${settings.dateFormat === fmt
-                      ? 'border-[#2563EB] bg-[#EFF6FF] text-[#2563EB]'
-                      : 'border-[#E8EDF2] bg-white text-[#64748B] hover:border-[#94A3B8]'
+                      ? 'border-primary-600 bg-primary-50 text-primary-700'
+                      : 'border-border-soft bg-surface-1 text-ink-subtle hover:border-border-strong'
                     }`}
                 >
                   {fmt}
@@ -832,7 +843,9 @@ function LanguageSection({ profile, onSave }) {
 
 /* ─────────────────────────────────────────────
    APPEARANCE SECTION — real theme (light/dark/
-   system) via useTheme, persisted to localStorage.
+   system) via ThemeContext. Applied instantly from
+   localStorage and synced to the account, so the
+   choice follows the patient to another device.
    Accent Color and Density were removed: nothing
    in the app reads either setting, so persisting
    them would just be a different flavor of fake
@@ -846,7 +859,7 @@ function AppearanceSection() {
       <SectionTitle title="Appearance" subtitle="Customize the look of your portal" />
 
       <Card variant="default" padding="lg">
-        <p className="text-sm font-bold text-[#0F172A] mb-4">Theme</p>
+        <p className="text-sm font-bold text-ink mb-4">Theme</p>
         <div className="grid grid-cols-3 gap-3">
           {[
             { id: 'light',  label: 'Light',  icon: Sun },
@@ -855,28 +868,30 @@ function AppearanceSection() {
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setTheme(id)}
-              className={`flex flex-col items-center gap-2 p-4 rounded-lg border transition-all duration-200
+              aria-pressed={theme === id}
+              className={`focus-ring flex flex-col items-center gap-2 p-4 rounded-lg border transition-all duration-200
                 ${theme === id
-                  ? 'bg-[#EFF6FF] border-[#2563EB]'
-                  : 'bg-[#F8FAFC] border-[#E8EDF2] hover:border-[#94A3B8]'
+                  ? 'bg-primary-50 border-primary-600'
+                  : 'bg-surface-2 border-border-soft hover:border-border-strong'
                 }`}
             >
-              <Icon size={20} className={theme === id ? 'text-[#2563EB]' : 'text-[#64748B]'} />
-              <span className={`text-xs font-semibold ${theme === id ? 'text-[#2563EB]' : 'text-[#64748B]'}`}>
+              <Icon size={20} className={theme === id ? 'text-primary-700' : 'text-ink-subtle'} />
+              <span className={`text-xs font-semibold ${theme === id ? 'text-primary-700' : 'text-ink-subtle'}`}>
                 {label}
               </span>
               {theme === id && (
-                <div className="w-4 h-4 rounded-full bg-[#2563EB] flex items-center justify-center">
-                  <Check size={10} className="text-white" strokeWidth={3} />
+                <div className="w-4 h-4 rounded-full bg-primary-600 flex items-center justify-center">
+                  <Check size={10} className="text-on-primary" strokeWidth={3} />
                 </div>
               )}
             </button>
           ))}
         </div>
-        <p className="mt-4 text-xs text-[#64748B]">
-          Saved to this device. Most of the portal is currently designed for light mode —
-          dark mode support is still being rolled out across pages.
+        <p className="mt-4 text-xs text-ink-subtle">
+          Applied straight away on this device and saved to your account, so it follows you
+          when you sign in somewhere else. System matches your device's own setting.
         </p>
       </Card>
     </div>

@@ -48,18 +48,18 @@ export default class ErrorBoundary extends Component {
         <div className="w-full max-w-md text-center">
           <span
             aria-hidden="true"
-            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#FBEAE7]"
+            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-critical-bg"
           >
-            <AlertTriangle size={26} className="text-[#A33A28]" />
+            <AlertTriangle size={26} className="text-critical-fg" />
           </span>
 
-          <h1 className="text-xl font-semibold text-[#0F172A]">
+          <h1 className="text-xl font-semibold text-ink">
             Something went wrong on this page
           </h1>
 
           {/* Plain language, no stack trace, no error codes. A patient can act
               on "try again"; they cannot act on a component stack. */}
-          <p className="mt-2.5 text-sm leading-relaxed text-[#475569]">
+          <p className="mt-2.5 text-sm leading-relaxed text-ink-muted">
             This part of the portal could not be displayed. Your information is safe.
             Try again, and if it keeps happening please contact your care team.
           </p>
@@ -68,13 +68,13 @@ export default class ErrorBoundary extends Component {
             <button
               type="button"
               onClick={this.handleReset}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#1D4ED8]"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-700"
             >
               <RefreshCw size={15} aria-hidden="true" /> Try again
             </button>
             <a
               href="/app"
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-5 text-sm font-semibold text-[#475569] transition-colors hover:bg-[#F1F5F9]"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface-1 px-5 text-sm font-semibold text-ink-muted transition-colors hover:bg-surface-2"
             >
               <Home size={15} aria-hidden="true" /> Back to home
             </a>
@@ -82,7 +82,7 @@ export default class ErrorBoundary extends Component {
 
           {/* Dev-only detail. Never rendered in a production build. */}
           {import.meta.env.DEV && this.state.error && (
-            <pre className="mt-6 overflow-x-auto rounded-lg bg-[#F1F5F9] p-3 text-left text-xs text-[#A33A28]">
+            <pre className="mt-6 overflow-x-auto rounded-lg bg-surface-2 p-3 text-left text-xs text-critical-fg">
               {String(this.state.error?.stack ?? this.state.error)}
             </pre>
           )}

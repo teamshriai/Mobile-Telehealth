@@ -38,6 +38,9 @@ function decryptAppointment<T extends Appointment>(row: T): T {
   return out;
 }
 
+/** Hard ceiling on any one appointment listing. */
+const MAX_LIST_ROWS = 200;
+
 export const appointmentRepository = {
   /**
    * Resolve the caller's own patient profile id. Every other method is scoped
@@ -52,8 +55,14 @@ export const appointmentRepository = {
     return profile?.id ?? null;
   },
 
-  async listForPatient(
-    patientId: string,
+  /**
+   * Scoped by `patient: { userId }` rather than by a pre-resolved patient id,
+   * which folds the old separate `findPatientProfileIdByUserId` round trip
+   * into this query's join. The service still distinguishes "no profile" (404)
+   * from "no appointments" (empty list) — see appointment.service.ts.
+   */
+  async listForUser(
+    userId: string,
     scope: 'upcoming' | 'past' | 'all',
   ): Promise<AppointmentWithDoctor[]> {
     const now = new Date();
@@ -63,19 +72,19 @@ export const appointmentRepository = {
     const where: Prisma.AppointmentWhereInput =
       scope === 'upcoming'
         ? {
-            patientId,
+            patient: { userId },
             scheduledAt: { gte: now },
             status: { notIn: [AppointmentStatus.Cancelled, AppointmentStatus.Completed] },
           }
         : scope === 'past'
           ? {
-              patientId,
+              patient: { userId },
               OR: [
                 { scheduledAt: { lt: now } },
                 { status: { in: [AppointmentStatus.Cancelled, AppointmentStatus.Completed] } },
               ],
             }
-          : { patientId };
+          : { patient: { userId } };
 
     const rows = await prisma.appointment.findMany({
       where,
@@ -83,6 +92,10 @@ export const appointmentRepository = {
       // Upcoming reads soonest-first (what do I do next?); past reads
       // most-recent-first (what happened last?).
       orderBy: { scheduledAt: scope === 'upcoming' ? 'asc' : 'desc' },
+      // A patient years into follow-up accumulates an unbounded history, and
+      // every row here is decrypted individually. No screen in the product
+      // renders more than a page of these.
+      take: MAX_LIST_ROWS,
     });
 
     return rows.map(decryptAppointment);

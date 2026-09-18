@@ -35,18 +35,24 @@ export function countAllergies(knownAllergies) {
   return text.split(/[;,\n]/).map((s) => s.trim()).filter(Boolean).length
 }
 
+/* Pastel accent tints, one per tile, so the four counts are distinguishable at
+   a glance rather than four identical blue boxes. `amber` stays a semantic
+   warning tone because it is the one tile whose colour carries meaning — an
+   allergy on record. The rest are category colour, not state. */
 const TONES = {
-  blue:  { bg: 'bg-[#EFF6FF]', fg: 'text-[#1D4ED8]', ring: 'border-[#DBEAFE]' },
-  teal:  { bg: 'bg-[#E6F4F1]', fg: 'text-[#2F6B5E]', ring: 'border-[#CCE7E1]' },
-  amber: { bg: 'bg-[#FBF0E2]', fg: 'text-[#8A5A1B]', ring: 'border-[#F3E0C4]' },
+  sky:   { bg: 'bg-accent-sky',  fg: 'text-accent-sky-fg',  ring: 'border-accent-sky-fg/20' },
+  teal:  { bg: 'bg-accent-teal', fg: 'text-accent-teal-fg', ring: 'border-accent-teal-fg/20' },
+  sage:  { bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', ring: 'border-accent-sage-fg/20' },
+  clay:  { bg: 'bg-accent-clay', fg: 'text-accent-clay-fg', ring: 'border-accent-clay-fg/20' },
+  amber: { bg: 'bg-warning-bg',  fg: 'text-warning-fg',     ring: 'border-warning-fg/30' },
 }
 
-function Tile({ to, icon: Icon, value, label, hint, tone = 'blue' }) {
-  const t = TONES[tone] ?? TONES.blue
+function Tile({ to, icon: Icon, value, label, hint, tone = 'sky' }) {
+  const t = TONES[tone] ?? TONES.sky
   return (
     <Link
       to={to}
-      className={`focus-ring group flex min-h-11 flex-col gap-2.5 rounded-xl border ${t.ring} bg-white p-4 transition-colors hover:bg-[#FAFBFC]`}
+      className={`focus-ring group flex min-h-11 flex-col gap-2.5 rounded-xl border ${t.ring} bg-surface-1 p-4 shadow-card transition-colors hover:border-border-strong hover:bg-surface-2`}
     >
       <span
         aria-hidden="true"
@@ -55,15 +61,15 @@ function Tile({ to, icon: Icon, value, label, hint, tone = 'blue' }) {
         <Icon size={17} className={t.fg} />
       </span>
       <span className="flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold leading-none tracking-tight text-[#0F172A]">
+        <span className="text-2xl font-semibold leading-none tracking-tight text-ink">
           {value}
         </span>
-        <span className="text-sm text-[#64748B]">{label}</span>
+        <span className="text-sm text-ink-subtle">{label}</span>
       </span>
       {/* The hint carries the meaning a number alone cannot, and is what a
           screen reader reads after the value — so status never depends on
           colour. */}
-      <span className="text-xs leading-relaxed text-[#64748B]">{hint}</span>
+      <span className="text-xs leading-relaxed text-ink-subtle">{hint}</span>
     </Link>
   )
 }
@@ -76,15 +82,15 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
   ).length
 
   return (
-    <section aria-labelledby="snapshot-heading">
-      <h2 id="snapshot-heading" className="text-sm font-semibold text-[#0F172A]">
+    <section aria-labelledby="snapshot-heading" className="flex h-full flex-col">
+      <h2 id="snapshot-heading" className="text-sm font-semibold text-ink">
         Your health at a glance
       </h2>
-      <p className="mt-1 text-sm text-[#64748B]">
+      <p className="mt-1 text-sm text-ink-subtle">
         Counted from your records. Tap any item to see the detail.
       </p>
 
-      <div className="mt-3.5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-3.5 grid flex-1 grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-2">
         <Tile
           to="/app/medicines"
           icon={Pill}
@@ -96,7 +102,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/appointments"
           icon={CalendarCheck}
-          tone="blue"
+          tone="sky"
           value={upcoming}
           label={upcoming === 1 ? 'appointment' : 'appointments'}
           hint={upcoming > 0 ? 'Coming up' : 'Nothing scheduled'}
@@ -104,7 +110,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/care-team"
           icon={Users}
-          tone="blue"
+          tone="sage"
           value={careTeam.length}
           label={careTeam.length === 1 ? 'clinician' : 'clinicians'}
           hint={careTeam.length > 0 ? 'Looking after you' : 'No one assigned yet'}
@@ -112,7 +118,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/health"
           icon={ShieldAlert}
-          tone={allergies > 0 ? 'amber' : 'blue'}
+          tone={allergies > 0 ? 'amber' : 'clay'}
           value={allergies}
           label={allergies === 1 ? 'allergy' : 'allergies'}
           hint={allergies > 0 ? 'Recorded — tell any new clinician' : 'None recorded'}

@@ -191,12 +191,14 @@ export const profileService = {
    * leaves `privacy`/`accessibility`/`language` untouched.
    */
   async updatePreferences(userId: string, dto: PreferencesDto): Promise<ProfileResponse> {
-    const existing = await profileRepository.findByUserId(userId);
-    if (existing === null) {
+    // Only the preferences column is needed for the merge — fetching and
+    // decrypting the whole profile here doubled the cost of every save.
+    const existing = await profileRepository.findPreferencesByUserId(userId);
+    if (existing === undefined) {
       throw new AppError('Patient profile not found.', 404);
     }
 
-    const currentPreferences = (existing.preferences as PreferencesDto | null) ?? {};
+    const currentPreferences = (existing as PreferencesDto | null) ?? {};
     const merged: PreferencesDto = { ...currentPreferences };
     for (const [category, values] of Object.entries(dto)) {
       merged[category as keyof PreferencesDto] = {

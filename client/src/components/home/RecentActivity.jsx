@@ -22,11 +22,11 @@ const ICON_BY_TYPE = {
 
 /** Muted by design: this is history, not a set of alerts competing for attention. */
 const TONE_BY_TYPE = {
-  Appointment: 'bg-[#EFF6FF] text-[#1D4ED8]',
-  Report:      'bg-[#EDE9FE] text-[#7C3AED]',
-  CareTeam:    'bg-[#E6F4F1] text-[#2F6B5E]',
-  Medication:  'bg-[#E6F4F1] text-[#2F6B5E]',
-  General:     'bg-[#F1F5F9] text-[#64748B]',
+  Appointment: 'bg-primary-50 text-primary-700',
+  Report:      'bg-therapy-bg text-therapy-fg',
+  CareTeam:    'bg-success-bg text-success-fg',
+  Medication:  'bg-success-bg text-success-fg',
+  General:     'bg-surface-2 text-ink-subtle',
 }
 
 function relativeDate(iso) {
@@ -44,14 +44,14 @@ export default function RecentActivity({ notifications = [] }) {
   const items = notifications.slice(0, 4)
 
   return (
-    <section aria-labelledby="activity-heading">
-      <h2 id="activity-heading" className="text-sm font-semibold text-[#0F172A]">
+    <section aria-labelledby="activity-heading" className="flex h-full flex-col">
+      <h2 id="activity-heading" className="text-sm font-semibold text-ink">
         Recent activity
       </h2>
 
-      <div className="mt-3.5 rounded-xl border border-[#E8EDF2] bg-white p-4">
+      <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card">
         {items.length === 0 ? (
-          <p className="py-6 text-center text-sm leading-relaxed text-[#64748B]">
+          <p className="py-6 text-center text-sm leading-relaxed text-ink-subtle">
             Nothing yet. Updates about your appointments and care team will show here.
           </p>
         ) : (
@@ -71,24 +71,24 @@ export default function RecentActivity({ notifications = [] }) {
                     >
                       <Icon size={15} />
                     </span>
-                    {!last && <span aria-hidden="true" className="w-px flex-1 bg-[#E8EDF2]" />}
+                    {!last && <span aria-hidden="true" className="w-px flex-1 bg-surface-3" />}
                   </div>
 
                   <div className={`min-w-0 flex-1 ${last ? '' : 'pb-4'}`}>
                     <div className="flex flex-wrap items-baseline gap-x-2">
-                      <p className="text-sm font-semibold text-[#0F172A]">{n.title}</p>
+                      <p className="text-sm font-semibold text-ink">{n.title}</p>
                       {!n.isRead && (
                         // Text, not just a colour dot — status must survive
                         // both colour-blindness and a screen reader.
-                        <span className="rounded bg-[#EFF6FF] px-1.5 py-0.5 text-[11px] font-semibold text-[#1D4ED8]">
+                        <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
                           New
                         </span>
                       )}
                     </div>
                     {n.body && (
-                      <p className="mt-0.5 text-sm leading-relaxed text-[#64748B]">{n.body}</p>
+                      <p className="mt-0.5 text-sm leading-relaxed text-ink-subtle">{n.body}</p>
                     )}
-                    <p className="mt-1 text-xs text-[#94A3B8]">{relativeDate(n.createdAt)}</p>
+                    <p className="mt-1 text-xs text-ink-subtle">{relativeDate(n.createdAt)}</p>
                   </div>
                 </li>
               )

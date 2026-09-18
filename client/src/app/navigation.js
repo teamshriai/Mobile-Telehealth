@@ -1,5 +1,5 @@
 import {
-  Home, Calendar, Pill, FolderHeart, Users, Siren, User, Settings,
+  Home, Calendar, Pill, FolderHeart, Users, Siren, User, Settings, Sparkles,
 } from 'lucide-react'
 
 /**
@@ -19,9 +19,13 @@ import {
  *    already existed in fixtures with nowhere to live.
  *  - "Emergency" promoted to top level. It was a dashboard component; on a
  *    stroke product it must be one tap from anywhere.
- *  - "Care Guide" (the AI assistant) REMOVED from navigation — it returned
- *    three random canned replies presented as clinical reassurance. It returns
- *    when it is real.
+ *  - "Care Guide" (the AI assistant) was REMOVED from navigation — it returned
+ *    three random canned replies presented as clinical reassurance.
+ *  - "AI Insights" is its replacement, and is NOT a walk-back of that rule.
+ *    The screen is the finished interface with no model behind it, and it says
+ *    so on itself: it declines to answer rather than inventing reassurance.
+ *    The thing that got Care Guide removed was fabricated clinical confidence,
+ *    not the presence of an assistant.
  *
  * Phase 1 also found the same route carrying up to four different names across
  * sidebar, search index, spoke rail and page <h1>. This file is now the single
@@ -55,6 +59,12 @@ export const PATIENT_NAV = [
     description: 'Records, reports and your recovery',
   },
   {
+    label: 'AI Insights',
+    path: '/app/ai-insights',
+    icon: Sparkles,
+    description: 'Ask about your reports and medicines',
+  },
+  {
     label: 'My Care Team',
     path: '/app/care-team',
     icon: Users,
@@ -85,6 +95,7 @@ export const ROUTE_TITLES = {
   '/app/appointments': 'Appointments',
   '/app/medicines': 'Medicines',
   '/app/health': 'My Health',
+  '/app/ai-insights': 'AI Insights',
   '/app/care-team': 'My Care Team',
   '/app/emergency': 'Emergency',
   '/app/profile': 'Profile',

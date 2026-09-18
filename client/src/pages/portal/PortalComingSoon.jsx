@@ -45,17 +45,17 @@ export default function PortalComingSoon({ portal = 'Doctor' }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FAFBFC]">
-      <header className="flex h-16 items-center gap-2.5 border-b border-[#E8EDF2] bg-white px-4 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-bg">
+      <header className="flex h-16 items-center gap-2.5 border-b border-border-soft bg-surface-1 px-4 sm:px-6">
         <BrandMark size={16} />
-        <span className="text-[15px] font-bold tracking-tight text-[#0F172A]">Stroke AI</span>
-        <span aria-hidden="true" className="text-[#64748B]">/</span>
-        <span className="text-sm font-medium text-[#64748B]">{config.name}</span>
+        <span className="text-[15px] font-bold tracking-tight text-ink">Stroke AI</span>
+        <span aria-hidden="true" className="text-ink-subtle">/</span>
+        <span className="text-sm font-medium text-ink-subtle">{config.name}</span>
 
         <button
           type="button"
           onClick={handleSignOut}
-          className="focus-ring tap-target ml-auto inline-flex items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#475569] transition-colors hover:bg-[#F1F5F9]"
+          className="focus-ring tap-target ml-auto inline-flex items-center gap-2 rounded-lg px-3 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2"
         >
           <LogOut size={16} aria-hidden="true" /> Sign out
         </button>
@@ -65,33 +65,33 @@ export default function PortalComingSoon({ portal = 'Doctor' }) {
         <div className="w-full max-w-lg text-center">
           <span
             aria-hidden="true"
-            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#EFF6FF]"
+            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary-50"
           >
-            <Icon size={26} className="text-[#1D4ED8]" />
+            <Icon size={26} className="text-primary-700" />
           </span>
 
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A]">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
             {config.name} is not available yet
           </h1>
 
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#475569]">
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
             {config.blurb} It is not built yet — we are not going to show you a
             preview that behaves like the real thing.
           </p>
 
-          <div className="mt-7 rounded-xl border border-[#E8EDF2] bg-white p-5 text-left">
-            <p className="text-sm font-semibold text-[#0F172A]">Your account is set up correctly</p>
+          <div className="mt-7 rounded-xl border border-border-soft bg-surface-1 p-5 text-left">
+            <p className="text-sm font-semibold text-ink">Your account is set up correctly</p>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between gap-4">
-                <dt className="text-[#64748B]">Signed in as</dt>
-                <dd className="truncate font-medium text-[#0F172A]">{user?.email ?? '—'}</dd>
+                <dt className="text-ink-subtle">Signed in as</dt>
+                <dd className="truncate font-medium text-ink">{user?.email ?? '—'}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-[#64748B]">Role</dt>
-                <dd className="font-medium text-[#0F172A]">{role ?? '—'}</dd>
+                <dt className="text-ink-subtle">Role</dt>
+                <dd className="font-medium text-ink">{role ?? '—'}</dd>
               </div>
             </dl>
-            <p className="mt-3.5 border-t border-[#E8EDF2] pt-3 text-xs leading-relaxed text-[#64748B]">
+            <p className="mt-3.5 border-t border-border-soft pt-3 text-xs leading-relaxed text-ink-subtle">
               Authentication, your role, and the permissions attached to it are live.
               When this portal ships, your account will already work with it.
             </p>
@@ -99,7 +99,7 @@ export default function PortalComingSoon({ portal = 'Doctor' }) {
 
           <a
             href="/"
-            className="focus-ring mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-[#2563EB] hover:text-[#1D4ED8]"
+            className="focus-ring mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-primary-700 hover:text-primary-700"
           >
             <ArrowLeft size={15} aria-hidden="true" /> Back to the main site
           </a>

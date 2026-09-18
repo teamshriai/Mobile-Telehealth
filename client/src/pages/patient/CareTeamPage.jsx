@@ -32,8 +32,8 @@ export default function CareTeamPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">My Care Team</h1>
-        <p className="mt-1.5 text-sm text-[#475569]">The clinicians looking after your recovery.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My Care Team</h1>
+        <p className="mt-1.5 text-sm text-ink-muted">The clinicians looking after your recovery.</p>
       </div>
 
       {loading ? (
@@ -49,27 +49,27 @@ export default function CareTeamPage() {
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {members.map((m) => (
-            <li key={m.id} className="rounded-xl border border-[#E8EDF2] bg-white p-4">
+            <li key={m.id} className="rounded-xl border border-border-soft bg-surface-1 p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-sm font-semibold text-[#0F172A]">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                     {m.doctor.name}
                     {m.isPrimary && (
                       <span title="Primary clinician">
-                        <Star size={13} aria-hidden="true" className="fill-[#8A5A1B] text-[#8A5A1B]" />
+                        <Star size={13} aria-hidden="true" className="fill-warning-fg text-warning-fg" />
                         <span className="sr-only">Primary clinician</span>
                       </span>
                     )}
                   </p>
-                  <p className="mt-0.5 text-sm text-[#475569]">{m.careRole}</p>
+                  <p className="mt-0.5 text-sm text-ink-muted">{m.careRole}</p>
                   {m.doctor.specialty && (
-                    <p className="mt-0.5 text-xs text-[#64748B]">{m.doctor.specialty}</p>
+                    <p className="mt-0.5 text-xs text-ink-subtle">{m.doctor.specialty}</p>
                   )}
                 </div>
               </div>
 
               {m.doctor.hospitalName && (
-                <p className="mt-3 flex items-center gap-1.5 border-t border-[#E8EDF2] pt-3 text-xs text-[#64748B]">
+                <p className="mt-3 flex items-center gap-1.5 border-t border-border-soft pt-3 text-xs text-ink-subtle">
                   <Building2 size={13} aria-hidden="true" />
                   {m.doctor.hospitalName}
                 </p>

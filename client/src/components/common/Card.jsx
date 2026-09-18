@@ -7,32 +7,32 @@ import { motion } from 'framer-motion'
 
 const VARIANTS = {
   default: `
-    bg-white/95 border border-[#E8EDF2]
+    bg-surface-1/95 border border-border-soft
     shadow-[0_1px_2px_0_rgba(15,23,42,0.03),0_8px_24px_rgba(15,23,42,0.04)]
   `,
   elevated: `
-    bg-white/95 border border-[#E8EDF2]
+    bg-surface-1/95 border border-border-soft
     shadow-[0_18px_45px_0_rgba(15,23,42,0.08)]
   `,
   ghost: `
-    bg-[#F8FAFC] border border-[#E8EDF2]
+    bg-surface-2 border border-border-soft
   `,
   bordered: `
-    bg-white border-2 border-[#E8EDF2]
+    bg-surface-1 border-2 border-border-soft
   `,
   gradient: `
-    border border-[#E8EDF2]
+    border border-border-soft
     shadow-[0_1px_3px_0_rgba(15,23,42,0.04),0_4px_16px_0_rgba(15,23,42,0.06)]
   `,
   primary: `
-    border border-[#BFDBFE]
+    border border-primary-200
     shadow-[0_1px_3px_0_rgba(37,99,235,0.08),0_4px_16px_0_rgba(37,99,235,0.08)]
   `,
   /* Level 3 of the material hierarchy — selective, elevated, translucent.
      Reach for this deliberately (AI-insight surfaces, floating panels),
      not as a default replacement for `default`. */
   glass: `
-    backdrop-blur-xl border border-white/60
+    backdrop-blur-xl border border-surface-1/60
     shadow-[0_20px_60px_0_rgba(15,23,42,0.10)]
   `,
 }
@@ -65,9 +65,9 @@ export default function Card({
 }) {
   /* Gradient background for gradient variant */
   const gradientStyle = variant === 'gradient'
-    ? { background: 'linear-gradient(160deg, #FFFFFF 0%, #EFF6FF 100%)' }
+    ? { background: 'linear-gradient(160deg, var(--color-surface-1) 0%, var(--color-primary-50) 100%)' }
     : variant === 'primary'
-    ? { background: 'linear-gradient(160deg, #EFF6FF 0%, #DBEAFE 100%)' }
+    ? { background: 'linear-gradient(160deg, var(--color-primary-50) 0%, var(--color-primary-100) 100%)' }
     : variant === 'glass'
     ? { background: 'rgba(255,255,255,0.72)' }
     : {}

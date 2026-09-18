@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Menu, LogOut, ChevronDown, User as UserIcon, Settings as SettingsIcon } from 'lucide-react'
 import { useAuth } from '../../app/AuthContext.jsx'
 import NotificationBell from './NotificationBell.jsx'
+import ThemeToggle from '../common/ThemeToggle.jsx'
 
 /**
  * Patient portal top bar: menu toggle (mobile), page title, notifications,
@@ -65,23 +66,24 @@ export default function PatientTopbar({ title, sidebarOpen, onOpenSidebar }) {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center gap-3 border-b border-[#E8EDF2] bg-white/95 px-4 backdrop-blur sm:px-5">
+    <header className="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center gap-3 border-b border-border-soft bg-surface-1/95 px-4 backdrop-blur sm:px-5">
       <button
         type="button"
         onClick={onOpenSidebar}
         aria-label="Open navigation menu"
         aria-controls="patient-sidebar"
         aria-expanded={sidebarOpen}
-        className="focus-ring tap-target -ml-1 rounded-lg text-[#475569] hover:bg-[#F1F5F9] lg:hidden"
+        className="focus-ring tap-target -ml-1 rounded-lg text-ink-muted hover:bg-surface-2 lg:hidden"
       >
         <Menu size={21} aria-hidden="true" />
       </button>
 
       {/* The page's accessible heading lives in the page body; this is a
           secondary visual label, so it is not an <h1>. */}
-      <p className="truncate text-[15px] font-semibold text-[#0F172A]">{title}</p>
+      <p className="truncate text-[15px] font-semibold text-ink">{title}</p>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <ThemeToggle />
         <NotificationBell />
 
         <div className="relative">
@@ -91,18 +93,18 @@ export default function PatientTopbar({ title, sidebarOpen, onOpenSidebar }) {
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            className="focus-ring flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-[#F1F5F9]"
+            className="focus-ring flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
           >
             <span
               aria-hidden="true"
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-xs font-bold text-[#1D4ED8]"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-bold text-primary-700"
             >
               {initials}
             </span>
-            <span className="hidden max-w-[160px] truncate text-sm font-medium text-[#0F172A] sm:block">
+            <span className="hidden max-w-[160px] truncate text-sm font-medium text-ink sm:block">
               {displayName}
             </span>
-            <ChevronDown size={15} aria-hidden="true" className="text-[#64748B]" />
+            <ChevronDown size={15} aria-hidden="true" className="text-ink-subtle" />
           </button>
 
           {menuOpen && (
@@ -110,12 +112,12 @@ export default function PatientTopbar({ title, sidebarOpen, onOpenSidebar }) {
               ref={menuRef}
               role="menu"
               aria-label="Account menu"
-              className="absolute right-0 top-[calc(100%+6px)] w-56 overflow-hidden rounded-xl border border-[#E8EDF2] bg-white shadow-[0_4px_16px_0_rgba(15,23,42,0.08)]"
+              className="absolute right-0 top-[calc(100%+6px)] w-56 overflow-hidden rounded-xl border border-border-soft bg-surface-1 shadow-card-lg"
             >
-              <div className="border-b border-[#E8EDF2] px-3.5 py-3">
-                <p className="truncate text-sm font-semibold text-[#0F172A]">{displayName}</p>
+              <div className="border-b border-border-soft px-3.5 py-3">
+                <p className="truncate text-sm font-semibold text-ink">{displayName}</p>
                 {user?.email && (
-                  <p className="truncate text-xs text-[#64748B]">{user.email}</p>
+                  <p className="truncate text-xs text-ink-subtle">{user.email}</p>
                 )}
               </div>
 
@@ -123,7 +125,7 @@ export default function PatientTopbar({ title, sidebarOpen, onOpenSidebar }) {
                 type="button"
                 role="menuitem"
                 onClick={() => { setMenuOpen(false); navigate('/app/profile') }}
-                className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm text-[#475569] transition-colors hover:bg-[#F1F5F9]"
+                className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm text-ink-muted transition-colors hover:bg-surface-2"
               >
                 <UserIcon size={16} aria-hidden="true" /> Profile
               </button>
@@ -131,18 +133,18 @@ export default function PatientTopbar({ title, sidebarOpen, onOpenSidebar }) {
                 type="button"
                 role="menuitem"
                 onClick={() => { setMenuOpen(false); navigate('/app/settings') }}
-                className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm text-[#475569] transition-colors hover:bg-[#F1F5F9]"
+                className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm text-ink-muted transition-colors hover:bg-surface-2"
               >
                 <SettingsIcon size={16} aria-hidden="true" /> Settings
               </button>
 
-              <div className="border-t border-[#E8EDF2]">
+              <div className="border-t border-border-soft">
                 <button
                   type="button"
                   role="menuitem"
                   onClick={handleSignOut}
                   disabled={signingOut}
-                  className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm font-medium text-[#A33A28] transition-colors hover:bg-[#FBEAE7] disabled:opacity-60"
+                  className="focus-ring flex w-full min-h-11 items-center gap-2.5 px-3.5 text-sm font-medium text-critical-fg transition-colors hover:bg-critical-bg disabled:opacity-60"
                 >
                   <LogOut size={16} aria-hidden="true" />
                   {signingOut ? 'Signing out…' : 'Sign out'}

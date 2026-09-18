@@ -108,8 +108,17 @@ function formatWhen(date: Date): string {
 
 export const appointmentService = {
   async list(userId: string, dto: ListAppointmentsDto): Promise<AppointmentResponse[]> {
-    const patientId = await requireOwnPatientId(userId);
-    const rows = await appointmentRepository.listForPatient(patientId, dto.scope);
+    // One query in the normal case: the ownership predicate lives in the
+    // query's own join rather than in a preceding profile lookup.
+    const rows = await appointmentRepository.listForUser(userId, dto.scope);
+
+    // An empty result is ambiguous — no appointments, or no patient profile at
+    // all — and those must not answer the same way. Only that rare case pays
+    // for the second query, and only to preserve the 404.
+    if (rows.length === 0) {
+      await requireOwnPatientId(userId);
+    }
+
     return rows.map(toResponseShape);
   },
 

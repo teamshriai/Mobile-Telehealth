@@ -46,15 +46,15 @@ const ACTIVITY = [
 function TextArea({ id, label, hint, value, onChange }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[#0F172A]">{label}</label>
-      {hint && <p className="mb-1.5 text-xs text-[#64748B]">{hint}</p>}
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
+      {hint && <p className="mb-1.5 text-xs text-ink-subtle">{hint}</p>}
       <textarea
         id={id}
         rows={2}
         maxLength={1000}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+        className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
       />
     </div>
   )
@@ -63,12 +63,12 @@ function TextArea({ id, label, hint, value, onChange }) {
 function Select({ id, label, value, onChange, options }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[#0F172A]">{label}</label>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-ink">{label}</label>
       <select
         id={id}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
-        className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+        className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
       >
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -129,8 +129,8 @@ export default function MyHealthPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A] sm:text-3xl">My Health</h1>
-        <p className="mt-1.5 text-sm text-[#475569]">
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My Health</h1>
+        <p className="mt-1.5 text-sm text-ink-muted">
           A record of your medical history that your care team can rely on.
         </p>
       </div>
@@ -143,9 +143,9 @@ export default function MyHealthPage() {
         <ErrorState title="Profile not set up" description="Complete your profile before adding health history." />
       ) : (
         <form onSubmit={handleSave} className="space-y-5">
-          <section className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-            <h2 className="text-base font-semibold text-[#0F172A]">Medical history</h2>
-            <p className="mt-1 text-sm text-[#475569]">
+          <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
+            <h2 className="text-base font-semibold text-ink">Medical history</h2>
+            <p className="mt-1 text-sm text-ink-muted">
               This is your own summary in your own words — it helps your care team, but it does
               not replace a clinical record.
             </p>
@@ -165,9 +165,9 @@ export default function MyHealthPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-            <h2 className="text-base font-semibold text-[#0F172A]">Lifestyle</h2>
-            <p className="mt-1 text-sm text-[#475569]">Helps your care team give you better advice.</p>
+          <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
+            <h2 className="text-base font-semibold text-ink">Lifestyle</h2>
+            <p className="mt-1 text-sm text-ink-muted">Helps your care team give you better advice.</p>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select id="smoking" label="Smoking" options={SMOKING}
@@ -181,7 +181,7 @@ export default function MyHealthPage() {
             </div>
 
             <div className="mt-4">
-              <label htmlFor="occupation" className="mb-1.5 block text-sm font-medium text-[#0F172A]">
+              <label htmlFor="occupation" className="mb-1.5 block text-sm font-medium text-ink">
                 Occupation
               </label>
               <input
@@ -190,7 +190,7 @@ export default function MyHealthPage() {
                 maxLength={100}
                 value={form.occupation ?? ''}
                 onChange={(e) => update('occupation', e.target.value)}
-                className="focus-ring w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2.5 text-sm text-[#0F172A]"
+                className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
               />
             </div>
           </section>
@@ -202,7 +202,7 @@ export default function MyHealthPage() {
             <button
               type="submit"
               disabled={saving}
-              className="focus-ring tap-target inline-flex items-center gap-2 rounded-lg bg-[#2563EB] px-5 text-sm font-semibold text-white hover:bg-[#1D4ED8] disabled:opacity-60"
+              className="focus-ring tap-target inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-semibold text-on-primary hover:bg-primary-700 disabled:opacity-60"
             >
               <Save size={15} aria-hidden="true" />
               {saving ? 'Saving…' : 'Save changes'}
@@ -213,12 +213,12 @@ export default function MyHealthPage() {
 
       {/* Documents: deferred to Phase 4 — no Document model or file storage
           exists. An honest state, not a fake upload. */}
-      <section className="rounded-xl border border-[#E8EDF2] bg-white p-5">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-[#0F172A]">
-          <FileText size={17} aria-hidden="true" className="text-[#64748B]" />
+      <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+          <FileText size={17} aria-hidden="true" className="text-ink-subtle" />
           Reports and documents
         </h2>
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-[#475569]">
+        <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-muted">
           Uploading scans, discharge summaries and lab reports is not available yet. We would
           rather wait until it works properly than show you an upload that does not really save
           your file.

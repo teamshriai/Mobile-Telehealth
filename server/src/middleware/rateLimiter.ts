@@ -34,7 +34,46 @@ export const authLimiter = rateLimit({
   ),
 });
 
+/**
+ * Login gets its own limiter, separate from the rest of the auth endpoints,
+ * for one reason: `skipSuccessfulRequests`.
+ *
+ * Brute force is a pattern of FAILURES. A successful login is proof the caller
+ * already holds the credentials, so counting it protects nothing — it only
+ * burns the allowance of the legitimate user, who then gets locked out of
+ * their own account for 15 minutes after a handful of ordinary sign-ins
+ * (several devices, a demo, a shared clinic terminal). That is a denial of
+ * service against the real user, not a defence against an attacker.
+ *
+ * Failed attempts are still counted, and still capped well below what any
+ * password-guessing run needs. `authSlowDown` in front of this adds
+ * escalating latency, which is the control that actually makes guessing
+ * expensive.
+ *
+ * Registration deliberately does NOT use this: there, a *successful* request
+ * is the thing worth limiting, or one IP can mint unlimited accounts.
+ */
+export const loginLimiter = rateLimit({
+  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+  max: env.LOGIN_RATE_LIMIT_MAX,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: ApiResponseBuilder.error(
+    'Too many failed sign-in attempts. Please try again in 15 minutes.',
+  ),
+});
+
 const AUTH_SLOWDOWN_DELAY_AFTER = 3;
+
+/** Login's slow-down, which likewise only escalates on failures. */
+export const loginSlowDown = slowDown({
+  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+  delayAfter: AUTH_SLOWDOWN_DELAY_AFTER,
+  delayMs: (used) => (used - AUTH_SLOWDOWN_DELAY_AFTER) * 500,
+  maxDelayMs: 20_000,
+  skipSuccessfulRequests: true,
+});
 
 export const authSlowDown = slowDown({
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,

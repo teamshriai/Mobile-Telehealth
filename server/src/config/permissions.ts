@@ -30,6 +30,7 @@ export const Permission = {
   AppointmentCancelOwn: 'appointment:cancel:own',
   NotificationReadOwn: 'notification:read:own',
   CareTeamReadOwn: 'careteam:read:own',
+  AiInsightsUseOwn: 'ai:use:own',
 
   // ── Clinician access (Phase 6 doctor portal; enforced from today) ───────
   PatientReadAssigned: 'patient:read:assigned',
@@ -88,6 +89,7 @@ const PATIENT_PERMISSIONS: PermissionName[] = [
   Permission.NotificationReadOwn,
   Permission.CareTeamReadOwn,
   Permission.EncounterReadOwn,
+  Permission.AiInsightsUseOwn,
 ];
 
 const DOCTOR_PERMISSIONS: PermissionName[] = [

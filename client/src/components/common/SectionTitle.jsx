@@ -28,13 +28,13 @@ export default function SectionTitle({
     <div className={`flex items-start justify-between gap-4 ${className}`}>
       <div className="space-y-0.5 min-w-0">
         <h2
-          className={`text-[#0F172A] tracking-tight ${titleSizes[size] || titleSizes.md}`}
+          className={`text-ink tracking-tight ${titleSizes[size] || titleSizes.md}`}
           style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif' }}
         >
           {title}
         </h2>
         {subtitle && (
-          <p className={`text-[#64748B] ${subtitleSizes[size] || subtitleSizes.md}`}>
+          <p className={`text-ink-subtle ${subtitleSizes[size] || subtitleSizes.md}`}>
             {subtitle}
           </p>
         )}

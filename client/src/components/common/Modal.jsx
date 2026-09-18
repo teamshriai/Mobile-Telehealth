@@ -109,7 +109,7 @@ export default function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-[#0F172A]/40"
+            className="absolute inset-0 bg-scrim"
             style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
             onClick={closeable ? onClose : undefined}
             aria-hidden="true"
@@ -127,8 +127,8 @@ export default function Modal({
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className={`
-              focus-ring relative w-full bg-white rounded-xl
-              border border-[#E8EDF2] overflow-hidden
+              focus-ring relative w-full bg-surface-1 rounded-xl
+              border border-border-soft overflow-hidden
               shadow-[0_20px_60px_0_rgba(15,23,42,0.18)]
               ${SIZES[size] || SIZES.md}
               ${className}
@@ -141,13 +141,13 @@ export default function Modal({
                   {title && (
                     <h3
                       id={titleId}
-                      className="text-base font-semibold text-[#0F172A] leading-snug tracking-tight"
+                      className="text-base font-semibold text-ink leading-snug tracking-tight"
                     >
                       {title}
                     </h3>
                   )}
                   {subtitle && (
-                    <p className="text-sm text-[#64748B]">{subtitle}</p>
+                    <p className="text-sm text-ink-subtle">{subtitle}</p>
                   )}
                 </div>
 
@@ -157,7 +157,7 @@ export default function Modal({
                     onClick={onClose}
                     aria-label="Close dialog"
                     className="focus-ring tap-target flex items-center justify-center rounded-lg
-                               text-[#64748B] hover:bg-[#F1F5F9]
+                               text-ink-subtle hover:bg-surface-2
                                transition-colors flex-shrink-0 ml-4"
                   >
                     <X size={16} aria-hidden="true" />
@@ -173,7 +173,7 @@ export default function Modal({
 
             {/* Footer */}
             {footer && (
-              <div className="px-6 pb-6 pt-0 flex items-center justify-end gap-3 border-t border-[#F1F5F9] mt-2 pt-4">
+              <div className="px-6 pb-6 pt-0 flex items-center justify-end gap-3 border-t border-border-soft mt-2 pt-4">
                 {footer}
               </div>
             )}
