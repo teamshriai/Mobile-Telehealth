@@ -10,6 +10,9 @@ import { authRepository, type UserWithRole } from './auth.repository';
 import { refreshTokenService } from './refreshToken.service';
 import { decryptProfile } from '../profile/profile.repository';
 import { toProfileResponseShape } from '../profile/profile.service';
+import { toDoctorProfileResponseShape } from '../doctor/doctorProfile.service';
+import { toStaffProfileResponseShape } from '../hospitalAdmin/staffProfile.service';
+import { CURRENT_TERMS_VERSION } from './auth.validator';
 import type {
   RegisterDto,
   LoginDto,
@@ -75,11 +78,19 @@ export const authService = {
    *
    * 1. Validate email uniqueness
    * 2. Hash password with Argon2id
-   * 3. Fetch Patient role
-   * 4. Create User + PatientProfile in a transaction
+   * 3. Fetch the role matching dto.role (Patient/Doctor/HospitalAdmin — never
+   *    Admin, which the validator does not even accept)
+   * 4. Create User + the matching profile (Patient/Doctor/Staff) in one
+   *    transaction
    * 5. Sign JWT
-   * 6. Write audit log
+   * 6. Write audit log(s)
    * 7. Return token + sanitized user
+   *
+   * Every role is instant-active on creation (no approval gate blocks
+   * login) — see the schema comments on DoctorProfile.isVerified /
+   * StaffProfile.isVerified for why that flag exists anyway: it is a later,
+   * separate credential-check a Hospital Admin (or the global Admin, for a
+   * hospital's first doctor) sets, never a registration-time or login gate.
    */
   async register(
     dto: RegisterDto,
@@ -99,26 +110,61 @@ export const authService = {
       parallelism: env.ARGON2_PARALLELISM,
     });
 
-    // 3. Resolve Patient role
-    const patientRole = await authRepository.findRoleByName(RoleName.Patient);
-    if (patientRole === null) {
+    // 3. Resolve the requested role
+    const role = await authRepository.findRoleByName(RoleName[dto.role]);
+    if (role === null) {
       // Roles not seeded — configuration error, not a user error
       throw new AppError('Service is not configured correctly. Please contact support.', 500);
     }
 
-    // 4. Create user + profile atomically
-    const user = await authRepository.createUserWithProfile({
-      email: dto.email,
-      passwordHash,
-      roleId: patientRole.id,
-      profile: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        dateOfBirth: new Date(dto.dateOfBirth),
-        gender: dto.gender,
-        phoneNumber: dto.phoneNumber,
-      },
-    });
+    const termsAcceptedAt = dto.agreed ? new Date() : null;
+    const termsVersion = dto.agreed ? CURRENT_TERMS_VERSION : null;
+
+    // 4. Create user + the role-appropriate profile atomically
+    let user: UserWithRole;
+    if (dto.role === 'Doctor') {
+      user = await authRepository.createUserWithDoctorProfile({
+        email: dto.email,
+        passwordHash,
+        roleId: role.id,
+        termsAcceptedAt,
+        termsVersion,
+        profile: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          gender: dto.gender,
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+    } else if (dto.role === 'HospitalAdmin') {
+      user = await authRepository.createUserWithStaffProfile({
+        email: dto.email,
+        passwordHash,
+        roleId: role.id,
+        termsAcceptedAt,
+        termsVersion,
+        profile: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+    } else {
+      user = await authRepository.createUserWithProfile({
+        email: dto.email,
+        passwordHash,
+        roleId: role.id,
+        termsAcceptedAt,
+        termsVersion,
+        profile: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          dateOfBirth: new Date(dto.dateOfBirth),
+          gender: dto.gender,
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+    }
 
     // 5. Sign JWT
     const token = signAccessToken({
@@ -139,6 +185,16 @@ export const authService = {
       userAgent: meta.userAgent,
       metadata: { email: user.email, role: user.role.name },
     });
+
+    if (dto.role === 'HospitalAdmin') {
+      auditService.log({
+        action: AuditAction.HospitalAdminRegistered,
+        userId: user.id,
+        severity: AuditSeverity.Info,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+    }
 
     return { token, refreshToken: refresh.token, user: sanitize(user) };
   },
@@ -306,7 +362,14 @@ export const authService = {
 
   /**
    * GET PROFILE
-   * Returns authenticated user + their patient profile.
+   *
+   * Returns authenticated user + whichever profile actually exists for
+   * their role. Previously this only ever looked at patientProfile — a
+   * Doctor or HospitalAdmin's `/auth/me` silently returned `profile: null`
+   * forever, which made onboardingCompletedAt unreadable for those roles
+   * and onboarding routing impossible to implement for them. Branching here
+   * (rather than returning all three profiles) keeps one wire shape per
+   * role, matching this function's own existing discipline for Patient.
    */
   async getProfile(userId: string) {
     const user = await authRepository.findWithProfile(userId);
@@ -314,22 +377,29 @@ export const authService = {
       throw new AppError('User not found.', 404);
     }
 
+    const profile = user.patientProfile
+      ? // Reuse the profile module's curated shaper rather than returning the
+        // raw row. Returning `decryptProfile(...)` directly leaked 41 fields
+        // — the UNMASKED `aadhaarLast4` and the `abhaIdHash` blind index
+        // among them — while GET /profile correctly returned 30 curated
+        // fields with `aadhaarMasked`. One resource must have one wire
+        // shape, or a field ends up protected on one route and exposed on
+        // the other.
+        toProfileResponseShape(decryptProfile(user.patientProfile))
+      : user.doctorProfile
+        ? toDoctorProfileResponseShape(user.doctorProfile)
+        : user.staffProfile
+          ? toStaffProfileResponseShape(user.staffProfile)
+          : null;
+
     return {
       user: sanitize(user),
       // The client uses `permissions` to decide what to RENDER (hide a button
       // the user cannot use). It is never the authorization decision itself —
       // every endpoint re-checks server-side. Sending it saves the frontend
       // from re-deriving the role→capability map and drifting out of sync.
-      permissions: permissionsForRole(user.role.name as RoleName),
-      // Reuse the profile module's curated shaper rather than returning the raw
-      // row. Returning `decryptProfile(...)` directly leaked 41 fields — the
-      // UNMASKED `aadhaarLast4` and the `abhaIdHash` blind index among them —
-      // while GET /profile correctly returned 30 curated fields with
-      // `aadhaarMasked`. One resource must have one wire shape, or a field
-      // ends up protected on one route and exposed on the other.
-      profile: user.patientProfile
-        ? toProfileResponseShape(decryptProfile(user.patientProfile))
-        : null,
+      permissions: permissionsForRole(user.role.name),
+      profile,
     };
   },
 
@@ -348,7 +418,7 @@ export const authService = {
   ): Promise<{ token: string | null; email: string }> {
     const user = await authRepository.findByEmail(dto.email);
 
-    if (user === null || !user.isActive) {
+    if (!user?.isActive) {
       auditService.log({
         action: AuditAction.UserLoginFailed,
         severity: AuditSeverity.Warning,
@@ -446,11 +516,7 @@ export const authService = {
     });
 
     // Execute atomic reset transaction
-    await authRepository.resetPasswordWithToken(
-      resetRecord.id,
-      resetRecord.user.id,
-      passwordHash,
-    );
+    await authRepository.resetPasswordWithToken(resetRecord.id, resetRecord.user.id, passwordHash);
 
     // A password reset is the canonical "I may have been compromised" event.
     // Every existing session must die, not just the one doing the reset.

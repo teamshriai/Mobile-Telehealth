@@ -41,9 +41,17 @@ export function clearAccessToken() {
 }
 
 /**
- * Register a new patient account.
- * The form carries `confirmPassword` and `agreed`, which are client-only and
- * rejected by the backend schema — stripped here rather than in the component.
+ * Register a new account for one of the three self-registering roles
+ * (Patient / Doctor / HospitalAdmin — Admin stays seed/ops-created only).
+ *
+ * The form carries `confirmPassword`, which is client-only and rejected by
+ * the backend schema — stripped here rather than in the component.
+ *
+ * Bug fix: `agreed` (the Terms/Privacy checkbox) used to be stripped here
+ * too, even though the server now records it as `termsAcceptedAt`/
+ * `termsVersion` — every account's consent was collected and validated by
+ * the UI, then silently discarded before the request ever reached the
+ * server, leaving no record it happened. It is sent through as-is now.
  */
 export async function register(formData) {
   const digits = formData.phoneNumber ? formData.phoneNumber.replace(/\D/g, '') : ''
@@ -58,6 +66,8 @@ export async function register(formData) {
     dateOfBirth: formData.dateOfBirth,
     phoneNumber: local ? `+91 ${local}` : '',
     password: formData.password,
+    role: formData.role ?? 'Patient',
+    agreed: formData.agreed,
   }
 
   const { token, user } = await apiClient.post('/auth/register', payload)

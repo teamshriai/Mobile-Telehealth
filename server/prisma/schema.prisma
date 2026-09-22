@@ -42,6 +42,11 @@ enum RoleName {
   Doctor
   HealthcareWorker
   LabTechnician
+  /// Manages a single hospital's doctors, patients-in-context and operations.
+  /// Deliberately NOT the same role as Admin — Admin is walled off from all
+  /// clinical/patient access by design (see careRelationship.service.ts);
+  /// HospitalAdmin needs exactly that access, scoped to one hospital.
+  HospitalAdmin
 
   @@map("role_name")
 }
@@ -173,6 +178,27 @@ enum AuditAction {
   AiPolicyBlocked
   AiProviderError
   AiConversationDeleted
+  // ── Hospital Admin / three-role onboarding ──────────────────────────────
+  HospitalAdminRegistered
+  DoctorAvailabilityUpdated
+  FeedbackSubmitted
+  // ── Care-team membership ────────────────────────────────────────────────
+  // Who may read a patient's record is decided by care-team membership, so
+  // granting and ending one is an authorization change and audited as such.
+  CareTeamAssigned
+  CareTeamEnded
+  // ── Appointments ────────────────────────────────────────────────────────
+  // Appointment writes previously logged as ProfileUpdated with an
+  // `operation` discriminator in metadata, which made them invisible to any
+  // query filtering by action.
+  AppointmentCreated
+  AppointmentRescheduled
+  AppointmentStatusChanged
+  AppointmentCancelled
+  // ── Clinical notes ──────────────────────────────────────────────────────
+  NoteCreated
+  NoteSigned
+  NoteAmended
 
   @@map("audit_action")
 }
@@ -216,10 +242,10 @@ model Role {
 
 model Permission {
   id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique              // e.g. "patient:read"
+  name        String   @unique // e.g. "patient:read"
   description String?
-  resource    String                        // e.g. "patient", "lab_report"
-  action      String                        // e.g. "create", "read", "update", "delete"
+  resource    String // e.g. "patient", "lab_report"
+  action      String // e.g. "create", "read", "update", "delete"
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -240,8 +266,8 @@ model Permission {
 // =============================================================================
 
 model RolePermission {
-  roleId       String @map("role_id") @db.Uuid
-  permissionId String @map("permission_id") @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
 
   // ── Relations ───────────────────────────────────────────────────────────
@@ -270,8 +296,8 @@ model RolePermission {
 // =============================================================================
 
 model User {
-  id    String   @id @default(uuid()) @db.Uuid
-  email String   @unique
+  id           String @id @default(uuid()) @db.Uuid
+  email        String @unique
   passwordHash String @map("password_hash")
 
   // ── Role FK ──────────────────────────────────────────────────────────────
@@ -279,38 +305,45 @@ model User {
 
   // ── Account Status ────────────────────────────────────────────────────────
   isVerified Boolean @default(false) @map("is_verified")
-  isActive   Boolean @default(true)  @map("is_active")
+  isActive   Boolean @default(true) @map("is_active")
 
   // ── Security Fields ───────────────────────────────────────────────────────
-  failedLoginAttempts Int       @default(0)  @map("failed_login_attempts")
-  lockedUntil         DateTime?              @map("locked_until")
-  lastLoginAt         DateTime?              @map("last_login_at")
-  passwordChangedAt   DateTime?              @map("password_changed_at")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastLoginAt         DateTime? @map("last_login_at")
+  passwordChangedAt   DateTime? @map("password_changed_at")
 
   // ── Email Verification ────────────────────────────────────────────────────
   // verificationToken is UNIQUE: prevents token collision across users.
   // It is nullable: NULL when the account is already verified.
   verificationToken   String?   @unique @map("verification_token")
-  verificationExpires DateTime?           @map("verification_expires")
+  verificationExpires DateTime? @map("verification_expires")
+
+  // ── Consent ───────────────────────────────────────────────────────────────
+  // Set when the registration form's "I agree to Terms & Privacy" checkbox is
+  // checked. Previously collected client-side and silently discarded before
+  // reaching the server — this is the fix for that gap.
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
+  termsVersion    String?   @map("terms_version")
 
   // ── Soft Delete ───────────────────────────────────────────────────────────
   deletedAt DateTime? @map("deleted_at")
 
   // ── Timestamps ────────────────────────────────────────────────────────────
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // ── Relations ─────────────────────────────────────────────────────────────
-  role               Role                 @relation(fields: [roleId], references: [id])
-  patientProfile     PatientProfile?
-  doctorProfile      DoctorProfile?
-  staffProfile       StaffProfile?
-  auditLogs          AuditLog[]
+  role                Role                 @relation(fields: [roleId], references: [id])
+  patientProfile      PatientProfile?
+  doctorProfile       DoctorProfile?
+  staffProfile        StaffProfile?
+  auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
-  refreshTokens      RefreshToken[]
-  notifications      Notification[]
-  aiConversations    AiConversation[]
-  aiMemoryChunks     AiMemoryChunk[]
+  refreshTokens       RefreshToken[]
+  notifications       Notification[]
+  aiConversations     AiConversation[]
+  aiMemoryChunks      AiMemoryChunk[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // email: @unique creates the lookup index implicitly — not duplicated here.
@@ -370,36 +403,41 @@ model PatientProfile {
   /// which is the default. Fails closed: absent or false means "real".
   isSyntheticData Boolean @default(false) @map("is_synthetic_data")
 
-  aiMemoryChunks     AiMemoryChunk[]
+  aiMemoryChunks AiMemoryChunk[]
+
+  /// Set once the Required-tier onboarding fields are filled and the patient
+  /// has passed the "enter the app" gate. Null means still onboarding.
+  /// Recommended/Optional fields remain fillable later regardless of this.
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
 
   registrationSource RegistrationSource @default(SelfRegistered) @map("registration_source")
   // Set only when registrationSource is Staff/FieldRegistered. The User who
   // performed the registration — used by the HealthcareWorker care-relationship
   // grant (see careRelationship.service.ts) since a field worker has no
   // CareTeamMember row.
-  registeredByUserId String? @map("registered_by_user_id") @db.Uuid
-  identityStatus     IdentityStatus @default(Unverified) @map("identity_status")
+  registeredByUserId String?            @map("registered_by_user_id") @db.Uuid
+  identityStatus     IdentityStatus     @default(Unverified) @map("identity_status")
 
   // ── Basic Information ─────────────────────────────────────────────────────
-  firstName     String        @map("first_name")
-  middleName    String?       @map("middle_name")
-  lastName      String        @map("last_name")
+  firstName      String         @map("first_name")
+  middleName     String?        @map("middle_name")
+  lastName       String         @map("last_name")
   // Nullable as of Phase 6: an unconscious/unidentified patient may have no
   // known DOB. dobIsEstimated distinguishes a real recorded value from a
   // clinician's best guess — never silently treated the same as a confirmed
   // date (age-based dosing depends on this distinction).
   dateOfBirth    DateTime?      @map("date_of_birth") @db.Date
   dobIsEstimated Boolean        @default(false) @map("dob_is_estimated")
-  gender        Gender?
-  bloodGroup    BloodGroup?   @map("blood_group")
-  maritalStatus MaritalStatus? @map("marital_status")
+  gender         Gender?
+  bloodGroup     BloodGroup?    @map("blood_group")
+  maritalStatus  MaritalStatus? @map("marital_status")
 
   // ── Profile Photo ─────────────────────────────────────────────────────────
   // Stores only the relative filename — e.g. "uuid.jpg"
   // Full URL is constructed at the service layer.
   // Binary data NEVER stored in PostgreSQL.
-  profilePhoto      String?       @map("profile_photo")
-  photoMetadata     ProfilePhoto?
+  profilePhoto  String?       @map("profile_photo")
+  photoMetadata ProfilePhoto?
 
   // ── Identification ────────────────────────────────────────────────────────
   // abhaId is stored ENCRYPTED (AES-256-GCM, random IV per value) — see
@@ -408,30 +446,30 @@ model PatientProfile {
   // enforced on this column directly. abhaIdHash is a deterministic
   // HMAC-SHA256 blind index of the plaintext, carrying the @unique
   // constraint instead — the encrypted value is never used for lookups.
-  abhaId        String? @map("abha_id")
-  abhaIdHash    String? @unique @map("abha_id_hash")
+  abhaId         String? @map("abha_id")
+  abhaIdHash     String? @unique @map("abha_id_hash")
   passportNumber String? @map("passport_number")
   // Only the last 4 digits are ever accepted or stored — the full 12-digit
   // Aadhaar number is never persisted, so there is no "full identifier" to
   // secure/migrate later. Displayed to the user as e.g. "XXXX-XXXX-1234".
   // Stored encrypted — no longer a fixed-width column (ciphertext is longer
   // than 4 chars).
-  aadhaarLast4  String? @map("aadhaar_last4")
+  aadhaarLast4   String? @map("aadhaar_last4")
 
   // ── Contact ───────────────────────────────────────────────────────────────
   // phoneNumber/alternatePhone/address* are stored ENCRYPTED (see abhaId
   // comment above for the encryption scheme). country is left plaintext —
   // low sensitivity, used as a display default.
-  phoneNumber     String? @map("phone_number")
-  alternatePhone  String? @map("alternate_phone")
-  addressLine1    String? @map("address_line1")
-  addressLine2    String? @map("address_line2")
-  village         String?
-  city            String?
-  district        String?
-  state           String?
-  country         String? @default("India")
-  postalCode      String? @map("postal_code")
+  phoneNumber    String? @map("phone_number")
+  alternatePhone String? @map("alternate_phone")
+  addressLine1   String? @map("address_line1")
+  addressLine2   String? @map("address_line2")
+  village        String?
+  city           String?
+  district       String?
+  state          String?
+  country        String? @default("India")
+  postalCode     String? @map("postal_code")
 
   // ── Emergency Contact ─────────────────────────────────────────────────────
   // Stored ENCRYPTED.
@@ -440,20 +478,20 @@ model PatientProfile {
   emergencyContactRelation String? @map("emergency_contact_relation")
 
   // ── Lifestyle ─────────────────────────────────────────────────────────────
-  smokingStatus    SmokingStatus?  @map("smoking_status")
-  alcoholStatus    AlcoholStatus?  @map("alcohol_status")
-  tobaccoStatus    TobaccoStatus?  @map("tobacco_status")
+  smokingStatus    SmokingStatus?    @map("smoking_status")
+  alcoholStatus    AlcoholStatus?    @map("alcohol_status")
+  tobaccoStatus    TobaccoStatus?    @map("tobacco_status")
   physicalActivity PhysicalActivity? @map("physical_activity")
   occupation       String?
 
   // ── Medical Summary ───────────────────────────────────────────────────────
   // Stored as plain text / comma-separated lists, ENCRYPTED.
   // Future: normalize to separate tables per domain requirement.
-  knownAllergies    String?   @map("known_allergies")
+  knownAllergies     String? @map("known_allergies")
   currentMedications String? @map("current_medications")
-  existingDiseases  String?  @map("existing_diseases")
-  familyHistory     String?  @map("family_history")
-  previousSurgeries String?  @map("previous_surgeries")
+  existingDiseases   String? @map("existing_diseases")
+  familyHistory      String? @map("family_history")
+  previousSurgeries  String? @map("previous_surgeries")
 
   // ── Preferences ───────────────────────────────────────────────────────────
   // Notification/privacy/accessibility/language settings from the Settings
@@ -465,16 +503,18 @@ model PatientProfile {
 
   // ── Timestamps ────────────────────────────────────────────────────────────
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // ── Relations ─────────────────────────────────────────────────────────────
   // Nullable relation to match nullable userId — a login-less patient has no
   // linked User row until link-account is used.
   user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  careTeam     CareTeamMember[]
-  appointments Appointment[]
-  encounters   Encounter[]
+  careTeam      CareTeamMember[]
+  appointments  Appointment[]
+  encounters    Encounter[]
+  feedback      Feedback[]
+  clinicalNotes ClinicalNote[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
@@ -545,7 +585,7 @@ model AuditLog {
   id         String        @id @default(uuid()) @db.Uuid
   userId     String?       @map("user_id") @db.Uuid
   action     AuditAction
-  resource   String?                            // e.g. "user", "patient_profile"
+  resource   String? // e.g. "user", "patient_profile"
   resourceId String?       @map("resource_id") // UUID of the affected row
   severity   AuditSeverity @default(Info)
   ipAddress  String?       @map("ip_address")
@@ -581,14 +621,14 @@ model AuditLog {
 // One-to-one with PatientProfile.
 // =============================================================================
 model ProfilePhoto {
-  id               String         @id @default(uuid()) @db.Uuid
-  patientProfileId String         @unique @map("patient_profile_id") @db.Uuid
+  id               String   @id @default(uuid()) @db.Uuid
+  patientProfileId String   @unique @map("patient_profile_id") @db.Uuid
   filename         String
   path             String
-  mimeType         String         @map("mime_type")
-  uploadedAt       DateTime       @default(now()) @map("uploaded_at")
+  mimeType         String   @map("mime_type")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
 
-  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  patientProfile PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
 
   @@map("profile_photos")
 }
@@ -634,27 +674,27 @@ model PasswordResetToken {
 //    sessions later without another schema change.
 // =============================================================================
 model RefreshToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
 
-  tokenHash String    @unique @map("token_hash")
+  tokenHash String @unique @map("token_hash")
 
   /// All tokens rotated from a single login share this id.
-  familyId  String    @map("family_id") @db.Uuid
+  familyId String @map("family_id") @db.Uuid
 
   /// Set when this token is rotated away or explicitly revoked. Non-null = unusable.
-  revokedAt DateTime? @map("revoked_at")
+  revokedAt  DateTime? @map("revoked_at")
   /// Hash of the token that replaced this one — audit trail for rotation.
-  replacedBy String?  @map("replaced_by")
+  replacedBy String?   @map("replaced_by")
 
-  expiresAt DateTime  @map("expires_at")
+  expiresAt DateTime @map("expires_at")
 
   // ── Session context (for a future "your devices" screen) ─────────────────
   deviceLabel String? @map("device_label")
   ipAddress   String? @map("ip_address")
   userAgent   String? @map("user_agent")
 
-  createdAt DateTime  @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -687,29 +727,50 @@ model DoctorProfile {
   /// ABDM Healthcare Professional Registry id.
   hprId              String? @unique @map("hpr_id")
 
-  specialty      String?
-  qualifications String?
-  /// Free text until a Hospital/Facility model is justified by real requirements.
-  hospitalName   String? @map("hospital_name")
-  yearsExperience Int?   @map("years_experience")
+  specialty       String?
+  qualifications  String?
+  /// Free text fallback — kept for legacy/unmatched rows. A doctor who
+  /// selects a real Hospital during onboarding gets hospitalId set instead;
+  /// this stays populated too so existing display code needs no branching.
+  hospitalName    String? @map("hospital_name")
+  /// Structured link, added once a Hospital model existed to justify it.
+  /// Nullable: an independent/unaffiliated doctor has no hospital at all.
+  hospitalId      String? @map("hospital_id") @db.Uuid
+  yearsExperience Int?    @map("years_experience")
 
-  /// Set by an administrator once credentials are checked. Never self-service.
-  isVerified Boolean   @default(false) @map("is_verified")
-  verifiedAt DateTime? @map("verified_at")
+  /// Set by an administrator (Hospital Admin, or the global Admin for a
+  /// hospital's first doctor) once credentials are checked. Never
+  /// self-service, and never a login gate — see onboarding decision notes.
+  isVerified       Boolean   @default(false) @map("is_verified")
+  verifiedAt       DateTime? @map("verified_at")
+  /// Plain field, same pattern as PatientProfile.registeredByUserId — no
+  /// formal relation needed for a one-directional attribution column.
+  verifiedByUserId String?   @map("verified_by_user_id") @db.Uuid
 
-  phoneNumber String? @map("phone_number")
+  /// Set once the Required-tier onboarding fields (specialty, hospital
+  /// choice, experience) are filled. Recommended/Optional (qualifications,
+  /// registration number, HPR id, photo) and Availability remain fillable
+  /// later regardless of this.
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+
+  phoneNumber  String? @map("phone_number")
   profilePhoto String? @map("profile_photo")
 
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt      @map("updated_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
-  user     User             @relation(fields: [userId], references: [id], onDelete: Restrict)
-  careTeam CareTeamMember[]
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  hospital     Hospital?            @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  careTeam     CareTeamMember[]
   appointments Appointment[]
+  availability DoctorAvailability[]
+  leaves       DoctorLeave[]
+  feedback     Feedback[]
 
   @@index([lastName, firstName])
   @@index([specialty])
+  @@index([hospitalId])
   @@map("doctor_profiles")
 }
 
@@ -733,16 +794,151 @@ model StaffProfile {
   department String?
   employeeId String? @unique @map("employee_id")
 
+  /// Only meaningful for HospitalAdmin rows today. Nullable: Admin and
+  /// LabTechnician have no hospital affiliation concept.
+  hospitalId String? @map("hospital_id") @db.Uuid
+
+  /// StaffProfile previously had no verification concept at all. Added for
+  /// HospitalAdmin, mirroring DoctorProfile.isVerified: never a login gate,
+  /// a credential-check/badge flag another administrator sets.
+  isVerified       Boolean   @default(false) @map("is_verified")
+  verifiedAt       DateTime? @map("verified_at")
+  verifiedByUserId String?   @map("verified_by_user_id") @db.Uuid
+
+  /// Set once this role's Required-tier onboarding fields are filled.
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+
   phoneNumber String? @map("phone_number")
 
   deletedAt DateTime? @map("deleted_at")
   createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt      @map("updated_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  hospital Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
 
   @@index([lastName, firstName])
+  @@index([hospitalId])
   @@map("staff_profiles")
+}
+
+// =============================================================================
+// HOSPITAL
+//
+// Added to back the HospitalAdmin role. Deliberately minimal: this platform
+// does not need a facilities/billing/department hierarchy yet, only a stable
+// entity doctors and hospital-admin staff can be scoped to. Patients are
+// intentionally NOT linked here (no PatientProfile.hospitalId) — a patient
+// may see doctors from more than one hospital over their lifetime, so "which
+// patients belong to this hospital" is a derived query through
+// CareTeamMember/Appointment → DoctorProfile.hospitalId, never a stored
+// column (see hospitalAdmin.service.ts).
+// =============================================================================
+model Hospital {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String
+  city     String?
+  state    String?
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  doctors DoctorProfile[]
+  staff   StaffProfile[]
+
+  @@index([isActive])
+  @@map("hospitals")
+}
+
+// =============================================================================
+// DOCTOR AVAILABILITY / LEAVE
+//
+// Recurring weekly hours a doctor can be booked in, plus leave periods that
+// override them. Deliberately NOT wired into the appointment booking flow
+// yet (Appointment.scheduledAt is still freely chosen) — that integration is
+// a real follow-up, kept out of this phase to bound scope. Today these are
+// visible to the doctor (self-service) and to their Hospital Admin.
+// =============================================================================
+model DoctorAvailability {
+  id       String @id @default(uuid()) @db.Uuid
+  doctorId String @map("doctor_id") @db.Uuid
+
+  /// 0=Sunday..6=Saturday.
+  dayOfWeek Int    @map("day_of_week")
+  /// "HH:mm", 24-hour, no date component — validated at the service layer.
+  startTime String @map("start_time")
+  endTime   String @map("end_time")
+
+  slotDurationMins Int     @default(30) @map("slot_duration_mins")
+  isActive         Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  doctor DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, dayOfWeek])
+  @@map("doctor_availability")
+}
+
+model DoctorLeave {
+  id       String @id @default(uuid()) @db.Uuid
+  doctorId String @map("doctor_id") @db.Uuid
+
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  reason    String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  doctor DoctorProfile @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, startDate, endDate])
+  @@map("doctor_leaves")
+}
+
+// =============================================================================
+// FEEDBACK
+//
+// Patient-authored feedback on a doctor, a hospital's service, or the app
+// itself. `comment` is encrypted at rest — the same rule as every other
+// patient-authored free-text field (see PatientProfile's medical summary
+// fields). Hospital Admin reads this aggregated and scoped to their own
+// hospital's doctors, never as a raw per-patient feed (see feedback.service.ts).
+// =============================================================================
+enum FeedbackCategory {
+  DoctorExperience
+  HospitalService
+  AppUsability
+  Other
+
+  @@map("feedback_category")
+}
+
+model Feedback {
+  id            String  @id @default(uuid()) @db.Uuid
+  patientId     String  @map("patient_id") @db.Uuid
+  doctorId      String? @map("doctor_id") @db.Uuid
+  appointmentId String? @map("appointment_id") @db.Uuid
+
+  category FeedbackCategory
+  /// 1-5, validated at the service layer (not a DB check constraint — Prisma
+  /// has no portable way to express one, and the service layer already owns
+  /// every other cross-field validation in this codebase).
+  rating   Int
+  /// Encrypted at rest — patient-authored free text about their care.
+  comment  String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor      DoctorProfile? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
+  appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([doctorId])
+  @@index([category, createdAt])
+  @@map("feedback")
 }
 
 // =============================================================================
@@ -759,7 +955,7 @@ model StaffProfile {
 model CareTeamMember {
   id        String @id @default(uuid()) @db.Uuid
   patientId String @map("patient_id") @db.Uuid
-  doctorId  String @map("doctor_id")  @db.Uuid
+  doctorId  String @map("doctor_id") @db.Uuid
 
   /// Role on THIS patient's care team, e.g. "Neurologist", "Physiotherapist".
   /// Distinct from the platform RoleName — a doctor's account role never changes.
@@ -770,10 +966,10 @@ model CareTeamMember {
   activeTo   DateTime? @map("active_to")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor  DoctorProfile  @relation(fields: [doctorId],  references: [id], onDelete: Restrict)
+  doctor  DoctorProfile  @relation(fields: [doctorId], references: [id], onDelete: Restrict)
 
   /// A doctor holds one active assignment per patient. Re-assignment after an
   /// activeTo is intentionally allowed — hence the composite includes careRole.
@@ -794,8 +990,8 @@ model CareTeamMember {
 // the patient's timezone. Never store wall-clock time without a zone.
 // =============================================================================
 model Appointment {
-  id        String @id @default(uuid()) @db.Uuid
-  patientId String @map("patient_id") @db.Uuid
+  id        String  @id @default(uuid()) @db.Uuid
+  patientId String  @map("patient_id") @db.Uuid
   doctorId  String? @map("doctor_id") @db.Uuid
 
   scheduledAt  DateTime @map("scheduled_at")
@@ -816,14 +1012,16 @@ model Appointment {
   cancelReason String?   @map("cancel_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor  DoctorProfile? @relation(fields: [doctorId],  references: [id], onDelete: SetNull)
+  doctor  DoctorProfile? @relation(fields: [doctorId], references: [id], onDelete: SetNull)
 
   /// Reverse side of Encounter.appointmentId. At most one encounter links to
   /// a given appointment (enforced by @unique on that field).
-  encounter Encounter?
+  encounter     Encounter?
+  feedback      Feedback[]
+  clinicalNotes ClinicalNote[]
 
   @@index([patientId])
   @@index([doctorId])
@@ -912,12 +1110,12 @@ model AiConversation {
   /// Rolling summary of turns older than the working window. ENCRYPTED, same
   /// rule as the messages it summarises. Written AFTER a reply is returned so
   /// the summariser is never on the patient's critical path.
-  summary String? 
+  summary                 String?
   summaryThroughMessageId String? @map("summary_through_message_id") @db.Uuid
   summaryTokenCount       Int?    @map("summary_token_count")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages AiMessage[]
@@ -1012,9 +1210,9 @@ enum AiChunkSource {
 /// per-patient chunk count an exact scan is both faster and, unlike an ANN
 /// index, cannot silently under-return a patient-scoped query.
 model AiMemoryChunk {
-  id          String        @id @default(uuid()) @db.Uuid
-  ownerUserId String        @map("owner_user_id") @db.Uuid
-  patientId   String?       @map("patient_id") @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  ownerUserId String  @map("owner_user_id") @db.Uuid
+  patientId   String? @map("patient_id") @db.Uuid
 
   sourceType  AiChunkSource @map("source_type")
   sourceId    String        @map("source_id") @db.Uuid
@@ -1025,8 +1223,8 @@ model AiMemoryChunk {
   content     String
   /// hmacBlindIndex(renderedText) — a keyed digest, not a bare hash, so it is
   /// not rainbow-tableable against a short string like "Penicillin".
-  contentHash String        @map("content_hash")
-  tokenCount  Int           @map("token_count")
+  contentHash String @map("content_hash")
+  tokenCount  Int    @map("token_count")
 
   /// Nullable so a chunk can exist with embedding pending (e.g. embedder
   /// temporarily unavailable) without failing the whole sync pass.
@@ -1039,7 +1237,7 @@ model AiMemoryChunk {
   sourceUpdatedAt DateTime @map("source_updated_at")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   owner   User            @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   patient PatientProfile? @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -1060,7 +1258,7 @@ model AiUsageDaily {
   blockedCount     Int @default(0) @map("blocked_count")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@unique([userId, day])
   @@map("ai_usage_daily")
@@ -1122,12 +1320,13 @@ model Encounter {
   chiefComplaint String? @map("chief_complaint")
 
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   patient     PatientProfile @relation(fields: [patientId], references: [id], onDelete: Restrict)
   appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   strokeAssessment StrokeAssessment?
+  clinicalNotes    ClinicalNote[]
 
   @@index([patientId, startedAt])
   @@index([status])
@@ -1180,27 +1379,27 @@ model StrokeAssessment {
   // The single most consequential value in acute stroke care — it gates
   // thrombolysis eligibility. See StrokeLkwRevision below: every change to
   // these three fields must be independently, transactionally recorded.
-  lkwAt        DateTime?     @map("lkw_at")
-  lkwCertainty LkwCertainty  @default(Unknown) @map("lkw_certainty")
-  lkwSource    LkwSource?    @map("lkw_source")
+  lkwAt        DateTime?    @map("lkw_at")
+  lkwCertainty LkwCertainty @default(Unknown) @map("lkw_certainty")
+  lkwSource    LkwSource?   @map("lkw_source")
   /// Free text context ("wife last saw him normal at dinner"). Encrypted.
-  lkwNote      String?       @map("lkw_note")
+  lkwNote      String?      @map("lkw_note")
 
   // ── Symptom flags ──────────────────────────────────────────────────────────
   // A checklist of REPORTED symptoms, not a diagnosis. The service layer
   // must never render or log any of this as "patient has stroke" — only as
   // "potential stroke symptoms identified" (see encounter.service.ts).
-  facialWeakness     Boolean @default(false) @map("facial_weakness")
-  armWeakness        Boolean @default(false) @map("arm_weakness")
-  legWeakness        Boolean @default(false) @map("leg_weakness")
-  speechDifficulty   Boolean @default(false) @map("speech_difficulty")
-  suddenConfusion    Boolean @default(false) @map("sudden_confusion")
-  visionProblem      Boolean @default(false) @map("vision_problem")
-  severeHeadache     Boolean @default(false) @map("severe_headache")
-  balanceProblem     Boolean @default(false) @map("balance_problem")
+  facialWeakness      Boolean @default(false) @map("facial_weakness")
+  armWeakness         Boolean @default(false) @map("arm_weakness")
+  legWeakness         Boolean @default(false) @map("leg_weakness")
+  speechDifficulty    Boolean @default(false) @map("speech_difficulty")
+  suddenConfusion     Boolean @default(false) @map("sudden_confusion")
+  visionProblem       Boolean @default(false) @map("vision_problem")
+  severeHeadache      Boolean @default(false) @map("severe_headache")
+  balanceProblem      Boolean @default(false) @map("balance_problem")
   lossOfConsciousness Boolean @default(false) @map("loss_of_consciousness")
   /// Free text for a symptom not covered above. Encrypted.
-  otherSymptomNote   String? @map("other_symptom_note")
+  otherSymptomNote    String? @map("other_symptom_note")
 
   /// True only when at least one symptom flag above is set AND the encounter
   /// type indicates urgency. This is a WORKFLOW SIGNAL — routes the patient
@@ -1210,8 +1409,8 @@ model StrokeAssessment {
   onAnticoagulants Boolean? @map("on_anticoagulants")
 
   createdByUserId String?  @map("created_by_user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt      @map("updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   encounter  Encounter           @relation(fields: [encounterId], references: [id], onDelete: Restrict)
   lkwHistory StrokeLkwRevision[]
@@ -1272,4 +1471,100 @@ model StrokeLkwRevision {
 
   @@index([assessmentId, createdAt])
   @@map("stroke_lkw_revisions")
+}
+
+// =============================================================================
+// CLINICAL NOTE — the consultation record
+// =============================================================================
+
+enum ClinicalNoteStatus {
+  Draft
+  Signed
+
+  @@map("clinical_note_status")
+}
+
+/// A clinician's consultation note, in the SOAP structure UI_ATLAS S-06-03
+/// specifies (Subjective / Objective / Assessment / Plan) plus a coded
+/// problem and an attestation.
+///
+/// ⚠️ A SIGNED NOTE IS NEVER EDITED — only amended, via ClinicalNoteAddendum.
+/// That is NABH (CMP-NABH-10) and it is enforced in the repository, which
+/// scopes every content update to `status: Draft`, not merely hidden in the
+/// UI. The same discipline as StrokeLkwRevision, which keeps an append-only
+/// side-log rather than overwriting a safety-critical value.
+model ClinicalNote {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+
+  /// Optional links to the visit this note documents. Both are nullable: a
+  /// note may be written outside any booked appointment or opened encounter.
+  encounterId   String? @map("encounter_id") @db.Uuid
+  appointmentId String? @map("appointment_id") @db.Uuid
+
+  /// The authoring clinician's User id. A plain column, not a relation —
+  /// the same pattern as Encounter.createdByUserId.
+  authorUserId String @map("author_user_id") @db.Uuid
+
+  /// The four SOAP sections. All clinician-authored free text about a
+  /// patient, so all four are ENCRYPTED at rest — see
+  /// clinicalNote.repository.ts's NOTE_ENCRYPTED_FIELDS.
+  subjective String?
+  objective  String?
+  assessment String?
+  plan       String?
+
+  /// ICD-10 leaf code and its label. Not encrypted: a diagnosis code is
+  /// indexed and reported on, and the code alone is meaningless without the
+  /// patient row it hangs off, which is itself access-controlled.
+  problemCode String? @map("problem_code")
+  problemText String? @map("problem_text")
+
+  status ClinicalNoteStatus @default(Draft)
+
+  /// Attestation. STAMPED AT SIGN TIME FROM THE SESSION, never typed by the
+  /// author — CMP-NABH-11 requires author identity, registration number and
+  /// timestamp on the legal record, and a typed name is not an attestation.
+  /// The name and registration number are copied rather than joined so the
+  /// record still reads correctly if the doctor later changes either.
+  signedAt                 DateTime? @map("signed_at")
+  signedByUserId           String?   @map("signed_by_user_id") @db.Uuid
+  signerName               String?   @map("signer_name")
+  signerRegistrationNumber String?   @map("signer_registration_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  patient     PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter   Encounter?             @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  appointment Appointment?           @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  addenda     ClinicalNoteAddendum[]
+
+  @@index([patientId, createdAt])
+  @@index([authorUserId, createdAt])
+  @@index([encounterId])
+  @@index([status])
+  @@map("clinical_notes")
+}
+
+/// An addition to an already-signed note. Append-only by construction: there
+/// is no update path, so the original note and every amendment stay
+/// separately attributed and separately timestamped.
+model ClinicalNoteAddendum {
+  id     String @id @default(uuid()) @db.Uuid
+  noteId String @map("note_id") @db.Uuid
+
+  /// Clinician free text — ENCRYPTED at rest, same as the note's own sections.
+  body String
+
+  authorUserId             String  @map("author_user_id") @db.Uuid
+  authorName               String  @map("author_name")
+  authorRegistrationNumber String? @map("author_registration_number")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note ClinicalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt])
+  @@map("clinical_note_addenda")
 }

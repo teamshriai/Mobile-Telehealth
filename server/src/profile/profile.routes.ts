@@ -4,6 +4,7 @@ import {
   updateProfile,
   updateHealthHistory,
   updatePreferences,
+  completeOnboarding,
 } from './profile.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
@@ -30,5 +31,11 @@ router.patch(
   updateHealthHistory,
 );
 router.patch('/preferences', authenticate, authorize(RoleName.Patient), updatePreferences);
+router.post(
+  '/onboarding-complete',
+  authenticate,
+  authorize(RoleName.Patient),
+  completeOnboarding,
+);
 
 export { router as profileRouter };

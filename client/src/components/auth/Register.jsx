@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
+  ArrowLeft,
   Eye,
   EyeOff,
   Mail,
@@ -11,12 +12,41 @@ import {
   Calendar,
   Phone,
   Check,
-  Shield
+  Shield,
+  HeartPulse,
+  Stethoscope,
+  Building2,
 } from 'lucide-react'
 import { useAuth } from '../../app/AuthContext.jsx'
-import { homeForRole } from '../../app/guards.jsx'
 import BrandMark from '../common/BrandMark.jsx'
 import AuthShell from './AuthShell.jsx'
+
+/**
+ * The role-selection step. Presented before the identity form so
+ * registration branches into the right onboarding path from the start,
+ * rather than defaulting everyone to Patient. Admin is deliberately absent
+ * — the global Admin role stays seed/ops-created only, never self-service.
+ */
+const ROLE_OPTIONS = [
+  {
+    value: 'Patient',
+    label: 'Patient',
+    icon: HeartPulse,
+    description: 'Book visits, track your health, and message your care team.',
+  },
+  {
+    value: 'Doctor',
+    label: 'Doctor',
+    icon: Stethoscope,
+    description: 'Manage your patients, availability, and clinical schedule.',
+  },
+  {
+    value: 'HospitalAdmin',
+    label: 'Hospital Administrator',
+    icon: Building2,
+    description: "Manage your hospital's doctors, patients and operations.",
+  },
+]
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -50,7 +80,9 @@ const getPasswordStrength = (password) => {
 export default function Register() {
   const navigate = useNavigate()
   const { register, loading, error: authError } = useAuth()
+  const [step, setStep] = useState('role')
   const [form, setForm] = useState({
+    role: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -64,6 +96,13 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [successBanner, setSuccessBanner] = useState('')
+
+  const selectedRole = ROLE_OPTIONS.find((r) => r.value === form.role)
+
+  const chooseRole = (value) => {
+    setForm((prev) => ({ ...prev, role: value }))
+    setStep('form')
+  }
 
   const strength = getPasswordStrength(form.password)
 
@@ -146,11 +185,15 @@ export default function Register() {
         // Registration signs the user in (the API returns a session), so
         // sending them to /login would ask them to authenticate again for no
         // reason — and RequireAnonymous would bounce them straight back.
-        setSuccessBanner('Account created. Taking you to your portal…')
+        // A fresh registration always has onboarding to complete — sending
+        // it straight to the onboarding flow avoids a pointless bounce
+        // through the portal home, which RequireAuth would redirect away
+        // from anyway (see guards.jsx's needsOnboarding check).
+        setSuccessBanner("Account created. Let's finish setting up your profile…")
         window.scrollTo({ top: 0, behavior: 'smooth' })
 
         setTimeout(() => {
-          navigate(homeForRole(result.role), { replace: true })
+          navigate('/onboarding', { replace: true })
         }, 900)
         return
       }
@@ -165,6 +208,76 @@ export default function Register() {
     } catch (err) {
       setErrors({ global: err.message || 'Registration failed. Please try again.' })
     }
+  }
+
+  if (step === 'role') {
+    return (
+      <AuthShell>
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="relative z-10 w-full max-w-[640px] bg-surface-1 rounded-lg shadow-2xl border border-surface-1/80 overflow-hidden"
+          style={{ boxShadow: '0 6px 32px 0 rgba(26,46,59,0.08), 0 2px 6px 0 rgba(0,0,0,0.04)' }}
+        >
+          <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-600 via-accent-clay-fg to-accent-sage-fg" />
+
+          <div className="px-6 py-8 sm:px-10 sm:py-10">
+            <div className="flex items-center gap-2.5 mb-6">
+              <BrandMark size={18} />
+              <span className="text-lg font-bold tracking-tight text-ink">Stroke AI</span>
+            </div>
+
+            <h1 className="text-2xl md:text-[28px] font-bold tracking-tight text-ink">
+              Which of these describes you?
+            </h1>
+            <p className="mt-2 text-sm text-ink-muted">
+              We'll set up the right kind of account and onboarding for you.
+            </p>
+
+            <div role="radiogroup" aria-label="Account type" className="mt-6 space-y-3">
+              {ROLE_OPTIONS.map((option, index) => {
+                const Icon = option.icon
+                return (
+                  <motion.button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.role === option.value}
+                    custom={index}
+                    variants={fadeIn}
+                    initial="initial"
+                    animate="animate"
+                    onClick={() => chooseRole(option.value)}
+                    className="focus-ring group flex w-full items-center gap-4 rounded-lg border border-border-soft bg-surface-1 px-4 py-4 text-left transition-all duration-150 hover:border-primary-700/50 hover:bg-primary-50/40"
+                  >
+                    <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+                      <Icon size={20} strokeWidth={2} />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block text-sm font-semibold text-ink">{option.label}</span>
+                      <span className="mt-0.5 block text-xs text-ink-muted">{option.description}</span>
+                    </span>
+                    <ArrowRight
+                      size={16}
+                      strokeWidth={2}
+                      className="text-ink-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-primary-700"
+                    />
+                  </motion.button>
+                )
+              })}
+            </div>
+
+            <p className="mt-6 text-center text-xs sm:text-sm text-ink-muted">
+              Already have an account?{' '}
+              <Link to="/login" className="font-semibold hover:opacity-80 transition-opacity text-primary-700">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </motion.div>
+      </AuthShell>
+    )
   }
 
   return (
@@ -199,14 +312,24 @@ export default function Register() {
                 </span>
               </div>
 
-              <div className="mb-5">
-              </div>
+              <button
+                type="button"
+                onClick={() => setStep('role')}
+                className="focus-ring mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-2xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+              >
+                <ArrowLeft size={11} strokeWidth={2.5} />
+                {selectedRole?.label ?? 'Change account type'}
+              </button>
 
               <h2 className="text-2xl md:text-[28px] font-bold tracking-tight text-ink">
                 Create your account
               </h2>
               <p className="mt-2 text-sm text-ink-muted">
-                Get started with your healthcare journey
+                {form.role === 'Doctor'
+                  ? 'Set up your clinician profile'
+                  : form.role === 'HospitalAdmin'
+                    ? "Set up your hospital's account"
+                    : 'Get started with your healthcare journey'}
               </p>
             </div>
 
@@ -305,7 +428,10 @@ export default function Register() {
               {/* Mobile Number */}
               <motion.div custom={4} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-ink-muted">
+                  <label
+                    htmlFor="register-phoneNumber"
+                    className="text-xs sm:text-sm font-medium text-ink-muted"
+                  >
                     Mobile number
                   </label>
                   <span className="text-2xs font-medium px-2 py-0.5 rounded-full border text-primary-700 bg-primary-50 border-primary-200">
@@ -325,6 +451,7 @@ export default function Register() {
                     <span className="text-ink-subtle font-normal">|</span>
                   </div>
                   <input
+                    id="register-phoneNumber"
                     type="tel"
                     name="phoneNumber"
                     value={form.phoneNumber}
@@ -333,6 +460,8 @@ export default function Register() {
                     inputMode="numeric"
                     maxLength={11}
                     autoComplete="tel-national"
+                    aria-invalid={errors.phoneNumber ? 'true' : undefined}
+                    aria-describedby="register-phoneNumber-hint"
                     className={`w-full border bg-surface-1 rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
@@ -344,9 +473,11 @@ export default function Register() {
                   />
                 </div>
                 {errors.phoneNumber ? (
-                  <p className="mt-1 text-xs text-critical-fg">{errors.phoneNumber}</p>
+                  <p id="register-phoneNumber-hint" role="alert" className="mt-1 text-xs text-critical-fg">
+                    {errors.phoneNumber}
+                  </p>
                 ) : (
-                  <p className="mt-1 text-xs text-ink-subtle">
+                  <p id="register-phoneNumber-hint" className="mt-1 text-xs text-ink-subtle">
                     Enter your 10-digit Indian mobile number
                   </p>
                 )}
@@ -356,7 +487,7 @@ export default function Register() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-4.5">
               <motion.div custom={5} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-ink-muted">Password</label>
+                  <label htmlFor="register-password" className="text-xs sm:text-sm font-medium text-ink-muted">Password</label>
                 </div>
                 <div className="relative group">
                   <Lock
@@ -366,12 +497,15 @@ export default function Register() {
                                transition-colors group-focus-within:text-primary-700 pointer-events-none"
                   />
                   <input
+                    id="register-password"
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={form.password}
                     onChange={handleChange}
                     placeholder="Min. 8 characters"
                     autoComplete="new-password"
+                    aria-invalid={errors.password ? 'true' : undefined}
+                    aria-describedby={errors.password ? 'register-password-error' : undefined}
                     className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
@@ -416,14 +550,14 @@ export default function Register() {
                   </div>
                 )}
                 {errors.password && (
-                  <p className="mt-1 text-xs text-critical-fg">{errors.password}</p>
+                  <p id="register-password-error" role="alert" className="mt-1 text-xs text-critical-fg">{errors.password}</p>
                 )}
               </motion.div>
 
               {/* Confirm Password */}
               <motion.div custom={6} variants={fadeIn} initial="initial" animate="animate">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs sm:text-sm font-medium text-ink-muted">
+                  <label htmlFor="register-confirmPassword" className="text-xs sm:text-sm font-medium text-ink-muted">
                     Confirm password
                   </label>
                 </div>
@@ -435,12 +569,15 @@ export default function Register() {
                                transition-colors group-focus-within:text-primary-700 pointer-events-none"
                   />
                   <input
+                    id="register-confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={form.confirmPassword}
                     onChange={handleChange}
                     placeholder="Repeat your password"
                     autoComplete="new-password"
+                    aria-invalid={errors.confirmPassword ? 'true' : undefined}
+                    aria-describedby={errors.confirmPassword ? 'register-confirmPassword-error' : undefined}
                     className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
@@ -472,7 +609,7 @@ export default function Register() {
                     )}
                 </div>
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-xs text-critical-fg">{errors.confirmPassword}</p>
+                  <p id="register-confirmPassword-error" role="alert" className="mt-1 text-xs text-critical-fg">{errors.confirmPassword}</p>
                 )}
               </motion.div>
               </div>
@@ -591,7 +728,14 @@ export default function Register() {
   )
 }
 
-/* ─── InputField Component ─── */
+/* ─── InputField Component ───
+ * Bug fix: the <label> had no `htmlFor`/the <input> no `id` (no programmatic
+ * name association), and a validation error rendered as a plain, unlinked
+ * <p> — the input had no `aria-invalid`/`aria-describedby` and the error
+ * text no `role="alert"`. A screen-reader user got no indication a field
+ * was invalid, or why, after a failed submit. Fixed by deriving a stable id
+ * from `name` (every caller already passes one) and wiring the three
+ * attributes through. */
 function InputField({
   index,
   label,
@@ -601,10 +745,14 @@ function InputField({
   error,
   ...inputProps
 }) {
+  const inputId = `register-${inputProps.name}`
+  const errorId = `${inputId}-error`
   return (
     <motion.div custom={index} variants={fadeIn} initial="initial" animate="animate">
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-xs sm:text-sm font-medium text-ink-muted">{label}</label>
+        <label htmlFor={inputId} className="text-xs sm:text-sm font-medium text-ink-muted">
+          {label}
+        </label>
         {action}
       </div>
       <div className="relative group">
@@ -615,6 +763,9 @@ function InputField({
                      transition-colors group-focus-within:text-primary-700 pointer-events-none"
         />
         <input
+          id={inputId}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={error ? errorId : undefined}
           {...inputProps}
           className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
                      text-sm text-ink placeholder:text-ink-subtle
@@ -627,7 +778,11 @@ function InputField({
         />
         {rightElement}
       </div>
-      {error && <p className="mt-1 text-xs text-critical-fg">{error}</p>}
+      {error && (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-critical-fg">
+          {error}
+        </p>
+      )}
     </motion.div>
   )
 }

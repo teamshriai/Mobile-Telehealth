@@ -37,6 +37,11 @@ export type UserWithRole = Prisma.UserGetPayload<{ select: typeof userWithRoleSe
 const userWithProfileSelect = {
   ...userWithRoleSelect,
   patientProfile: true,
+  // Doctor/Staff profile shapers (see doctorProfile.service.ts /
+  // staffProfile.service.ts) render the linked Hospital, so it must be
+  // included here too — this select feeds GET /auth/me for every role.
+  doctorProfile: { include: { hospital: true } },
+  staffProfile: { include: { hospital: true } },
 } satisfies Prisma.UserSelect;
 
 export type UserWithProfile = Prisma.UserGetPayload<{ select: typeof userWithProfileSelect }>;
@@ -93,6 +98,8 @@ export const authRepository = {
     email: string;
     passwordHash: string;
     roleId: string;
+    termsAcceptedAt: Date | null;
+    termsVersion: string | null;
     profile: {
       firstName: string;
       lastName: string;
@@ -109,6 +116,8 @@ export const authRepository = {
             passwordHash: data.passwordHash,
             roleId: data.roleId,
             passwordChangedAt: new Date(),
+            termsAcceptedAt: data.termsAcceptedAt,
+            termsVersion: data.termsVersion,
             patientProfile: {
               create: {
                 shriPatientId,
@@ -128,6 +137,95 @@ export const authRepository = {
         return user;
       }),
     );
+  },
+
+  /**
+   * Create a User and DoctorProfile atomically. Unlike PatientProfile,
+   * DoctorProfile.id has no generated public identifier needing a
+   * collision-retry wrapper — a plain transaction is enough. isVerified
+   * defaults to false (schema default) and is never set here: per the
+   * onboarding decision, a new Doctor account is instant-active (can log in
+   * and use the app immediately) — isVerified is a later credential-check
+   * flag a Hospital Admin sets, never a registration-time or login gate.
+   */
+  async createUserWithDoctorProfile(data: {
+    email: string;
+    passwordHash: string;
+    roleId: string;
+    termsAcceptedAt: Date | null;
+    termsVersion: string | null;
+    profile: {
+      firstName: string;
+      lastName: string;
+      gender?: Gender;
+      phoneNumber?: string;
+    };
+  }): Promise<UserWithRole> {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          passwordHash: data.passwordHash,
+          roleId: data.roleId,
+          passwordChangedAt: new Date(),
+          termsAcceptedAt: data.termsAcceptedAt,
+          termsVersion: data.termsVersion,
+          doctorProfile: {
+            create: {
+              firstName: data.profile.firstName,
+              lastName: data.profile.lastName,
+              gender: data.profile.gender,
+              phoneNumber: data.profile.phoneNumber,
+            },
+          },
+        },
+        select: userWithRoleSelect,
+      });
+
+      return user;
+    });
+  },
+
+  /**
+   * Create a User and StaffProfile atomically — used for the HospitalAdmin
+   * role today (StaffProfile is the shared identity table for
+   * Admin/HealthcareWorker/LabTechnician/HospitalAdmin; only HospitalAdmin
+   * is ever self-registered through this path).
+   */
+  async createUserWithStaffProfile(data: {
+    email: string;
+    passwordHash: string;
+    roleId: string;
+    termsAcceptedAt: Date | null;
+    termsVersion: string | null;
+    profile: {
+      firstName: string;
+      lastName: string;
+      phoneNumber?: string;
+    };
+  }): Promise<UserWithRole> {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          passwordHash: data.passwordHash,
+          roleId: data.roleId,
+          passwordChangedAt: new Date(),
+          termsAcceptedAt: data.termsAcceptedAt,
+          termsVersion: data.termsVersion,
+          staffProfile: {
+            create: {
+              firstName: data.profile.firstName,
+              lastName: data.profile.lastName,
+              phoneNumber: data.profile.phoneNumber,
+            },
+          },
+        },
+        select: userWithRoleSelect,
+      });
+
+      return user;
+    });
   },
 
   /**

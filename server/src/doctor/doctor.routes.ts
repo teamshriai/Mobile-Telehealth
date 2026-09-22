@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { listDoctors } from './doctor.controller';
+import { listDoctorSlots } from '../scheduling/scheduling.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/authorize';
 import { Permission } from '../config/permissions';
@@ -16,5 +17,16 @@ import { Permission } from '../config/permissions';
 const router = Router();
 
 router.get('/', authenticate, requirePermission(Permission.AppointmentCreateOwn), listDoctors);
+
+// A clinician's free slots, so the patient books a time that actually
+// exists. Returns availability only — no patient data — so the booking
+// permission is the whole gate. Same generator the doctor's own calendar
+// uses, which is what keeps the two sides agreeing about what is bookable.
+router.get(
+  '/:doctorId/slots',
+  authenticate,
+  requirePermission(Permission.AppointmentCreateOwn),
+  listDoctorSlots,
+);
 
 export { router as doctorRouter };

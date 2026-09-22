@@ -14,6 +14,10 @@ import {
 } from '@prisma/client';
 import { hash, Algorithm } from '@node-rs/argon2';
 import { encryptField, hmacBlindIndex } from '../src/utils/encryption';
+import {
+  withGeneratedShriPatientId,
+  computePhoneNumberHash,
+} from '../src/services/patientIdentity.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seed — roles, and optionally a small demo clinician directory.
@@ -47,6 +51,7 @@ const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
   Doctor: 'Licensed physician with access to assigned patient records.',
   HealthcareWorker: 'Clinical support staff assisting with patient care.',
   LabTechnician: 'Laboratory staff managing lab reports and imaging data.',
+  HospitalAdmin: "Manages a single hospital's doctors, patients-in-context and operations.",
 };
 
 /**
@@ -237,11 +242,22 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
 
   // Encrypted fields are written through the same encryptField() the
   // production API uses — never plaintext, even in a seed script.
-  const profile = await prisma.patientProfile.upsert({
+  //
+  // shriPatientId is generated through the same collision-retry helper the
+  // registration write paths use. It was previously omitted here, which made
+  // this seed unrunnable against a fresh database: the column is NOT NULL and
+  // UNIQUE with no default (20260911100100_patient_identity_constraints), so
+  // the create branch failed outright. phoneNumberHash is written alongside
+  // for the same reason the backfill script writes it — a profile with an
+  // encrypted phone but no blind index is invisible to search-by-mobile.
+  const profile = await withGeneratedShriPatientId((shriPatientId) =>
+    prisma.patientProfile.upsert({
     where: { userId: user.id },
     update: {},
     create: {
       userId: user.id,
+      shriPatientId,
+      phoneNumberHash: computePhoneNumberHash('+91 9884512230'),
       firstName: 'Meenakshi',
       lastName: 'Subramaniam',
       dateOfBirth: new Date('1969-11-03'),
@@ -282,7 +298,8 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
       familyHistory: encryptField('Father had a heart attack at age 62. Elder sister has type 2 diabetes.'),
       previousSurgeries: encryptField('Cholecystectomy (gallbladder removal), 2011'),
     },
-  });
+    }),
+  );
 
   console.log(`  ✅ Patient: Meenakshi Subramaniam (${DEMO_PATIENT_EMAIL})`);
 

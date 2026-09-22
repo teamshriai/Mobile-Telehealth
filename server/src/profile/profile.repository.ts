@@ -154,4 +154,11 @@ export const profileRepository = {
     });
     return decryptProfile(updated);
   },
+
+  async markOnboardingComplete(userId: string): Promise<void> {
+    await prisma.patientProfile.update({
+      where: { userId },
+      data: { onboardingCompletedAt: new Date() },
+    });
+  },
 };

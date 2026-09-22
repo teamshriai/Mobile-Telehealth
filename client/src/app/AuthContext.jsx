@@ -116,7 +116,14 @@ export function AuthProvider({ children }) {
       await authService.login(credentials)
       const me = await authService.getMe()
       applySession(me.user, me.permissions, me.profile)
-      return { success: true, role: me.user?.role }
+      // Returned directly (not read back off context state) so the caller
+      // can route correctly on this very call — reading context state here
+      // would race the setState calls inside applySession above.
+      return {
+        success: true,
+        role: me.user?.role,
+        needsOnboarding: !me.profile?.onboardingCompletedAt,
+      }
     } catch (err) {
       setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
       return { success: false, fieldErrors: err.fieldErrors ?? null }
@@ -132,7 +139,11 @@ export function AuthProvider({ children }) {
       await authService.register(formData)
       const me = await authService.getMe()
       applySession(me.user, me.permissions, me.profile)
-      return { success: true, role: me.user?.role }
+      return {
+        success: true,
+        role: me.user?.role,
+        needsOnboarding: !me.profile?.onboardingCompletedAt,
+      }
     } catch (err) {
       setError({ message: err.message, fieldErrors: err.fieldErrors ?? null })
       return { success: false, fieldErrors: err.fieldErrors ?? null }
@@ -172,14 +183,32 @@ export function AuthProvider({ children }) {
     isAuthenticated: status === 'authenticated',
     isChecking: status === 'checking',
     role: user?.role ?? null,
+    /**
+     * True once a role-specific profile exists but its Required-onboarding
+     * tier is not yet complete. `profile` is null for a role with no
+     * profile at all (should not happen post-registration) — treated the
+     * same as "needs onboarding" rather than crashing a guard on it.
+     */
+    needsOnboarding: status === 'authenticated' && !profile?.onboardingCompletedAt,
     /** UI gating only — the server re-checks every request. */
     can: (permission) => permissions.includes(permission),
     login,
     register,
     logout,
+    /**
+     * Ends the session locally without a server round-trip — for the case
+     * where the server has ALREADY declared the session over (a refresh
+     * failure apiClient could not recover from). Bug fix: previously only
+     * apiClient's own in-memory token was cleared here; AuthContext's user/
+     * status stayed stale at 'authenticated', so `RequireAnonymous` on the
+     * login page it was redirected to bounced the user straight back,
+     * producing an unrecoverable redirect loop. See SessionExpiryBridge in
+     * App.jsx, the only caller.
+     */
+    endSession: clearSession,
     reloadUser,
     clearError: () => setError(null),
-  }), [user, permissions, profile, status, error, loading, login, register, logout, reloadUser])
+  }), [user, permissions, profile, status, error, loading, login, register, logout, clearSession, reloadUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

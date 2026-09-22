@@ -9,7 +9,7 @@ import { RequireAuth, RequireAnonymous, homeForRole } from './app/guards.jsx'
 import { setSessionExpiredHandler } from './lib/apiClient'
 import ErrorBoundary from './components/feedback/ErrorBoundary.jsx'
 import FullPageLoader from './components/feedback/FullPageLoader.jsx'
-import PatientLayout from './components/layout/PatientLayout.jsx'
+import AppShell from './components/layout/AppShell.jsx'
 
 /* ── Public ── */
 const Login          = lazy(() => import('./components/auth/Login.jsx'))
@@ -29,8 +29,39 @@ const CareTeamPage    = lazy(() => import('./pages/patient/CareTeamPage.jsx'))
 const Profile         = lazy(() => import('./pages/Profile.jsx'))
 const Settings        = lazy(() => import('./pages/Settings.jsx'))
 
-/* ── Doctor / Admin: architecture only, no fabricated UI ── */
+/* ── Onboarding (Patient / Doctor / Hospital Admin) ── */
+const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage.jsx'))
+
+/* ── Doctor portal ── */
+const DoctorHome            = lazy(() => import('./pages/clinic/DoctorHome.jsx'))
+const DoctorAvailabilityPage = lazy(() => import('./pages/clinic/DoctorAvailabilityPage.jsx'))
+const DoctorPatientsPage    = lazy(() => import('./pages/clinic/DoctorPatientsPage.jsx'))
+const DoctorProfilePage     = lazy(() => import('./pages/clinic/DoctorProfilePage.jsx'))
+
+/* ── Hospital Admin portal ── */
+const HospitalAdminOverview        = lazy(() => import('./pages/hospitalAdmin/HospitalAdminOverview.jsx'))
+const HospitalAdminDoctorsPage     = lazy(() => import('./pages/hospitalAdmin/HospitalAdminDoctorsPage.jsx'))
+const HospitalAdminPatientsPage    = lazy(() => import('./pages/hospitalAdmin/HospitalAdminPatientsPage.jsx'))
+const HospitalAdminHospitalPage    = lazy(() => import('./pages/hospitalAdmin/HospitalAdminHospitalPage.jsx'))
+const HospitalAdminAppointmentsPage = lazy(() => import('./pages/hospitalAdmin/HospitalAdminAppointmentsPage.jsx'))
+const HospitalAdminFeedbackPage    = lazy(() => import('./pages/hospitalAdmin/HospitalAdminFeedbackPage.jsx'))
+
+/* ── HealthcareWorker/LabTechnician/Admin: architecture only, no fabricated UI ── */
 const PortalComingSoon = lazy(() => import('./pages/portal/PortalComingSoon.jsx'))
+
+/**
+ * `/clinic` is shared by three roles, but only Doctor has a real portal
+ * this phase (see PortalComingSoon.jsx's header comment on why
+ * HealthcareWorker/LabTechnician stay on the placeholder). Branching here
+ * — rather than two competing route trees both matching "/clinic" — avoids
+ * React Router picking whichever one happens to rank first regardless of
+ * which role is actually signed in.
+ */
+function ClinicPortalGate() {
+  const { role } = useAuth()
+  if (role !== 'Doctor') return <PortalComingSoon />
+  return <AppShell />
+}
 
 /**
  * Wires apiClient's "session is irrecoverably over" signal to a real redirect.
@@ -40,15 +71,23 @@ const PortalComingSoon = lazy(() => import('./pages/portal/PortalComingSoon.jsx'
  */
 function SessionExpiryBridge() {
   const navigate = useNavigate()
+  const { endSession } = useAuth()
 
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      // Bug fix: this used to only navigate, leaving AuthContext's user/
+      // status stale at 'authenticated'. RequireAnonymous would then see an
+      // "authenticated" user on the very /login page it was just sent to
+      // and redirect straight back to the portal, which immediately re-fired
+      // the same failing request — an unrecoverable loop. Clearing the
+      // session here first is what makes /login actually render.
+      endSession()
       if (!window.location.pathname.startsWith('/login')) {
         navigate('/login', { replace: true, state: { expired: true } })
       }
     })
     return () => setSessionExpiredHandler(() => {})
-  }, [navigate])
+  }, [navigate, endSession])
 
   return null
 }
@@ -59,19 +98,20 @@ function SessionExpiryBridge() {
  * belongs in their portal rather than being bounced through /login's guard.
  */
 function RootRedirect() {
-  const { isChecking, isAuthenticated, role } = useAuth()
+  const { isChecking, isAuthenticated, role, needsOnboarding } = useAuth()
 
   if (isChecking) return <FullPageLoader label="Loading Stroke AI…" />
-  return <Navigate to={isAuthenticated ? homeForRole(role) : '/login'} replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <Navigate to={needsOnboarding ? '/onboarding' : homeForRole(role)} replace />
 }
 
 /** Sends an already-authenticated visitor to the portal their role belongs to. */
 function RoleHomeRedirect() {
-  const { isChecking, isAuthenticated, role } = useAuth()
+  const { isChecking, isAuthenticated, role, needsOnboarding } = useAuth()
 
   if (isChecking) return <FullPageLoader label="Checking your session…" />
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  return <Navigate to={homeForRole(role)} replace />
+  return <Navigate to={needsOnboarding ? '/onboarding' : homeForRole(role)} replace />
 }
 
 export default function App() {
@@ -116,12 +156,26 @@ export default function App() {
                   <Route path="/terms"   element={<LegalPlaceholder title="Terms of Service" />} />
                   <Route path="/privacy" element={<LegalPlaceholder title="Privacy Policy" />} />
 
+                  {/* ── Onboarding (role: Patient, Doctor, HospitalAdmin) ──
+                      Reachable by any authenticated role with a real
+                      onboarding flow — RequireAuth itself decides whether to
+                      redirect a signed-in visitor here (see needsOnboarding
+                      in guards.jsx), this route just has to allow them in. */}
+                  <Route
+                    path="/onboarding"
+                    element={
+                      <RequireAuth roles={['Patient', 'Doctor', 'HospitalAdmin']}>
+                        <OnboardingPage />
+                      </RequireAuth>
+                    }
+                  />
+
                   {/* ── Patient portal (role: Patient) ── */}
                   <Route
                     path="/app"
                     element={
                       <RequireAuth roles={['Patient']}>
-                        <PatientLayout />
+                        <AppShell />
                       </RequireAuth>
                     }
                   >
@@ -136,22 +190,47 @@ export default function App() {
                     <Route path="settings"      element={<Settings />} />
                   </Route>
 
-                  {/* ── Doctor portal (role: Doctor, HealthcareWorker, LabTechnician) ── */}
+                  {/* ── Doctor portal (role: Doctor, HealthcareWorker, LabTechnician) ──
+                      Only Doctor gets the real portal (ClinicPortalGate);
+                      HealthcareWorker/LabTechnician stay on the correctly-
+                      labelled placeholder (see PortalComingSoon.jsx). */}
                   <Route
-                    path="/clinic/*"
+                    path="/clinic"
                     element={
                       <RequireAuth roles={['Doctor', 'HealthcareWorker', 'LabTechnician']}>
-                        <PortalComingSoon portal="Doctor" />
+                        <ClinicPortalGate />
                       </RequireAuth>
                     }
-                  />
+                  >
+                    <Route index                element={<DoctorHome />} />
+                    <Route path="patients"      element={<DoctorPatientsPage />} />
+                    <Route path="availability"  element={<DoctorAvailabilityPage />} />
+                    <Route path="profile"       element={<DoctorProfilePage />} />
+                  </Route>
+
+                  {/* ── Hospital Admin portal (role: HospitalAdmin) ── */}
+                  <Route
+                    path="/hospital-admin"
+                    element={
+                      <RequireAuth roles={['HospitalAdmin']}>
+                        <AppShell />
+                      </RequireAuth>
+                    }
+                  >
+                    <Route index              element={<HospitalAdminOverview />} />
+                    <Route path="doctors"     element={<HospitalAdminDoctorsPage />} />
+                    <Route path="patients"    element={<HospitalAdminPatientsPage />} />
+                    <Route path="hospital"    element={<HospitalAdminHospitalPage />} />
+                    <Route path="appointments" element={<HospitalAdminAppointmentsPage />} />
+                    <Route path="feedback"    element={<HospitalAdminFeedbackPage />} />
+                  </Route>
 
                   {/* ── Admin portal (role: Admin) ── */}
                   <Route
                     path="/admin/*"
                     element={
                       <RequireAuth roles={['Admin']}>
-                        <PortalComingSoon portal="Admin" />
+                        <PortalComingSoon />
                       </RequireAuth>
                     }
                   />

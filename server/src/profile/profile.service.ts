@@ -81,6 +81,17 @@ function toResponseShape(profile: PatientProfile) {
 
     preferences: (profile.preferences as PreferencesDto | null) ?? {},
 
+    // Bug fix: this was missing from the shape entirely, so GET /profile and
+    // GET /auth/me (which reuses this exact shaper — see toProfileResponseShape
+    // below) never returned it for a Patient. The client's needsOnboarding
+    // check (`!profile?.onboardingCompletedAt`) therefore always evaluated to
+    // true, even immediately after completeOnboarding() had genuinely set it
+    // server-side — RequireAuth kept redirecting back to /onboarding forever,
+    // and "Continue"/"Finish setup" could never actually land the patient in
+    // /app. The Doctor and HospitalAdmin equivalents already included this
+    // field; only the original Patient shape (predating onboarding) did not.
+    onboardingCompletedAt: profile.onboardingCompletedAt,
+
     updatedAt: profile.updatedAt,
   };
 }
@@ -210,5 +221,37 @@ export const profileService = {
     const updated = await profileRepository.updatePreferences(userId, merged);
 
     return toResponseShape(updated);
+  },
+
+  /**
+   * Advances past the Required onboarding tier. For a self-registered
+   * patient this is nearly always already satisfied — firstName/lastName/
+   * dateOfBirth/phoneNumber are collected at registration — but the check
+   * still runs rather than trusting the client blindly, the same
+   * discipline as the Doctor/HospitalAdmin onboarding-complete endpoints.
+   */
+  async completeOnboarding(userId: string): Promise<ProfileResponse> {
+    const existing = await profileRepository.findByUserId(userId);
+    if (existing === null) {
+      throw new AppError('Patient profile not found.', 404);
+    }
+
+    const hasRequiredFields =
+      existing.firstName.trim() !== '' &&
+      existing.lastName.trim() !== '' &&
+      existing.dateOfBirth !== null &&
+      existing.phoneNumber !== null &&
+      existing.phoneNumber.trim() !== '';
+
+    if (!hasRequiredFields) {
+      throw new AppError(
+        'Please provide your name, date of birth, and phone number before continuing.',
+        400,
+      );
+    }
+
+    await profileRepository.markOnboardingComplete(userId);
+    const updated = await profileRepository.findByUserId(userId);
+    return toResponseShape(updated!);
   },
 };

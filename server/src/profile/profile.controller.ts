@@ -72,3 +72,11 @@ export const updateHealthHistory = asyncHandler(async (req: Request, res: Respon
     .status(200)
     .json(ApiResponseBuilder.success('Health information updated successfully.', { profile }));
 });
+
+/**
+ * POST /api/v1/profile/onboarding-complete
+ */
+export const completeOnboarding = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const profile = await profileService.completeOnboarding(req.user!.id);
+  res.status(200).json(ApiResponseBuilder.success('Onboarding complete.', { profile }));
+});

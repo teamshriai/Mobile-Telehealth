@@ -22,11 +22,17 @@ export const ROLE_HOME = {
   Admin: '/admin',
   HealthcareWorker: '/clinic',
   LabTechnician: '/clinic',
+  HospitalAdmin: '/hospital-admin',
 }
 
 export function homeForRole(role) {
   return ROLE_HOME[role] ?? '/app'
 }
+
+/** Roles that have a real onboarding flow at /onboarding. Admin,
+ *  HealthcareWorker and LabTechnician are seed/ops-created only today (see
+ *  auth architecture notes) — they never need to be routed there. */
+const ONBOARDABLE_ROLES = ['Patient', 'Doctor', 'HospitalAdmin']
 
 /**
  * Requires a signed-in user. Optionally restricts to specific roles.
@@ -36,7 +42,7 @@ export function homeForRole(role) {
  * resolves is a visible flash and loses the requested URL.
  */
 export function RequireAuth({ children, roles }) {
-  const { isAuthenticated, isChecking, role } = useAuth()
+  const { isAuthenticated, isChecking, role, needsOnboarding } = useAuth()
   const location = useLocation()
 
   if (isChecking) return <FullPageLoader label="Checking your session…" />
@@ -50,6 +56,19 @@ export function RequireAuth({ children, roles }) {
     // Signed in, wrong portal. Send them to their own rather than showing a
     // 403 — it is not an error, they are just in the wrong place.
     return <Navigate to={homeForRole(role)} replace />
+  }
+
+  // Required-tier onboarding not yet complete: redirect into it rather than
+  // the portal, UNLESS this IS the onboarding route (which also renders
+  // under RequireAuth) or the role has no onboarding flow at all. Once
+  // onboarding is complete this never fires again — the route stays freely
+  // reachable afterwards for filling in Recommended/Optional fields.
+  if (
+    needsOnboarding &&
+    ONBOARDABLE_ROLES.includes(role) &&
+    location.pathname !== '/onboarding'
+  ) {
+    return <Navigate to="/onboarding" replace />
   }
 
   return children

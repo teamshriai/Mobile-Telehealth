@@ -31,6 +31,7 @@ export const Permission = {
   NotificationReadOwn: 'notification:read:own',
   CareTeamReadOwn: 'careteam:read:own',
   AiInsightsUseOwn: 'ai:use:own',
+  FeedbackSubmitOwn: 'feedback:submit:own',
 
   // ── Clinician access (Phase 6 doctor portal; enforced from today) ───────
   PatientReadAssigned: 'patient:read:assigned',
@@ -76,6 +77,34 @@ export const Permission = {
   RoleAssign: 'role:assign',
   DoctorVerify: 'doctor:verify',
   AuditRead: 'audit:read',
+
+  // ── Doctor self-service (availability) ──────────────────────────────────
+  AvailabilityManageOwn: 'availability:manage:own',
+
+  // ── Clinical notes ──────────────────────────────────────────────────────
+  // `sign` is deliberately separate from `write`: authoring a draft and
+  // attesting to the legal record are different acts, and UI_ATLAS §3.2
+  // treats them as different verbs for exactly that reason. `amend` is
+  // separate again — it is the ONLY way to change a signed note
+  // (CMP-NABH-10), so it must be grantable independently of drafting.
+  // Every one is still row-gated by careRelationship.requirePatientAccess.
+  NoteReadAssigned: 'note:read:assigned',
+  NoteWriteAssigned: 'note:write:assigned',
+  NoteSignOwn: 'note:sign:own',
+  NoteAmendOwn: 'note:amend:own',
+
+  // ── Hospital Admin — scoped to the admin's own hospital, never global.
+  // Row-level scoping (does this doctor/patient/appointment actually belong
+  // to THIS admin's hospital?) is enforced in hospitalAdmin.service.ts, the
+  // same way patient-record ownership is enforced in
+  // careRelationship.service.ts — a permission here only answers "may this
+  // role ever do this", never "may this user do it to this row".
+  HospitalDoctorRead: 'doctor:read:hospital-scoped',
+  HospitalDoctorManage: 'doctor:manage:hospital-scoped',
+  HospitalPatientRead: 'patient:read:hospital-scoped',
+  HospitalAppointmentRead: 'appointment:read:hospital-scoped',
+  HospitalManageOwn: 'hospital:manage:own',
+  FeedbackReadHospitalScoped: 'feedback:read:hospital-scoped',
 } as const;
 
 export type PermissionName = (typeof Permission)[keyof typeof Permission];
@@ -90,6 +119,7 @@ const PATIENT_PERMISSIONS: PermissionName[] = [
   Permission.CareTeamReadOwn,
   Permission.EncounterReadOwn,
   Permission.AiInsightsUseOwn,
+  Permission.FeedbackSubmitOwn,
 ];
 
 const DOCTOR_PERMISSIONS: PermissionName[] = [
@@ -103,9 +133,20 @@ const DOCTOR_PERMISSIONS: PermissionName[] = [
   Permission.PatientCreateAny,
   Permission.PatientSearchAny,
   Permission.EncounterCreateAny,
+  // Bug fix: EncounterReadAssigned was missing while EncounterManageAssigned
+  // and both Assessment permissions were granted — so a Doctor could close an
+  // encounter and write its stroke assessment but got a 403 from
+  // GET /encounters/:id and GET /patients/:id/encounters, which both require
+  // it. A clinician who may write a record must be able to read it.
+  Permission.EncounterReadAssigned,
   Permission.EncounterManageAssigned,
   Permission.AssessmentReadAssigned,
   Permission.AssessmentWriteAssigned,
+  Permission.AvailabilityManageOwn,
+  Permission.NoteReadAssigned,
+  Permission.NoteWriteAssigned,
+  Permission.NoteSignOwn,
+  Permission.NoteAmendOwn,
   // Deliberately NOT PatientReadAny: that would let any Doctor read any
   // patient system-wide, which is exactly the unrestricted clinical-record
   // access careRelationship.service exists to prevent (the same reasoning
@@ -156,12 +197,32 @@ const ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.PatientManageAny,
 ];
 
+/**
+ * Manages a single hospital's doctors, hospital-scoped patient visibility,
+ * and operations. Deliberately NOT a superset of ADMIN_PERMISSIONS and
+ * deliberately excludes UserManageAny/RoleAssign/AuditRead/PatientManageAny
+ * — this role's reach stops at its own hospital, enforced by
+ * hospitalAdmin.service.ts, never a platform-wide grant.
+ */
+const HOSPITAL_ADMIN_PERMISSIONS: PermissionName[] = [
+  Permission.ProfileReadOwn,
+  Permission.ProfileUpdateOwn,
+  Permission.NotificationReadOwn,
+  Permission.HospitalDoctorRead,
+  Permission.HospitalDoctorManage,
+  Permission.HospitalPatientRead,
+  Permission.HospitalAppointmentRead,
+  Permission.HospitalManageOwn,
+  Permission.FeedbackReadHospitalScoped,
+];
+
 export const ROLE_PERMISSIONS: Record<RoleName, readonly PermissionName[]> = {
   [RoleName.Patient]: PATIENT_PERMISSIONS,
   [RoleName.Doctor]: DOCTOR_PERMISSIONS,
   [RoleName.HealthcareWorker]: HEALTHCARE_WORKER_PERMISSIONS,
   [RoleName.LabTechnician]: LAB_TECHNICIAN_PERMISSIONS,
   [RoleName.Admin]: ADMIN_PERMISSIONS,
+  [RoleName.HospitalAdmin]: HOSPITAL_ADMIN_PERMISSIONS,
 };
 
 /**

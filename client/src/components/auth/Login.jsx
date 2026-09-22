@@ -47,9 +47,14 @@ export default function Login() {
     const result = await login({ email: form.email, password: form.password })
     if (result.success) {
       // Route by role rather than to a fixed path: a Doctor or Admin signing in
-      // must land in their own portal, not the patient one.
+      // must land in their own portal, not the patient one. An account that
+      // has not finished onboarding goes there first regardless of `from` —
+      // RequireAuth would redirect it there anyway (see guards.jsx), so this
+      // just skips the extra hop.
       const from = location.state?.from
-      navigate(from ?? homeForRole(result.role), { replace: true })
+      navigate(result.needsOnboarding ? '/onboarding' : (from ?? homeForRole(result.role)), {
+        replace: true,
+      })
     }
   }
 
@@ -258,12 +263,20 @@ export default function Login() {
   )
 }
 
-/* ─── InputField ─── */
+/* ─── InputField ───
+ * Bug fix: the <label> here had no `htmlFor` and the <input> no `id` — the
+ * visible label text was never exposed to the accessibility tree as the
+ * input's accessible name, only tied to it by CSS proximity. A screen
+ * reader announced just "edit text" rather than "Email address, edit
+ * text". `id` is derived from `name`, which every caller already passes. */
 function InputField({ index, label, icon: Icon, action, rightElement, ...inputProps }) {
+  const inputId = `login-${inputProps.name}`
   return (
     <motion.div custom={index} variants={fadeIn} initial="initial" animate="animate">
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-xs sm:text-sm font-medium text-ink-muted">{label}</label>
+        <label htmlFor={inputId} className="text-xs sm:text-sm font-medium text-ink-muted">
+          {label}
+        </label>
         {action}
       </div>
       <div className="relative group">
@@ -274,6 +287,7 @@ function InputField({ index, label, icon: Icon, action, rightElement, ...inputPr
                      transition-colors group-focus-within:text-primary-700 pointer-events-none"
         />
         <input
+          id={inputId}
           {...inputProps}
           className="w-full border border-border-soft bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
                      text-sm text-ink placeholder:text-ink-subtle

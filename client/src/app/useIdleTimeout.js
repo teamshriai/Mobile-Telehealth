@@ -29,12 +29,24 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  *
  * Staff get less: a clinician's screen shows many patients' data, not just
  * their own, so an unattended staff terminal exposes more.
+ *
+ * Bug fix: this previously keyed on 'Nurse', which is not and has never
+ * been a value of the real RoleName enum (Admin/Patient/Doctor/
+ * HealthcareWorker/LabTechnician/HospitalAdmin) — it silently fell through
+ * to DEFAULT_IDLE_MINUTES for every real staff role. That alone was
+ * harmless (the default matched the intended 15), but combined with this
+ * hook's only caller being PatientLayout (Patient-only route), idle
+ * timeout ran for NO staff session at all — the opposite of "staff get
+ * less" above. Every authenticated layout now mounts this hook (see
+ * DoctorLayout, HospitalAdminLayout), with the role keys corrected here.
  */
 const IDLE_MINUTES_BY_ROLE = {
   Patient: 20,
   Doctor: 15,
-  Nurse: 15,
+  HealthcareWorker: 15,
+  LabTechnician: 15,
   Admin: 15,
+  HospitalAdmin: 15,
 }
 
 /** Fallback for any role not listed — the stricter of the two. */

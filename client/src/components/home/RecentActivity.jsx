@@ -20,15 +20,6 @@ const ICON_BY_TYPE = {
   General:     Bell,
 }
 
-/** Muted by design: this is history, not a set of alerts competing for attention. */
-const TONE_BY_TYPE = {
-  Appointment: 'bg-primary-50 text-primary-700',
-  Report:      'bg-therapy-bg text-therapy-fg',
-  CareTeam:    'bg-success-bg text-success-fg',
-  Medication:  'bg-success-bg text-success-fg',
-  General:     'bg-surface-2 text-ink-subtle',
-}
-
 function relativeDate(iso) {
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return ''
@@ -49,16 +40,18 @@ export default function RecentActivity({ notifications = [] }) {
         Recent activity
       </h2>
 
-      <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card">
+      {/* Solid blue panel — the same "logistics/updates" meaning as the
+          appointments stat tile, so this reads as one system rather than a
+          one-off accent. Fixed white text (see the `tile-blue` tokens). */}
+      <div className="mt-3.5 flex-1 rounded-xl bg-tile-blue p-4 shadow-card">
         {items.length === 0 ? (
-          <p className="py-6 text-center text-sm leading-relaxed text-ink-subtle">
+          <p className="py-6 text-center text-sm leading-relaxed text-white/75">
             Nothing yet. Updates about your appointments and care team will show here.
           </p>
         ) : (
           <ul>
             {items.map((n, i) => {
               const Icon = ICON_BY_TYPE[n.type] ?? Bell
-              const tone = TONE_BY_TYPE[n.type] ?? TONE_BY_TYPE.General
               const last = i === items.length - 1
               return (
                 <li key={n.id} className="flex gap-3">
@@ -67,28 +60,28 @@ export default function RecentActivity({ notifications = [] }) {
                   <div className="flex flex-col items-center">
                     <span
                       aria-hidden="true"
-                      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${tone}`}
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/15 text-white"
                     >
                       <Icon size={15} />
                     </span>
-                    {!last && <span aria-hidden="true" className="w-px flex-1 bg-surface-3" />}
+                    {!last && <span aria-hidden="true" className="w-px flex-1 bg-white/20" />}
                   </div>
 
                   <div className={`min-w-0 flex-1 ${last ? '' : 'pb-4'}`}>
                     <div className="flex flex-wrap items-baseline gap-x-2">
-                      <p className="text-sm font-semibold text-ink">{n.title}</p>
+                      <p className="text-sm font-semibold text-white">{n.title}</p>
                       {!n.isRead && (
                         // Text, not just a colour dot — status must survive
                         // both colour-blindness and a screen reader.
-                        <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700">
+                        <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-tile-blue">
                           New
                         </span>
                       )}
                     </div>
                     {n.body && (
-                      <p className="mt-0.5 text-sm leading-relaxed text-ink-subtle">{n.body}</p>
+                      <p className="mt-0.5 text-sm leading-relaxed text-white/75">{n.body}</p>
                     )}
-                    <p className="mt-1 text-xs text-ink-subtle">{relativeDate(n.createdAt)}</p>
+                    <p className="mt-1 text-xs text-white/70">{relativeDate(n.createdAt)}</p>
                   </div>
                 </li>
               )

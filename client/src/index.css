@@ -134,6 +134,21 @@
   --color-accent-sage:    #E9F0E6;
   --color-accent-sage-fg: #4C6B46;
 
+  /* ── Solid tiles ───────────────────────────────────────────────────────
+     Muted-solid fills paired with a FIXED white foreground — deliberately
+     theme-invariant, same precedent as `on-primary`/`on-danger` above, so
+     these never get a `.dark` redefinition. Reserved for the handful of
+     dashboard containers meant to read as bold and distinct at a glance
+     (the health-snapshot stat tiles, the recent-activity panel) rather than
+     the app's usual quiet pastel `accent-*` family. Deliberately desaturated
+     from a first pass that read as too bright/neon — each hue is blended
+     toward neutral so it stays calm rather than loud. Each `-fg` is plain
+     white and clears WCAG AA (>=4.5:1, computed) against its own `-bg`. */
+  --color-tile-blue:      #2F5AA8;  --color-tile-blue-fg:   #FFFFFF; /* appointments / logistics — 6.7:1 */
+  --color-tile-teal:      #22685F;  --color-tile-teal-fg:   #FFFFFF; /* medicines — 6.5:1 */
+  --color-tile-violet:    #6A4E9E;  --color-tile-violet-fg: #FFFFFF; /* care team / people — 6.6:1 */
+  --color-tile-amber:     #8F5F32;  --color-tile-amber-fg:  #FFFFFF; /* allergy / attention — 5.5:1 */
+
   /* ── Type scale ────────────────────────────────────────────────────────
      One step larger than a typical consumer app. The stroke population
      includes visual-field loss and post-stroke fatigue; 12px secondary text
@@ -527,4 +542,5 @@ html[data-high-contrast='true']:root.dark {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
 }

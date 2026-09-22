@@ -16,10 +16,15 @@ import { profileRouter } from './profile/profile.routes';
 import { appointmentRouter } from './appointment/appointment.routes';
 import { careTeamRouter } from './careteam/careteam.routes';
 import { notificationRouter } from './notification/notification.routes';
+import { clinicalNoteRouter } from './clinicalNote/clinicalNote.routes';
 import { aiRouter } from './ai/ai.routes';
 import { doctorRouter } from './doctor/doctor.routes';
+import { doctorSelfRouter } from './doctor/doctorSelf.routes';
 import { patientRouter } from './patient/patient.routes';
 import { encounterRouter } from './encounter/encounter.routes';
+import { hospitalRouter } from './hospital/hospital.routes';
+import { hospitalAdminRouter } from './hospitalAdmin/hospitalAdmin.routes';
+import { feedbackRouter } from './feedback/feedback.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Factory
@@ -111,10 +116,15 @@ export function createApp(): Application {
   app.use('/api/v1/appointments', appointmentRouter);
   app.use('/api/v1/care-team', careTeamRouter);
   app.use('/api/v1/notifications', notificationRouter);
+  app.use('/api/v1/notes', clinicalNoteRouter);
   app.use('/api/v1/ai', aiRouter);
   app.use('/api/v1/doctors', doctorRouter);
+  app.use('/api/v1/doctor', doctorSelfRouter);
   app.use('/api/v1/patients', patientRouter);
   app.use('/api/v1/encounters', encounterRouter);
+  app.use('/api/v1/hospitals', hospitalRouter);
+  app.use('/api/v1/hospital-admin', hospitalAdminRouter);
+  app.use('/api/v1/feedback', feedbackRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

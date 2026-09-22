@@ -72,8 +72,14 @@ export default class ErrorBoundary extends Component {
             >
               <RefreshCw size={15} aria-hidden="true" /> Try again
             </button>
+            {/* "/" rather than "/app": this boundary wraps every portal, and
+                the patient home is the wrong destination for a doctor or an
+                administrator. RootRedirect resolves "/" to whichever portal
+                the signed-in role actually belongs to. A plain <a> (not a
+                Link) is deliberate — a full reload is the reliable escape
+                when the router itself may be what threw. */}
             <a
-              href="/app"
+              href="/"
               className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface-1 px-5 text-sm font-semibold text-ink-muted transition-colors hover:bg-surface-2"
             >
               <Home size={15} aria-hidden="true" /> Back to home

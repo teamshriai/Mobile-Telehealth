@@ -52,6 +52,31 @@ export enum AuditAction {
   AiPolicyBlocked = 'AiPolicyBlocked',
   AiProviderError = 'AiProviderError',
   AiConversationDeleted = 'AiConversationDeleted',
+  // ── Hospital Admin / three-role onboarding ──────────────────────────────
+  HospitalAdminRegistered = 'HospitalAdminRegistered',
+  DoctorAvailabilityUpdated = 'DoctorAvailabilityUpdated',
+  FeedbackSubmitted = 'FeedbackSubmitted',
+
+  // ── Care-team membership ──────────────────────────────────────────────
+  // Care-team membership is what careRelationship.service reads to decide
+  // who may open a patient's record, so granting or ending one is an
+  // authorization change, not bookkeeping.
+  CareTeamAssigned = 'CareTeamAssigned',
+  CareTeamEnded = 'CareTeamEnded',
+
+  // ── Appointments ──────────────────────────────────────────────────────
+  // These replace the previous practice of logging appointment writes as
+  // ProfileUpdated with an `operation` discriminator in metadata, which made
+  // them invisible to any query that filters by action.
+  AppointmentCreated = 'AppointmentCreated',
+  AppointmentRescheduled = 'AppointmentRescheduled',
+  AppointmentStatusChanged = 'AppointmentStatusChanged',
+  AppointmentCancelled = 'AppointmentCancelled',
+
+  // ── Clinical notes ────────────────────────────────────────────────────
+  NoteCreated = 'NoteCreated',
+  NoteSigned = 'NoteSigned',
+  NoteAmended = 'NoteAmended',
 }
 
 export enum AuditSeverity {

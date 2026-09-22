@@ -13,9 +13,11 @@ import { Pill, Users, CalendarCheck, ShieldAlert } from 'lucide-react'
  * completeness) and cut: the demo patient's profile is effectively complete,
  * so it would render a permanent 100% — decoration, not information.
  *
- * Colour carries meaning rather than variety: blue for care logistics,
- * teal for medication, amber for something needing attention. Tiles that
- * mean the same kind of thing share a colour.
+ * Colour carries meaning rather than variety: blue for care logistics, teal
+ * for medication, violet for people/care team, amber for something needing
+ * attention. Each is a solid fill with fixed white text (the `tile-*`
+ * tokens) rather than the app's usual quiet pastel, so these four functions
+ * are distinguishable at a glance.
  */
 
 /** Splits the free-text medications field into individual entries. */
@@ -35,41 +37,41 @@ export function countAllergies(knownAllergies) {
   return text.split(/[;,\n]/).map((s) => s.trim()).filter(Boolean).length
 }
 
-/* Pastel accent tints, one per tile, so the four counts are distinguishable at
-   a glance rather than four identical blue boxes. `amber` stays a semantic
-   warning tone because it is the one tile whose colour carries meaning — an
-   allergy on record. The rest are category colour, not state. */
+/* Solid, saturated fills — one per tile, each with a fixed white foreground —
+   so the four containers read as distinct at a glance and their function is
+   scannable without reading the label. `amber` stays the one tile whose
+   colour carries semantic meaning (an allergy on record); the rest are
+   category colour, not state. See the `tile-*` tokens in index.css. */
 const TONES = {
-  sky:   { bg: 'bg-accent-sky',  fg: 'text-accent-sky-fg',  ring: 'border-accent-sky-fg/20' },
-  teal:  { bg: 'bg-accent-teal', fg: 'text-accent-teal-fg', ring: 'border-accent-teal-fg/20' },
-  sage:  { bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', ring: 'border-accent-sage-fg/20' },
-  clay:  { bg: 'bg-accent-clay', fg: 'text-accent-clay-fg', ring: 'border-accent-clay-fg/20' },
-  amber: { bg: 'bg-warning-bg',  fg: 'text-warning-fg',     ring: 'border-warning-fg/30' },
+  blue:   { bg: 'bg-tile-blue',   fg: 'text-tile-blue-fg' },
+  teal:   { bg: 'bg-tile-teal',   fg: 'text-tile-teal-fg' },
+  violet: { bg: 'bg-tile-violet', fg: 'text-tile-violet-fg' },
+  amber:  { bg: 'bg-tile-amber',  fg: 'text-tile-amber-fg' },
 }
 
-function Tile({ to, icon: Icon, value, label, hint, tone = 'sky' }) {
-  const t = TONES[tone] ?? TONES.sky
+function Tile({ to, icon: Icon, value, label, hint, tone = 'blue' }) {
+  const t = TONES[tone] ?? TONES.blue
   return (
     <Link
       to={to}
-      className={`focus-ring group flex min-h-11 flex-col gap-2.5 rounded-xl border ${t.ring} bg-surface-1 p-4 shadow-card transition-colors hover:border-border-strong hover:bg-surface-2`}
+      className={`focus-ring group flex min-h-11 flex-col gap-2.5 rounded-xl border border-transparent ${t.bg} p-4 shadow-card transition-transform hover:-translate-y-0.5 hover:shadow-card-md`}
     >
       <span
         aria-hidden="true"
-        className={`flex h-9 w-9 items-center justify-center rounded-lg ${t.bg}`}
+        className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15"
       >
         <Icon size={17} className={t.fg} />
       </span>
       <span className="flex items-baseline gap-1.5">
-        <span className="text-2xl font-semibold leading-none tracking-tight text-ink">
+        <span className={`text-2xl font-semibold leading-none tracking-tight ${t.fg}`}>
           {value}
         </span>
-        <span className="text-sm text-ink-subtle">{label}</span>
+        <span className={`text-sm ${t.fg} opacity-90`}>{label}</span>
       </span>
       {/* The hint carries the meaning a number alone cannot, and is what a
           screen reader reads after the value — so status never depends on
           colour. */}
-      <span className="text-xs leading-relaxed text-ink-subtle">{hint}</span>
+      <span className={`text-xs leading-relaxed ${t.fg} opacity-75`}>{hint}</span>
     </Link>
   )
 }
@@ -102,7 +104,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/appointments"
           icon={CalendarCheck}
-          tone="sky"
+          tone="blue"
           value={upcoming}
           label={upcoming === 1 ? 'appointment' : 'appointments'}
           hint={upcoming > 0 ? 'Coming up' : 'Nothing scheduled'}
@@ -110,7 +112,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/care-team"
           icon={Users}
-          tone="sage"
+          tone="violet"
           value={careTeam.length}
           label={careTeam.length === 1 ? 'clinician' : 'clinicians'}
           hint={careTeam.length > 0 ? 'Looking after you' : 'No one assigned yet'}
@@ -118,7 +120,7 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
         <Tile
           to="/app/health"
           icon={ShieldAlert}
-          tone={allergies > 0 ? 'amber' : 'clay'}
+          tone="amber"
           value={allergies}
           label={allergies === 1 ? 'allergy' : 'allergies'}
           hint={allergies > 0 ? 'Recorded — tell any new clinician' : 'None recorded'}

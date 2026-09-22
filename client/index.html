@@ -1,5 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<!--
+  lang="en-IN" matches the product's actual locale and every
+  toLocaleDateString('en-IN') call in the app.
+
+  ⚠️ KNOWN LIMITATION it does NOT fix. UI_ATLAS §5.4 forbids MM/DD anywhere
+  (a real hazard when staff read 03/04 as 3 April) and requires 24-hour
+  times. All text the app renders itself obeys that — see
+  components/clinic/format.js. But native <input type="date"|"time"> take
+  their display format from the BROWSER'S UI LANGUAGE, not from this
+  attribute, not from the JS locale and not from CSS; verified in Chrome,
+  where an en-IN page in an en-US browser still shows mm/dd/yyyy and
+  05:00 PM. Fixing it properly means replacing the native pickers with
+  custom controls, which costs the native mobile keyboard and picker
+  accessibility. Left as-is deliberately, and worth a decision before
+  clinical sign-off.
+-->
+<html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

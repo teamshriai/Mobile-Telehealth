@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { Gender } from '@prisma/client';
 
+/**
+ * The version string stamped onto User.termsVersion when a registration's
+ * `agreed` checkbox is true. A constant here, not client-supplied — the
+ * client can request accepting the CURRENT terms, but it does not get to
+ * declare which version those were.
+ */
+export const CURRENT_TERMS_VERSION = '2026-09-19';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Reusable Password Schema
 //
@@ -56,10 +64,30 @@ export const registerSchema = z.object({
     .min(1, 'Mobile number is required.')
     .regex(
       /^(\+91[\s-]?)?[6-9]\d{9}$/,
-      'Please enter a valid 10-digit Indian mobile number (e.g. +91 9876543210 or 9876543210).'
+      'Please enter a valid 10-digit Indian mobile number (e.g. +91 9876543210 or 9876543210).',
     ),
 
   gender: z.nativeEnum(Gender).optional(),
+
+  /**
+   * Which of the three portals this account is for. Admin is deliberately
+   * NOT an accepted value — the global Admin role stays seed/ops-created
+   * only, never self-registered. Defaults to Patient so every existing
+   * caller (and every existing test) that omits this field is unaffected.
+   */
+  role: z.enum(['Patient', 'Doctor', 'HospitalAdmin']).optional().default('Patient'),
+
+  /**
+   * The "I agree to the Terms of Service and Privacy Policy" checkbox.
+   * Previously collected and validated client-side only, then stripped
+   * before the request ever reached the server — so every account's
+   * consent was unrecorded. Required true: the client already blocks
+   * submission without it, so this only ever rejects a request that
+   * bypassed the UI entirely.
+   */
+  agreed: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the Terms of Service and Privacy Policy.' }),
+  }),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

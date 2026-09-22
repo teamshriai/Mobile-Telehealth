@@ -15,7 +15,13 @@ import { decryptFieldOptional, encryptFieldOptional } from '../utils/encryption'
 // until now no code implemented it.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ENCRYPTED_FIELDS = ['reason', 'notes'] as const;
+// cancelReason joined this list in the scheduling phase. It was plaintext
+// while its two siblings on the same table were encrypted, even though
+// "cancelled — symptoms worsened, admitted via ED" is exactly as identifying
+// as the booking reason. Existing plaintext rows are converted by
+// prisma/scripts/encrypt-cancel-reasons.ts, which must run once before this
+// list takes effect — decryptField throws on a value that is not ciphertext.
+const ENCRYPTED_FIELDS = ['reason', 'notes', 'cancelReason'] as const;
 
 /** Doctor columns safe to show a patient. Never registrationNumber / hprId. */
 const DOCTOR_SELECT = {
@@ -158,7 +164,7 @@ export const appointmentRepository = {
         status: AppointmentStatus.Cancelled,
         cancelledAt: new Date(),
         cancelledBy: cancelledByUserId,
-        cancelReason,
+        cancelReason: encryptFieldOptional(cancelReason),
       },
     });
     return count;

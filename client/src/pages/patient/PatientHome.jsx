@@ -34,11 +34,15 @@ import MedsAndAllergies from '../../components/home/MedsAndAllergies.jsx'
  * gain. The grid therefore steps at `md` and `xl` and ignores `lg` entirely.
  */
 
+/* One pastel accent per tile (see `accent-*` in index.css) — matte, not
+   saturated, per the brief. Mirrors the stat-tile colour meanings above
+   (logistics/medication/attention/people) so the two sections read as one
+   consistent system rather than two unrelated palettes. */
 const MODULES = [
-  { to: '/app/appointments', icon: Calendar,    label: 'Appointments' },
-  { to: '/app/medicines',    icon: Pill,        label: 'Medicines' },
-  { to: '/app/health',       icon: FolderHeart, label: 'My Health' },
-  { to: '/app/care-team',    icon: Users,       label: 'My Care Team' },
+  { to: '/app/appointments', icon: Calendar,    label: 'Appointments', bg: 'bg-accent-sky',  fg: 'text-accent-sky-fg',  hoverBorder: 'hover:border-accent-sky-fg/40' },
+  { to: '/app/medicines',    icon: Pill,        label: 'Medicines',    bg: 'bg-accent-teal', fg: 'text-accent-teal-fg', hoverBorder: 'hover:border-accent-teal-fg/40' },
+  { to: '/app/health',       icon: FolderHeart, label: 'My Health',    bg: 'bg-accent-clay', fg: 'text-accent-clay-fg', hoverBorder: 'hover:border-accent-clay-fg/40' },
+  { to: '/app/care-team',    icon: Users,       label: 'My Care Team', bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', hoverBorder: 'hover:border-accent-sage-fg/40' },
 ]
 
 /**
@@ -245,23 +249,23 @@ export default function PatientHome() {
         <section aria-labelledby="modules-heading" className={`flex h-full flex-col ${spanFor('links')}`}>
           <h2 id="modules-heading" className="text-sm font-semibold text-ink">Go to</h2>
           <ul className="mt-3.5 grid flex-1 grid-cols-2 gap-3 md:grid-cols-4">
-            {MODULES.map(({ to, icon: Icon, label }) => (
-              <li key={to}>
+            {MODULES.map(({ to, icon: Icon, label, bg, fg, hoverBorder }) => (
+              <li key={to} className="aspect-square">
                 <Link
                   to={to}
-                  className="focus-ring group flex h-full min-h-11 items-center gap-2.5 rounded-xl border border-border bg-surface-1 px-3 py-3 shadow-card transition-colors hover:border-primary-300 hover:bg-primary-50"
+                  className={`focus-ring group flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border border-transparent bg-surface-1 p-3 text-center shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-md ${hoverBorder}`}
                 >
                   <span
                     aria-hidden="true"
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-accent-sky"
+                    className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}
                   >
-                    <Icon size={16} className="text-accent-sky-fg" />
+                    <Icon size={20} className={fg} />
                   </span>
-                  <span className="min-w-0 flex-1 text-sm font-semibold text-ink">{label}</span>
+                  <span className="min-w-0 text-sm font-semibold text-ink">{label}</span>
                   <ArrowRight
-                    size={14}
+                    size={13}
                     aria-hidden="true"
-                    className="hidden flex-shrink-0 text-ink-subtle transition-transform group-hover:translate-x-0.5 sm:block"
+                    className={`hidden -translate-y-0.5 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100 sm:block ${fg}`}
                   />
                 </Link>
               </li>

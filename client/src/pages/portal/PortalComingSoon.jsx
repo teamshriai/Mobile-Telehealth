@@ -1,20 +1,29 @@
 import { useNavigate } from 'react-router-dom'
-import { Stethoscope, ShieldCheck, LogOut, ArrowLeft } from 'lucide-react'
+import { Stethoscope, ShieldCheck, HeartPulse, FlaskConical, LogOut, ArrowLeft } from 'lucide-react'
 import BrandMark from '../../components/common/BrandMark.jsx'
 import { useAuth } from '../../app/AuthContext.jsx'
 
 /**
- * Doctor / Administrator portal placeholder.
+ * Placeholder portal for roles this phase does not build a real UI for
+ * (HealthcareWorker, LabTechnician) or that have none yet (Admin).
  *
- * These portals are Phase 6+. The Phase 2 brief is explicit: route them to a
- * controlled placeholder rather than pretending a future portal is
- * operational. So this page states plainly that the portal is not built, and
- * offers no fabricated dashboard, no mock patient list, no fake metrics.
+ * Bug fix: this component used to take its content from a hardcoded
+ * `portal="Doctor"` prop set on the route element in App.jsx, regardless of
+ * which of the three roles allowed on that route was actually signed in —
+ * so a HealthcareWorker or LabTechnician always saw "Doctor Portal" copy
+ * next to a "Role: LabTechnician" field a few lines below it, and there was
+ * no PORTALS entry for either role at all (both silently fell back to the
+ * Doctor config). The portal shown is now derived from the signed-in
+ * user's own role, and every role that can land on this component has its
+ * own accurate entry — Doctor and HospitalAdmin no longer use this
+ * component at all (they have real portals as of this phase).
  *
- * The ARCHITECTURE behind it is real, and that is the point of shipping it now:
- * the account authenticated, the server assigned it a role, RequireAuth routed
- * it here by that role, and the same server-side permission checks that will
- * guard the real portal are already enforcing. Only the UI is pending.
+ * This page states plainly that the portal is not built, and offers no
+ * fabricated dashboard, no mock patient list, no fake metrics. The
+ * ARCHITECTURE behind it is real: the account authenticated, the server
+ * assigned it a role, RequireAuth routed it here by that role, and the
+ * same server-side permission checks that will guard the real portal are
+ * already enforcing. Only the UI is pending.
  */
 
 const PORTALS = {
@@ -24,6 +33,17 @@ const PORTALS = {
     blurb:
       'The clinician workspace — your patient list, care-team assignments, appointments and clinical notes.',
   },
+  HealthcareWorker: {
+    icon: HeartPulse,
+    name: 'Clinical Support Portal',
+    blurb:
+      'Field and ward support — patient registration, care coordination and encounter intake.',
+  },
+  LabTechnician: {
+    icon: FlaskConical,
+    name: 'Lab Portal',
+    blurb: 'Laboratory workflow — sample tracking, report upload and result delivery.',
+  },
   Admin: {
     icon: ShieldCheck,
     name: 'Administrator Portal',
@@ -32,11 +52,11 @@ const PORTALS = {
   },
 }
 
-export default function PortalComingSoon({ portal = 'Doctor' }) {
+export default function PortalComingSoon() {
   const { user, logout, role } = useAuth()
   const navigate = useNavigate()
 
-  const config = PORTALS[portal] ?? PORTALS.Doctor
+  const config = PORTALS[role] ?? PORTALS.Doctor
   const Icon = config.icon
 
   const handleSignOut = async () => {

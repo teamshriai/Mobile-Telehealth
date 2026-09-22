@@ -51,3 +51,13 @@ export async function updatePreferences(categories) {
 export async function updateHealthHistory(updates) {
   return apiClient.patch('/profile/health-history', updates)
 }
+
+/**
+ * Advances past the Required onboarding tier. Recommended/Optional fields
+ * remain editable afterwards via updateProfile/updateHealthHistory.
+ *
+ * @returns {{ profile: object }}
+ */
+export async function completeOnboarding() {
+  return apiClient.post('/profile/onboarding-complete')
+}

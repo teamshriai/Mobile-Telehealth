@@ -1,5 +1,6 @@
-import { AppointmentMode, AppointmentStatus, NotificationType } from '@prisma/client';
+import { AppointmentMode, AppointmentStatus, NotificationType, Prisma } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
+import { schedulingService } from '../scheduling/scheduling.service';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { notificationService } from '../notification/notification.service';
 import {
@@ -141,23 +142,49 @@ export const appointmentService = {
   ): Promise<AppointmentResponse> {
     const patientId = await requireOwnPatientId(userId);
 
+    const scheduledAt = new Date(dto.scheduledAt);
+
     if (dto.doctorId) {
       const exists = await appointmentRepository.doctorExists(dto.doctorId);
       if (!exists) {
         throw new AppError('The selected clinician is not available.', 400);
       }
+
+      // The request must land on a slot the clinician actually published and
+      // that is still free. Until now scheduledAt was a completely free
+      // date+time: nothing checked availability, nothing checked leave, and
+      // nothing stopped two patients requesting the same instant. Validating
+      // against the same generator the doctor's own calendar uses is what
+      // makes the two sides agree about what is bookable.
+      const free = await schedulingService.isPublishedSlot(dto.doctorId, scheduledAt);
+      if (!free) {
+        throw new AppError(
+          'That time is not available. Please choose one of the offered slots.',
+          409,
+        );
+      }
     }
 
-    const created = await appointmentRepository.create({
-      patientId,
-      doctorId: dto.doctorId ?? null,
-      scheduledAt: new Date(dto.scheduledAt),
-      mode: dto.mode,
-      reason: dto.reason,
-    });
+    let created;
+    try {
+      created = await appointmentRepository.create({
+        patientId,
+        doctorId: dto.doctorId ?? null,
+        scheduledAt,
+        mode: dto.mode,
+        reason: dto.reason,
+      });
+    } catch (err) {
+      // The partial unique index on (doctor_id, scheduled_at) is the backstop
+      // for two requests that both passed the check above concurrently.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new AppError('That time was just taken. Please choose another slot.', 409);
+      }
+      throw err;
+    }
 
     auditService.log({
-      action: AuditAction.ProfileUpdated,
+      action: AuditAction.AppointmentCreated,
       userId,
       severity: AuditSeverity.Info,
       resource: 'appointment',
@@ -165,7 +192,7 @@ export const appointmentService = {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       // Never the reason text — that is PHI.
-      metadata: { operation: 'appointment_requested', mode: dto.mode },
+      metadata: { mode: dto.mode, bookedBy: 'patient' },
     });
 
     notificationService.notify({
@@ -210,14 +237,14 @@ export const appointmentService = {
     }
 
     auditService.log({
-      action: AuditAction.ProfileUpdated,
+      action: AuditAction.AppointmentCancelled,
       userId,
       severity: AuditSeverity.Info,
       resource: 'appointment',
       resourceId: id,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
-      metadata: { operation: 'appointment_cancelled' },
+      metadata: { cancelledBy: 'patient' },
     });
 
     notificationService.notify({
