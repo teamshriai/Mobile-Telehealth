@@ -1,7 +1,7 @@
 {
   "name": "stroke-ai-server",
   "version": "1.0.0",
-  "description": "Stroke AI — Patient Portal Platform Backend",
+  "description": "Stroke AI \u2014 Patient Portal Platform Backend",
   "main": "dist/server.js",
   "private": true,
   "engines": {
@@ -14,7 +14,7 @@
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts",
+    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts src/prescription/__tests__/*.test.ts src/clinicalNote/__tests__/*.test.ts src/services/__tests__/*.test.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -28,7 +28,11 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:demo:reset-breakglass": "tsx prisma/scripts/reset-demo-breakglass.ts",
+    "db:demo:reset-encounters": "tsx prisma/scripts/reset-demo-encounters.ts",
+    "db:demo:reset-clinical": "tsx prisma/scripts/reset-demo-clinical.ts",
+    "db:demo:check": "tsx prisma/scripts/check-demo-coherence.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

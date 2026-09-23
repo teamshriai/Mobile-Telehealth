@@ -63,6 +63,19 @@ export const getEncounter = asyncHandler(async (req: Request, res: Response): Pr
   res.status(200).json(ApiResponseBuilder.success('Encounter retrieved.', { encounter }));
 });
 
+export const getEncounterWorkspace = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const visitId = String(req.params.visitId ?? '');
+    const workspace = await encounterService.getWorkspace(
+      actorFromRequest(req),
+      visitId,
+      getRequestMeta(req),
+    );
+
+    res.status(200).json(ApiResponseBuilder.success('Workspace retrieved.', workspace));
+  },
+);
+
 export const closeEncounter = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { id } = encounterIdParamSchema.parse(req.params);
   const dto = closeEncounterSchema.parse(req.body ?? {});

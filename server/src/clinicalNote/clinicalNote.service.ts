@@ -3,7 +3,10 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { careRelationshipService } from '../services/careRelationship.service';
+import { roleHasPermission, Permission } from '../config/permissions';
 import { clinicalNoteRepository } from './clinicalNote.repository';
+import { checkDocumentationQuality, type AbbreviationFinding } from './bannedAbbreviations';
+import type { RoleName } from '../types/auth.types';
 import type { CreateNoteDto, UpdateNoteDto, AddendumDto } from './clinicalNote.validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,8 +67,38 @@ export const clinicalNoteService = {
     return note;
   },
 
+  /**
+   * Open a note for an encounter.
+   *
+   * ⚠️ RETURNS THE EXISTING DRAFT RATHER THAN CREATING A SECOND ONE.
+   *
+   * A visit has one note. Two drafts for one encounter is a documentation
+   * defect: whichever one the clinician happens to be looking at, the other is
+   * an orphan that still appears in the chart, on the timeline, and in the
+   * co-sign queue if it is ever submitted.
+   *
+   * This is not hypothetical. React StrictMode double-invokes effects in
+   * development, so the note screen's "load, and create one if none exists"
+   * fired twice on every open; both passes read an empty list and both
+   * created. The demo database had accumulated two drafts for every encounter
+   * a test had ever opened.
+   *
+   * The guard belongs here rather than in the client because the client is not
+   * the only caller and cannot be: two browser tabs, a retried request, or a
+   * double-tap on a slow connection all produce the same race. Scoped to the
+   * same author as well as the same encounter, so a resident opening a
+   * consultant's encounter still gets their own note.
+   */
   async create(actor: Actor, dto: CreateNoteDto, meta: Meta) {
     await careRelationshipService.requirePatientAccess(actor, dto.patientId, meta);
+
+    if (dto.encounterId !== undefined && dto.encounterId !== null) {
+      const existing = await clinicalNoteRepository.findOpenDraftForEncounter(
+        dto.encounterId,
+        actor.id,
+      );
+      if (existing !== null) return existing;
+    }
 
     const note = await clinicalNoteRepository.create({ ...dto, authorUserId: actor.id });
 
@@ -120,25 +153,54 @@ export const clinicalNoteService = {
     if (existing.status === ClinicalNoteStatus.Signed) {
       throw new AppError('This note is already signed.', 409);
     }
+    if (existing.status === ClinicalNoteStatus.CosignPending) {
+      throw new AppError(
+        'This note is awaiting a counter-signature. Use the co-sign queue instead.',
+        409,
+      );
+    }
     if (existing.authorUserId !== actor.id) {
-      // Counter-signing another clinician's note is a distinct act with its
-      // own permission (UI_ATLAS's cosign verb) and no queue exists for it
-      // yet. Refusing is honest; silently allowing it would misattribute the
-      // legal record.
-      throw new AppError('Only the author can sign this note.', 403);
+      // Signing is attesting to YOUR OWN entry. Counter-signing someone
+      // else's is the separate `cosign` verb with its own capability and its
+      // own queue (S-06-09) — allowing it here would misattribute the legal
+      // record to the wrong clinician.
+      throw new AppError('Only the author can sign this note. Use co-sign instead.', 403);
     }
 
-    const missing: string[] = []
-    if (!existing.assessment?.trim()) missing.push('Assessment')
-    if (!existing.plan?.trim()) missing.push('Plan')
+    const missing: string[] = [];
+    if (!existing.assessment?.trim()) missing.push('Assessment');
+    if (!existing.plan?.trim()) missing.push('Plan');
     if (missing.length > 0) {
       throw new AppError(`Please complete ${missing.join(' and ')} before signing.`, 400);
     }
+
+    // ⚠️ CMP-NABH-05. UI_ATLAS S-06-03 gates Sign on "banned abbreviations
+    // cleared", so this is a hard block, not a warning — and it is checked
+    // HERE as well as on blur in the UI, because a client-side-only
+    // documentation rule is a suggestion.
+    const quality = this.checkQuality(existing);
+    if (quality.length > 0) {
+      const terms = [...new Set(quality.map((q) => q.term))].join(', ');
+      throw new AppError(
+        `Unsafe abbreviations must be written out before signing: ${terms}.`,
+        400,
+      );
+    }
+
+    // ⚠️ THE CO-SIGN DECISION, and the only place it is made.
+    //
+    // Read from the actor's CAPABILITIES, never from their role name
+    // (UI_ATLAS §3.2). An author who cannot attest to the legal record
+    // alone — a Resident, today — produces a note in CosignPending that a
+    // consultant must counter-sign (CMP-NABH-03). Adding another role with
+    // the same constraint requires no change here.
+    const canAttestAlone = roleHasPermission(actor.roleName as RoleName, Permission.NoteSignOwn);
 
     const attestation = await attestationFor(actor.id);
     const signed = await clinicalNoteRepository.sign(noteId, {
       signedByUserId: actor.id,
       ...attestation,
+      requiresCosign: !canAttestAlone,
     });
     if (!signed) throw new AppError('This note is already signed.', 409);
 
@@ -150,10 +212,162 @@ export const clinicalNoteService = {
       resourceId: noteId,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
-      metadata: { patientId: existing.patientId },
+      metadata: { patientId: existing.patientId, requiresCosign: !canAttestAlone },
     });
 
     return clinicalNoteRepository.findById(noteId);
+  },
+
+  /**
+   * Run the documentation-quality rules over every narrative section.
+   *
+   * Exposed so the UI can call it on blur (S-06-03 checks Subjective on
+   * blur) and reused by sign() so the two can never disagree.
+   */
+  checkQuality(note: {
+    subjective?: string | null;
+    objective?: string | null;
+    assessment?: string | null;
+    plan?: string | null;
+  }): Array<AbbreviationFinding & { section: string }> {
+    const sections: Array<[string, string | null | undefined]> = [
+      ['Subjective', note.subjective],
+      ['Objective', note.objective],
+      ['Assessment', note.assessment],
+      ['Plan', note.plan],
+    ];
+
+    return sections.flatMap(([section, text]) =>
+      checkDocumentationQuality(text).map((finding) => ({ ...finding, section })),
+    );
+  },
+
+  /**
+   * The consultant co-sign queue (S-06-09).
+   *
+   * ⚠️ Returns identifying metadata only — patient name, author, age of the
+   * pending item — and never note content. A queue is a triage surface; the
+   * content is read on the note screen, through the same row-level gate as
+   * every other clinical read.
+   */
+  async listCosignQueue(actor: Actor) {
+    const rows = await clinicalNoteRepository.listAwaitingCosign();
+    const now = Date.now();
+
+    // Filter to the patients this consultant may actually act on. Done here
+    // rather than in SQL because the relationship rules (care team, field
+    // relationship, live break-glass grant) all live in one service and must
+    // not be reimplemented as a query.
+    const visible = [];
+    for (const row of rows) {
+      try {
+        await careRelationshipService.requirePatientAccess(actor, row.patientId, {});
+      } catch {
+        continue;
+      }
+      visible.push({
+        id: row.id,
+        patientId: row.patientId,
+        shriPatientId: row.patient.shriPatientId,
+        patientName: `${row.patient.firstName} ${row.patient.lastName}`.trim(),
+        authoredBy: row.signerName,
+        authoredAt: row.signedAt,
+        problemText: row.problemText,
+        ageHours:
+          row.signedAt === null ? 0 : Math.floor((now - row.signedAt.getTime()) / 3_600_000),
+      });
+    }
+    return visible;
+  },
+
+  /**
+   * Counter-sign another clinician's note.
+   *
+   * ⚠️ The co-signature is stamped ALONGSIDE the author's attestation, never
+   * replacing it. The record must always show who wrote it and who stood
+   * behind it — that is the whole content of CMP-NABH-03.
+   */
+  async cosign(actor: Actor, noteId: string, meta: Meta) {
+    const existing = await clinicalNoteRepository.findById(noteId);
+    if (existing === null) throw new AppError('Note not found.', 404);
+    await careRelationshipService.requirePatientAccess(actor, existing.patientId, meta);
+
+    if (!roleHasPermission(actor.roleName as RoleName, Permission.NoteCosignAssigned)) {
+      throw new AppError('You are not authorised to counter-sign a note.', 403);
+    }
+    if (existing.status !== ClinicalNoteStatus.CosignPending) {
+      throw new AppError('This note is not awaiting a counter-signature.', 409);
+    }
+    if (existing.authorUserId === actor.id) {
+      // A co-signature by the author is not a second opinion.
+      throw new AppError('You cannot counter-sign your own note.', 403);
+    }
+
+    const attestation = await attestationFor(actor.id);
+    const ok = await clinicalNoteRepository.cosign(noteId, {
+      cosignedByUserId: actor.id,
+      cosignerName: attestation.signerName,
+      cosignerRegistrationNumber: attestation.signerRegistrationNumber,
+    });
+    if (!ok) throw new AppError('This note is not awaiting a counter-signature.', 409);
+
+    auditService.log({
+      action: AuditAction.NoteCosigned,
+      userId: actor.id,
+      severity: AuditSeverity.Info,
+      resource: 'clinical_note',
+      resourceId: noteId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { patientId: existing.patientId, authorUserId: existing.authorUserId },
+    });
+
+    return clinicalNoteRepository.findById(noteId);
+  },
+
+  /**
+   * Send it back instead. ⚠️ A reason is mandatory and the author is
+   * notified — a note that silently reappears as a draft, with no reason
+   * attached, is indistinguishable from a bug to the person who wrote it.
+   */
+  async returnToAuthor(actor: Actor, noteId: string, reason: string, meta: Meta) {
+    const existing = await clinicalNoteRepository.findById(noteId);
+    if (existing === null) throw new AppError('Note not found.', 404);
+    await careRelationshipService.requirePatientAccess(actor, existing.patientId, meta);
+
+    if (!roleHasPermission(actor.roleName as RoleName, Permission.NoteCosignAssigned)) {
+      throw new AppError('You are not authorised to return this note.', 403);
+    }
+    if (existing.status !== ClinicalNoteStatus.CosignPending) {
+      throw new AppError('This note is not awaiting a counter-signature.', 409);
+    }
+
+    const ok = await clinicalNoteRepository.returnToAuthor(noteId, reason);
+    if (!ok) throw new AppError('This note is not awaiting a counter-signature.', 409);
+
+    await prisma.notification.create({
+      data: {
+        userId: existing.authorUserId,
+        type: 'General',
+        title: 'A note was returned for revision',
+        // The reason itself is NOT copied into the notification: notifications
+        // are not encrypted, and this text is clinical commentary. The author
+        // reads it on the note.
+        body: 'A consultant has asked for changes before counter-signing your note.',
+        actionUrl: `/encounter/${existing.encounterId ?? ''}/note`,
+      },
+    });
+
+    auditService.log({
+      action: AuditAction.NoteReturnedToAuthor,
+      userId: actor.id,
+      severity: AuditSeverity.Info,
+      resource: 'clinical_note',
+      resourceId: noteId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { patientId: existing.patientId, authorUserId: existing.authorUserId },
+    });
   },
 
   /** The only way to change a signed note. */

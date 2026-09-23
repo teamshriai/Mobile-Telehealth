@@ -71,6 +71,20 @@ export const encounterRepository = {
     return row ? decryptEncounter(row) : null;
   },
 
+  /**
+   * Lookup by the human-readable `VIS/…` identifier.
+   *
+   * The clinician-facing routes are keyed on visitId rather than the internal
+   * UUID because that is the number printed on the paperwork in the patient's
+   * hand — a clinician reconciling a URL against a wristband can only do it
+   * with the identifier they can both see. `visit_id` is @unique, so this is
+   * as precise as the UUID lookup.
+   */
+  async findByVisitId(visitId: string): Promise<Encounter | null> {
+    const row = await prisma.encounter.findUnique({ where: { visitId } });
+    return row ? decryptEncounter(row) : null;
+  },
+
   /** Scoped by patientId as well as id — matches appointment.repository.ts's
    *  findByIdForPatient convention exactly: an id alone is never enough. */
   async findByIdForPatient(id: string, patientId: string): Promise<Encounter | null> {

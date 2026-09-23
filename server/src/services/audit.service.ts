@@ -77,6 +77,25 @@ export enum AuditAction {
   NoteCreated = 'NoteCreated',
   NoteSigned = 'NoteSigned',
   NoteAmended = 'NoteAmended',
+  // ── Clinical authoring (M-06) ───────────────────────────────────────────
+  NoteCosigned = 'NoteCosigned',
+  NoteReturnedToAuthor = 'NoteReturnedToAuthor',
+  ProblemAdded = 'ProblemAdded',
+  ProblemResolved = 'ProblemResolved',
+  PrescriptionCreated = 'PrescriptionCreated',
+  PrescriptionSigned = 'PrescriptionSigned',
+  InstructionsIssued = 'InstructionsIssued',
+  TemplateSaved = 'TemplateSaved',
+  TemplatePromoted = 'TemplatePromoted',
+  // ── Deterministic safety ────────────────────────────────────────────────
+  // HardStopOverridden maps to UI_ATLAS's AI.SAF.HARD_STOP_OVERRIDDEN — the
+  // one event that must ALERT, not merely record, reviewed within 24h (§4.9).
+  HardStopTriggered = 'HardStopTriggered',
+  HardStopOverridden = 'HardStopOverridden',
+  // ── Break-glass (DD-014) ────────────────────────────────────────────────
+  BreakGlassRequested = 'BreakGlassRequested',
+  BreakGlassGranted = 'BreakGlassGranted',
+  BreakGlassReviewed = 'BreakGlassReviewed',
 }
 
 export enum AuditSeverity {
@@ -132,6 +151,58 @@ class AuditService {
         // Audit write failure must NEVER crash the server or fail the request
         console.error('[AuditService] Failed to write audit log:', err);
       });
+  }
+
+  /**
+   * Write an audit record and WAIT for it — then carry on regardless.
+   *
+   * ⚠️ This inverts `log()`'s contract on purpose, and only two kinds of event
+   * should use it: breaking glass, and overriding a deterministic hard stop.
+   *
+   * UI_ATLAS DD-014 is explicit that emergency access must not be gated on the
+   * audit write succeeding — "an authorization model that can block
+   * resuscitation is the wrong model" applies to the logging path too. But it
+   * is equally explicit that an unlogged break-glass is not acceptable. So:
+   *
+   *   - the write is AWAITED, so a caller can record its outcome alongside the
+   *     grant rather than hoping;
+   *   - a FAILURE IS ITSELF AN ALERT, surfaced loudly on stderr for the
+   *     platform's log-based alerting to catch;
+   *   - and it still RESOLVES, never rejects, so access proceeds either way.
+   *
+   * The boolean is the honest answer to "is this access actually logged?" —
+   * callers persist it so a reviewer can tell a logged access from one where
+   * the audit trail is known to be incomplete.
+   */
+  async logCritical(payload: AuditPayload): Promise<boolean> {
+    try {
+      const prismaAction = payload.action as unknown as import('@prisma/client').AuditAction;
+      await prisma.auditLog.create({
+        data: {
+          action: prismaAction,
+          severity: payload.severity ?? AuditSeverity.Critical,
+          userId: payload.userId ?? null,
+          resource: payload.resource ?? null,
+          resourceId: payload.resourceId ?? null,
+          ipAddress: payload.ipAddress ?? null,
+          userAgent: payload.userAgent ?? null,
+          metadata:
+            payload.metadata !== undefined
+              ? (payload.metadata as import('@prisma/client').Prisma.InputJsonValue)
+              : undefined,
+        },
+      });
+      return true;
+    } catch (err: unknown) {
+      // The failure is the alert. Deliberately shouty and deliberately not
+      // rethrown — see the doc comment.
+      console.error(
+        '[AuditService] ALERT: CRITICAL AUDIT WRITE FAILED — access proceeded unlogged.',
+        { action: payload.action, userId: payload.userId, resourceId: payload.resourceId },
+        err,
+      );
+      return false;
+    }
   }
 }
 

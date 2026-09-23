@@ -182,6 +182,19 @@
      44px per WCAG 2.2 AA (2.5.8). Applied via .tap-target. */
   --tap-min: 2.75rem;
 
+  /* ── Clinical density (UI_ATLAS §3.3) ───────────────────────────────────
+     Three densities are specified; two are used here. Compact (32px rows,
+     13px type) is the CLINICIAN default — a consultant scanning a 20-patient
+     clinic needs rows on screen, not air. Comfortable (40px, 14px) stays the
+     default everywhere else and is what the patient portal uses.
+
+     ⚠️ These are ROW heights, not tap-target heights. A 32px row may contain
+     a 44px-tall control; the row is the rhythm, --tap-min is the floor for
+     anything a gloved hand at a ward tablet has to hit (§3.3, WCAG 2.5.8).
+     Density must never be allowed to shrink a touch target. */
+  --row-h-compact: 2rem;
+  --row-h-comfortable: 2.5rem;
+
   /* ── Motion ────────────────────────────────────────────────────────────── */
   --ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth:  cubic-bezier(0.4, 0, 0.2, 1);
@@ -400,6 +413,13 @@ html[data-high-contrast='true']:root.dark {
     --text-2xl:  1.625rem;  /* 24 → 26 */
     --text-3xl:  2rem;      /* 30 → 32 */
     --text-4xl:  2.375rem;  /* 36 → 38 */
+
+    /* ⚠️ Rows scale with the type ramp. Leaving these fixed would clip
+       15px text inside a 32px row the moment a clinician turns large text
+       on — the accessibility setting has to win over the density setting,
+       always. This is also why nothing may hard-code `text-[13px]`. */
+    --row-h-compact: 2.375rem;
+    --row-h-comfortable: 2.875rem;
   }
 
   /* High contrast now works by overriding the colour tokens themselves —
@@ -499,6 +519,26 @@ html[data-high-contrast='true']:root.dark {
      Phase 1 found controls as small as 22×22 — including the location editor
      inside the emergency flow. Padding is deliberately NOT added: that would
      shift layouts. The element grows to 44px around its existing content. */
+  /* ── Clinical density scope ─────────────────────────────────────────────
+     Applied by the clinician shell only, so the patient portal keeps its
+     comfortable defaults and its 14px floor. `--row-h` is what dense
+     components read; it resolves differently inside the scope. */
+  [data-density='compact'] {
+    --row-h: var(--row-h-compact);
+  }
+
+  [data-density='comfortable'],
+  :root {
+    --row-h: var(--row-h-comfortable);
+  }
+
+  /* A dense table/list row. Height is a MINIMUM, so a wrapping cell grows
+     rather than clipping — a clipped clinical value is a safety problem, and
+     "it fitted on my screen" is not a defence. */
+  .clinical-row {
+    min-height: var(--row-h);
+  }
+
   .tap-target {
     min-width: var(--tap-min);
     min-height: var(--tap-min);

@@ -28,6 +28,11 @@ export const doctorPatientsRepository = {
         patient: {
           select: {
             id: true,
+            // The UHID as well as the internal id. Clinician-facing URLs are
+            // keyed on the UHID (it is the number on the patient's wristband
+            // and their paperwork), so a worklist that returned only the
+            // internal id could not link to the chart at all.
+            shriPatientId: true,
             firstName: true,
             lastName: true,
             // Scoped to the viewing doctor. Unscoped, "Last visit" showed the

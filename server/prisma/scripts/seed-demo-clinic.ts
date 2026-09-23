@@ -23,6 +23,7 @@
  */
 
 import 'dotenv/config';
+import { seedM06Clinical } from './m06ClinicalSeed';
 import {
   PrismaClient,
   RoleName,
@@ -329,6 +330,21 @@ const CARE_TEAM: Array<{
   { patient: 'SD-P-06', doctor: 'SD-S-01', role: 'Consultant Physician', primary: true, sinceDays: 9 },
   { patient: 'SD-P-09', doctor: 'SD-S-01', role: 'Consultant Physician', primary: true, sinceDays: 305 },
   { patient: 'SD-P-10', doctor: 'SD-S-01', role: 'Consultant Physician', primary: true, sinceDays: 48 },
+
+  /**
+   * ⚠️ Dr Iyer is the DEMO account, and these two patients carry the clinical
+   * signals the worklist is built to surface — SD-P-05's urgent-flagged stroke
+   * assessment and SD-P-07's septic-shock encounter.
+   *
+   * Without these two rows both signals sit on Dr Desai's panel, and the
+   * "Needs attention" section — the first thing anyone sees at sign-in, and
+   * the whole argument for the screen — renders its empty state on the
+   * account used to demonstrate the product. She is not the primary for
+   * either, which is also true to the clinical story: the neurologist and the
+   * intensivist lead, the physician is on the team.
+   */
+  { patient: 'SD-P-05', doctor: 'SD-S-01', role: 'Consultant Physician', primary: false, sinceDays: 1 },
+  { patient: 'SD-P-07', doctor: 'SD-S-01', role: 'Consultant Physician', primary: false, sinceDays: 3 },
 ];
 
 async function main(): Promise<void> {
@@ -496,11 +512,18 @@ async function main(): Promise<void> {
   console.log(`✓ care team: ${CARE_TEAM.length} assignments`);
 
   await seedTodaysClinic(patientIdByRef, doctorIdByRef);
+  await seedRecentWeeks(patientIdByRef, doctorIdByRef);
   await seedHistory(patientIdByRef, doctorIdByRef);
   await seedAvailability(doctorIdByRef);
   await seedClinicalRecords(patientIdByRef, doctorUserIdByRef);
   await seedFeedback(patientIdByRef, doctorIdByRef);
   await seedNotifications(doctorUserIdByRef);
+
+  // ── M-06 clinical authoring ───────────────────────────────────────────────
+  // Formulary + deterministic safety rules, ICD-10 catalogue, problem lists,
+  // clinical notes, templates and instructions. Kept in its own module purely
+  // because this file is already long; it runs under the same command.
+  await seedM06Clinical(prisma, patientIdByRef, doctorUserIdByRef, hospital.id, passwordHash);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -526,6 +549,26 @@ async function seedTodaysClinic(
     { doctor: 'SD-S-01', patient: 'SD-P-02', mins: 30, mode: AppointmentMode.InPerson, status: AppointmentStatus.Confirmed, reason: 'Pre-operative review before elective CABG' },
     { doctor: 'SD-S-01', patient: 'SD-P-10', mins: 90, mode: AppointmentMode.Video, status: AppointmentStatus.Confirmed, reason: 'Dermatology teleconsult follow-up' },
     { doctor: 'SD-S-01', patient: 'SD-P-03', mins: 150, mode: AppointmentMode.InPerson, status: AppointmentStatus.Requested, reason: 'Review of antibiotic response and oxygen requirement' },
+
+    /**
+     * A consultant's OPD list is long, and the worklist on S-06-01 is the
+     * first thing anyone sees. Seven rows reads as a quiet morning; a real
+     * list is what makes the screen look like the job.
+     *
+     * ⚠️ The §8.2 cast is nine patients, so a longer list necessarily means
+     * repeat visits within the day rather than new names — which is both true
+     * to the kit and true to an outpatient clinic, where review appointments
+     * and results follow-ups genuinely recur.
+     */
+    { doctor: 'SD-S-01', patient: 'SD-P-07', mins: -240, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Post-ICU step-down review' },
+    { doctor: 'SD-S-01', patient: 'SD-P-05', mins: -210, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Medical review alongside the stroke team' },
+    { doctor: 'SD-S-01', patient: 'SD-P-02', mins: -60, mode: AppointmentMode.Phone, status: AppointmentStatus.Completed, reason: 'Telephone review of fasting glucose diary' },
+    { doctor: 'SD-S-01', patient: 'SD-P-01', mins: -30, mode: AppointmentMode.InPerson, status: AppointmentStatus.Cancelled, reason: 'Duplicate booking — cancelled by reception' },
+    { doctor: 'SD-S-01', patient: 'SD-P-09', mins: 60, mode: AppointmentMode.InPerson, status: AppointmentStatus.Confirmed, reason: 'Repeat pre-dialysis assessment after missed slot' },
+    { doctor: 'SD-S-01', patient: 'SD-P-06', mins: 120, mode: AppointmentMode.InPerson, status: AppointmentStatus.Confirmed, reason: 'Paediatric review — 48-hour safety net' },
+    { doctor: 'SD-S-01', patient: 'SD-P-04', mins: 180, mode: AppointmentMode.InPerson, status: AppointmentStatus.Confirmed, reason: 'Haemoglobin recheck and iron tolerance' },
+    { doctor: 'SD-S-01', patient: 'SD-P-10', mins: 210, mode: AppointmentMode.Video, status: AppointmentStatus.Requested, reason: 'Teledermatology — photograph review requested' },
+    { doctor: 'SD-S-01', patient: 'SD-P-07', mins: 240, mode: AppointmentMode.InPerson, status: AppointmentStatus.Requested, reason: 'Renal function recheck after sepsis' },
 
     { doctor: 'SD-S-02', patient: 'SD-P-05', mins: -210, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Post-thrombectomy neurological review' },
     { doctor: 'SD-S-02', patient: 'SD-P-03', mins: -60, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Neurology opinion — confusion on background of sepsis' },
@@ -566,9 +609,30 @@ async function seedTodaysClinic(
   console.log(`✓ today's clinic: ${created} new appointment(s)`);
 }
 
+/**
+ * Does this clinic slot already exist **today**?
+ *
+ * ⚠️ SCOPED TO TODAY, deliberately. An earlier version matched on the reason
+ * alone, across all time — which made the seed idempotent in the narrow sense
+ * and useless in practice: the clinic was created once, on whatever day the
+ * seed first ran, and every later day showed "Clinic today: 0" because the
+ * rows existed but were dated in the past. A demo account whose clinic is
+ * empty unless you happen to demo on the day you seeded is not a demo account.
+ *
+ * Day-scoping means re-running on the same day converges (nothing duplicates)
+ * while re-running on a new day rebuilds today's clinic.
+ *
+ * Existence is still checked on the DECRYPTED reason, never on the
+ * ciphertext — AES-GCM uses a random IV per value, so the same plaintext
+ * never matches by ciphertext.
+ */
 async function appointmentExists(doctorId: string, reason: string): Promise<boolean> {
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+
   const rows = await prisma.appointment.findMany({
-    where: { doctorId },
+    where: { doctorId, scheduledAt: { gte: dayStart, lt: dayEnd } },
     select: { reason: true },
   });
   return rows.some((r) => decryptFieldOptional(r.reason) === reason);
@@ -579,6 +643,122 @@ async function appointmentExists(doctorId: string, reason: string): Promise<bool
 // consultations trend chart. Volumes vary per month because a flat line across
 // nine identical months looks generated, which it would be.
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * The last four weeks of clinics, day by day.
+ *
+ * ⚠️ WHY THIS EXISTS SEPARATELY FROM seedHistory. That function seeds eight
+ * months of volume for the trend chart, but it places roughly ONE appointment
+ * per day, spread thinly across each month, and it stops at the end of last
+ * month. The result was a consultant who sees 15 patients today and one patient
+ * on every other day — and a clinic calendar with five shaded squares in four
+ * weeks, which makes the surface look broken rather than quiet.
+ *
+ * A consultant's real month is clinics on most weekdays, lighter on Saturday,
+ * nothing on Sunday. That shape is what makes a calendar worth showing and a
+ * weekly chart worth plotting.
+ *
+ * ⚠️ Deterministic, not random: the per-day count is derived from the date, so
+ * the same day always has the same load and a demo repeats exactly.
+ */
+async function seedRecentWeeks(
+  patientIdByRef: Map<string, string>,
+  doctorIdByRef: Map<string, string>,
+): Promise<void> {
+  const PANEL: Record<string, string[]> = {
+    'SD-S-01': ['SD-P-01', 'SD-P-02', 'SD-P-03', 'SD-P-04', 'SD-P-06', 'SD-P-09', 'SD-P-10'],
+    'SD-S-02': ['SD-P-05', 'SD-P-03', 'SD-P-07', 'SD-P-01'],
+  };
+
+  const REASONS = [
+    'Routine follow-up',
+    'Medication review',
+    'Blood pressure check',
+    'Diabetes review',
+    'Results discussion',
+    'Post-discharge review',
+    'New referral — initial assessment',
+    'Repeat prescription review',
+  ];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let created = 0;
+
+  for (const [doctorRef, panel] of Object.entries(PANEL)) {
+    const doctorId = doctorIdByRef.get(doctorRef);
+    if (doctorId === undefined) continue;
+
+    // Consultants run different sized clinics; the neurologist's is smaller.
+    const scale = doctorRef === 'SD-S-01' ? 1 : 0.6;
+
+    for (let back = 1; back <= 28; back++) {
+      const day = new Date(today.getTime() - back * 86_400_000);
+      const dow = day.getDay();
+      if (dow === 0) continue; // No Sunday clinic.
+
+      // Deterministic per-day load: weekdays 6–13, Saturdays 3–5.
+      const base = dow === 6 ? 3 + (back % 3) : 6 + ((back * 5) % 8);
+      const target = Math.max(1, Math.round(base * scale));
+
+      const dayEnd = new Date(day.getTime() + 86_400_000);
+      const existing = await prisma.appointment.count({
+        where: { doctorId, scheduledAt: { gte: day, lt: dayEnd } },
+      });
+      if (existing >= target) continue;
+
+      for (let n = existing; n < target; n++) {
+        const patientRef = panel[(back + n) % panel.length];
+        const patientId = patientRef ? patientIdByRef.get(patientRef) : undefined;
+        if (patientId === undefined) continue;
+
+        /**
+         * ⚠️ A :15/:45 slot grid, not :00/:30.
+         *
+         * `(doctor_id, scheduled_at)` is unique — correctly, since one slot
+         * holds one patient — and seedHistory already places its thinner
+         * spread on the :00/:30 grid. Sharing a grid means these two seeders
+         * collide on any day they both touch. Using the quarter-hours keeps
+         * them disjoint by construction rather than by luck.
+         */
+        const when = new Date(day);
+        when.setHours(9 + Math.floor(n / 2), n % 2 === 0 ? 15 : 45, 0, 0);
+
+        // Mostly seen; a realistic scattering of did-not-attends and
+        // cancellations, because a clinic with a 100% attendance rate is the
+        // tell that data was generated rather than recorded.
+        const roll = (back * 7 + n) % 11;
+        const status =
+          roll === 0
+            ? AppointmentStatus.Cancelled
+            : roll === 1
+              ? AppointmentStatus.NoShow
+              : AppointmentStatus.Completed;
+
+        await prisma.appointment.create({
+          data: {
+            patientId,
+            doctorId,
+            scheduledAt: when,
+            durationMins: 30,
+            mode: (back + n) % 5 === 0 ? AppointmentMode.Video : AppointmentMode.InPerson,
+            status,
+            reason: encryptField(REASONS[(back + n) % REASONS.length] ?? 'Follow-up'),
+            notes:
+              status === AppointmentStatus.Completed
+                ? encryptField('Reviewed in clinic. Plan discussed with the patient and documented.')
+                : null,
+            locationName: 'Indostates Whitefield — OPD Block C',
+          },
+        });
+        created += 1;
+      }
+    }
+  }
+
+  console.log(`✓ recent weeks: ${created} new appointment(s) across the last four weeks`);
+}
+
 async function seedHistory(
   patientIdByRef: Map<string, string>,
   doctorIdByRef: Map<string, string>,

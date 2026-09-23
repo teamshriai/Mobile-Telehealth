@@ -36,6 +36,8 @@ function unidentifiedPlaceholderName(): { firstName: string; lastName: string } 
 
 function toPatientResponseShape(profile: PatientProfile) {
   return {
+    /** Internal UUID — the identifier every clinical write takes. */
+    id: profile.id,
     shriPatientId: profile.shriPatientId,
     firstName: profile.firstName,
     middleName: profile.middleName,
@@ -52,8 +54,84 @@ function toPatientResponseShape(profile: PatientProfile) {
 
 export type PatientResponse = ReturnType<typeof toPatientResponseShape>;
 
+/** Age is derived on every read, never stored, so it cannot drift. */
+function calculateAge(dateOfBirth: Date | null): number | null {
+  if (dateOfBirth === null) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const hadBirthday =
+    today.getMonth() > dateOfBirth.getMonth() ||
+    (today.getMonth() === dateOfBirth.getMonth() && today.getDate() >= dateOfBirth.getDate());
+  if (!hadBirthday) age -= 1;
+  return age;
+}
+
+/**
+ * What a CLINICIAN sees of a patient — the shape behind the Z3 patient banner
+ * (GP-05) and the chart summary (S-06-02).
+ *
+ * ⚠️ `knownAllergies` is the load-bearing field here. UI_ATLAS §6485 requires
+ * the allergy to be unmissable in the banner AS TEXT, not an icon, and the
+ * S-06-07 hard stop is evaluated against it. No other clinician endpoint
+ * returns it today, which is why this shape exists.
+ *
+ * ⚠️ Deliberately NOT returned: aadhaarLast4 and passportNumber. A consulting
+ * clinician has no clinical use for either, and the patient's own
+ * GET /profile already serves them to the one person entitled to see them.
+ */
+function toClinicalResponseShape(profile: PatientProfile) {
+  return {
+    id: profile.id,
+    shriPatientId: profile.shriPatientId,
+
+    firstName: profile.firstName,
+    middleName: profile.middleName,
+    lastName: profile.lastName,
+    dateOfBirth: profile.dateOfBirth,
+    dobIsEstimated: profile.dobIsEstimated,
+    age: calculateAge(profile.dateOfBirth),
+    gender: profile.gender,
+    bloodGroup: profile.bloodGroup,
+    maritalStatus: profile.maritalStatus,
+
+    abhaId: profile.abhaId,
+    identityStatus: profile.identityStatus,
+    registrationSource: profile.registrationSource,
+    hasPortalAccount: profile.userId !== null,
+
+    phoneNumber: profile.phoneNumber,
+    alternatePhone: profile.alternatePhone,
+    city: profile.city,
+    district: profile.district,
+    state: profile.state,
+
+    emergencyContactName: profile.emergencyContactName,
+    emergencyContactPhone: profile.emergencyContactPhone,
+    emergencyContactRelation: profile.emergencyContactRelation,
+
+    // ── Health history ────────────────────────────────────────────────────
+    knownAllergies: profile.knownAllergies,
+    currentMedications: profile.currentMedications,
+    existingDiseases: profile.existingDiseases,
+    familyHistory: profile.familyHistory,
+    previousSurgeries: profile.previousSurgeries,
+
+    // ── Lifestyle ─────────────────────────────────────────────────────────
+    smokingStatus: profile.smokingStatus,
+    alcoholStatus: profile.alcoholStatus,
+    tobaccoStatus: profile.tobaccoStatus,
+    physicalActivity: profile.physicalActivity,
+    occupation: profile.occupation,
+
+    updatedAt: profile.updatedAt,
+  };
+}
+
+export type PatientClinicalResponse = ReturnType<typeof toClinicalResponseShape>;
+
 function toSearchResultShape(row: PatientSearchResult) {
   return {
+    id: row.id,
     shriPatientId: row.shriPatientId,
     firstName: row.firstName,
     lastName: row.lastName,
@@ -299,6 +377,40 @@ export const patientService = {
     });
 
     return toPatientResponseShape(patient);
+  },
+
+  /**
+   * The clinician's clinical view. Same row-level gate as getByShriPatientId
+   * — a clinician with no relationship gets a uniform 404, or a break-glass
+   * offer if they hold the capability (see careRelationship.service).
+   */
+  async getClinicalByShriPatientId(
+    actor: { id: string; roleName: string },
+    shriPatientId: string,
+    meta: Meta,
+  ): Promise<PatientClinicalResponse> {
+    const patient = await patientRepository.findClinicalByShriPatientId(shriPatientId);
+    if (patient === null) {
+      throw new AppError('Patient record not found.', 404);
+    }
+
+    const role = actor.roleName as RoleName;
+    if (!roleHasPermission(role, Permission.PatientReadAny)) {
+      await careRelationshipService.requirePatientAccess(actor, patient.id, meta);
+    }
+
+    auditService.log({
+      action: AuditAction.PatientRecordViewed,
+      userId: actor.id,
+      severity: AuditSeverity.Info,
+      resource: 'patient',
+      resourceId: patient.id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: { view: 'clinical' },
+    });
+
+    return toClinicalResponseShape(patient);
   },
 
   /** Internal id lookup — used by the encounter module and by

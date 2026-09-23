@@ -40,7 +40,9 @@ export const doctorDashboardRepository = {
         careRole: true,
         isPrimary: true,
         activeFrom: true,
-        patient: { select: { id: true, firstName: true, lastName: true } },
+        // shriPatientId as well as id: the worklist links to the chart, and
+        // clinician-facing URLs are keyed on the UHID.
+        patient: { select: { id: true, shriPatientId: true, firstName: true, lastName: true } },
       },
       orderBy: { activeFrom: 'desc' },
     });
@@ -61,7 +63,9 @@ export const doctorDashboardRepository = {
         status: true,
         reason: true,
         locationName: true,
-        patient: { select: { id: true, firstName: true, lastName: true } },
+        // shriPatientId as well as id, for the same reason as listPanel: a
+        // clinic row that cannot link to the patient's chart is a dead end.
+        patient: { select: { id: true, shriPatientId: true, firstName: true, lastName: true } },
       },
       orderBy: { scheduledAt: 'asc' },
     });
@@ -126,6 +130,23 @@ export const doctorDashboardRepository = {
       orderBy: { createdAt: 'desc' },
     });
     return rows;
+  },
+
+  /**
+   * Per-day appointment counts across a window.
+   *
+   * ⚠️ Drives two surfaces from one query: the clinic calendar's per-day load
+   * shading and the weekly visit chart. Returning rows rather than a grouped
+   * aggregate because the window is small (weeks, not years) and the caller
+   * needs to bucket by LOCAL day — Postgres would group by UTC and put an
+   * 00:30 IST clinic on the previous day.
+   */
+  async listDailyLoad(doctorId: string, from: Date, to: Date) {
+    return prisma.appointment.findMany({
+      where: { doctorId, scheduledAt: { gte: from, lt: to } },
+      select: { scheduledAt: true, status: true },
+      orderBy: { scheduledAt: 'asc' },
+    });
   },
 
   /** Appointment rows for the trend series — status + date only. */

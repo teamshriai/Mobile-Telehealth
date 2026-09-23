@@ -1,4 +1,4 @@
-import { AppointmentStatus, LkwCertainty } from '@prisma/client';
+import { AppointmentStatus, EncounterType, LkwCertainty } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { doctorDashboardRepository } from './doctorDashboard.repository';
 
@@ -91,6 +91,25 @@ function addDays(d: Date, n: number): Date {
   return out;
 }
 
+/**
+ * Human wording for EncounterType.
+ *
+ * ⚠️ These strings are read by a clinician on the worklist, so they cannot be
+ * the enum member names — "Open ClinicVisit encounter" is a database identifier
+ * that leaked into the product. Every member is listed explicitly rather than
+ * derived by splitting camel case, so adding a member to the enum without
+ * deciding how to say it fails to compile.
+ */
+const ENCOUNTER_TYPE_LABELS: Record<EncounterType, string> = {
+  [EncounterType.ClinicVisit]: 'clinic visit',
+  [EncounterType.AmbulanceIntake]: 'ambulance intake',
+  [EncounterType.Emergency]: 'emergency',
+  [EncounterType.Telehealth]: 'teleconsultation',
+  [EncounterType.FollowUp]: 'follow-up',
+  [EncounterType.Screening]: 'screening',
+  [EncounterType.FieldRegistration]: 'field registration',
+};
+
 export const doctorDashboardService = {
   async getMyDay(userId: string, now: Date = new Date()) {
     const doctorId = await doctorDashboardRepository.findDoctorProfileIdByUserId(userId);
@@ -102,11 +121,23 @@ export const doctorDashboardService = {
     const dayEnd = addDays(dayStart, 1);
     const trendFrom = new Date(dayStart.getFullYear(), dayStart.getMonth() - (TREND_MONTHS - 1), 1);
 
-    const [panel, todays, upcomingCount, trendRows] = await Promise.all([
+    /**
+     * The calendar/chart window: four weeks back, two forward.
+     *
+     * Back far enough for the weekly chart to show a trend rather than a
+     * single bar, forward far enough that the calendar shows the clinic a
+     * consultant is about to walk into — which is the question they actually
+     * ask it.
+     */
+    const loadFrom = new Date(dayStart.getTime() - 28 * 86_400_000);
+    const loadTo = new Date(dayStart.getTime() + 15 * 86_400_000);
+
+    const [panel, todays, upcomingCount, trendRows, loadRows] = await Promise.all([
       doctorDashboardRepository.listPanel(doctorId),
       doctorDashboardRepository.listAppointmentsBetween(doctorId, dayStart, dayEnd),
       doctorDashboardRepository.countUpcoming(doctorId, now),
       doctorDashboardRepository.listForTrend(doctorId, trendFrom),
+      doctorDashboardRepository.listDailyLoad(doctorId, loadFrom, loadTo),
     ]);
 
     const patientIds = panel.map((row) => row.patient.id);
@@ -127,6 +158,9 @@ export const doctorDashboardService = {
         reason: a.reason,
         locationName: a.locationName,
         patientId: a.patient.id,
+        // The UHID as well as the internal id: the worklist links each row to
+        // that patient's chart, and clinician routes are keyed on the UHID.
+        shriPatientId: a.patient.shriPatientId,
         patientName: `${a.patient.firstName} ${a.patient.lastName}`.trim(),
       }));
 
@@ -177,7 +211,7 @@ export const doctorDashboardService = {
           score += WEIGHT.urgentAssessment;
         }
         if (openEncounter !== null) {
-          signals.push(`Open ${openEncounter.type} encounter`);
+          signals.push(`Open ${ENCOUNTER_TYPE_LABELS[openEncounter.type]} encounter`);
           score += WEIGHT.openEncounter;
         }
         if (symptoms.length >= MANY_SYMPTOMS_THRESHOLD) {
@@ -200,6 +234,7 @@ export const doctorDashboardService = {
 
         return {
           patientId,
+          shriPatientId: row.patient.shriPatientId,
           name: `${row.patient.firstName} ${row.patient.lastName}`.trim(),
           careRole: row.careRole,
           isPrimary: row.isPrimary,
@@ -231,8 +266,39 @@ export const doctorDashboardService = {
       });
     }
 
+    /**
+     * Per-day counts, bucketed by LOCAL date.
+     *
+     * ⚠️ `toISOString()` would bucket by UTC and shift an early-morning IST
+     * clinic onto the previous day, so the key is built from local parts.
+     * Cancelled appointments are excluded — they did not occupy a slot, and a
+     * calendar that shades a day busy because of cancellations is lying about
+     * the workload.
+     */
+    const dayKey = (d: Date): string =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const loadByDay = new Map<string, { total: number; completed: number }>();
+    for (const row of loadRows) {
+      if (row.status === AppointmentStatus.Cancelled) continue;
+      const key = dayKey(row.scheduledAt);
+      const bucket = loadByDay.get(key) ?? { total: 0, completed: 0 };
+      bucket.total += 1;
+      if (row.status === AppointmentStatus.Completed) bucket.completed += 1;
+      loadByDay.set(key, bucket);
+    }
+
+    const dailyLoad: Array<{ date: string; total: number; completed: number }> = [];
+    for (let i = 0; i < 43; i++) {
+      const d = new Date(loadFrom.getTime() + i * 86_400_000);
+      const key = dayKey(d);
+      const bucket = loadByDay.get(key) ?? { total: 0, completed: 0 };
+      dailyLoad.push({ date: key, total: bucket.total, completed: bucket.completed });
+    }
+
     return {
       asOf: now,
+      dailyLoad,
       today: {
         date: dayStart,
         total: clinic.length,

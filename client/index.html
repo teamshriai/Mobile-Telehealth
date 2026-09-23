@@ -32,7 +32,7 @@
       Pre-paint theme application. This has to be a blocking, non-module script
       in <head>: a module script is deferred, so React would mount and paint the
       light theme first and the page would visibly flash before switching.
-      Kept deliberately in sync with app/ThemeContext.jsx (same storage key,
+      Kept deliberately in sync with app/ThemeContext.tsx (same storage key,
       same resolution rule, same ground colours).
     -->
     <script>
@@ -56,7 +56,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 
 </html>

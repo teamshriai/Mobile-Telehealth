@@ -3,6 +3,7 @@ import { RegistrationSource, IdentityStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { decryptFieldOptional, encryptFieldOptional, hmacBlindIndex } from '../utils/encryption';
 import { computePhoneNumberHash } from '../services/patientIdentity.service';
+import { decryptProfile } from '../profile/profile.repository';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Patient Repository
@@ -15,7 +16,21 @@ import { computePhoneNumberHash } from '../services/patientIdentity.service';
 // stylistic inconsistency).
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Must match profile.repository.ts's ENCRYPTED_FIELDS exactly — same table. */
+/**
+ * The SUBSET of PatientProfile's encrypted columns that this module's
+ * response shapes actually surface.
+ *
+ * ⚠️ This is deliberately NOT the full list — profile.repository.ts encrypts
+ * 19 columns on this same table, including knownAllergies, currentMedications
+ * and the rest of the health history. Decrypting only what is returned keeps
+ * a search page from doing 19 AES operations per row for fields it will throw
+ * away.
+ *
+ * ⚠️ THE TRAP: anything reading a PatientProfile through THIS module and then
+ * surfacing a field outside this list will render CIPHERTEXT. If you need the
+ * health history, use `decryptProfile` from profile.repository.ts — that is
+ * exactly what it is exported for. See findClinicalByShriPatientId below.
+ */
 const ENCRYPTED_FIELDS = [
   'phoneNumber',
   'village',
@@ -44,6 +59,12 @@ function decryptPatient<T extends Partial<PatientProfile>>(row: T): T {
  *  query, so a future column added to the model cannot silently start
  *  leaking through search. */
 const SEARCH_RESULT_SELECT = {
+  // The internal UUID. Needed because /notes, /prescriptions and
+  // requirePatientAccess all speak internal ids while /patients speaks
+  // shriPatientId — without it, "search a patient, then write their note" is
+  // impossible in one pass. It is not a secret: /doctor/patients has always
+  // returned it, and every read it unlocks is still row-gated.
+  id: true,
   shriPatientId: true,
   firstName: true,
   lastName: true,
@@ -126,6 +147,21 @@ export const patientRepository = {
       where: { shriPatientId, deletedAt: null },
     });
     return row ? decryptPatient(row) : null;
+  },
+
+  /**
+   * The full clinical view of a patient, for a clinician.
+   *
+   * Uses profile.repository's `decryptProfile` rather than this module's
+   * narrow `decryptPatient`, because the Z3 patient banner needs the ALLERGY
+   * field and the chart summary needs the rest of the health history — none
+   * of which this module's own ENCRYPTED_FIELDS covers.
+   */
+  async findClinicalByShriPatientId(shriPatientId: string): Promise<PatientProfile | null> {
+    const row = await prisma.patientProfile.findFirst({
+      where: { shriPatientId, deletedAt: null },
+    });
+    return row ? decryptProfile(row) : null;
   },
 
   /** Exact-match search by ABHA blind index. */

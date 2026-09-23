@@ -10,6 +10,10 @@ import {
   signNote,
   amendNote,
   deleteNoteDraft,
+  listCosignQueue,
+  cosignNote,
+  returnNoteToAuthor,
+  checkNoteQuality,
 } from './clinicalNote.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,11 +35,56 @@ const router = Router();
 router.get('/', authenticate, requirePermission(Permission.NoteReadAssigned), listNotes);
 router.post('/', authenticate, requirePermission(Permission.NoteWriteAssigned), createNote);
 
+// ── Co-sign queue (S-06-09) ─────────────────────────────────────────────────
+// ⚠️ MUST stay above '/:id'. Express resolves in declaration order, so a bare
+// ':id' parameter route declared first would swallow the literal
+// '/cosign-queue' path and try to parse it as a note id.
+router.get(
+  '/cosign-queue',
+  authenticate,
+  requirePermission(Permission.NoteCosignAssigned),
+  listCosignQueue,
+);
+
+// Literal path, so it must also sit above '/:id'.
+router.post(
+  '/quality-check',
+  authenticate,
+  requirePermission(Permission.NoteWriteAssigned),
+  checkNoteQuality,
+);
+
 router.get('/:id', authenticate, requirePermission(Permission.NoteReadAssigned), getNote);
 router.patch('/:id', authenticate, requirePermission(Permission.NoteWriteAssigned), updateNote);
-router.delete('/:id', authenticate, requirePermission(Permission.NoteWriteAssigned), deleteNoteDraft);
+router.delete(
+  '/:id',
+  authenticate,
+  requirePermission(Permission.NoteWriteAssigned),
+  deleteNoteDraft,
+);
 
-router.post('/:id/sign', authenticate, requirePermission(Permission.NoteSignOwn), signNote);
+// ⚠️ Gated on WRITE, not SIGN — deliberately.
+//
+// Submitting your own note for the record is something any author may do.
+// What DIFFERS by capability is the outcome: an author holding
+// `note:sign:own` produces a Signed note; one without it produces a
+// CosignPending note for a consultant. That decision is made once, in
+// clinicalNote.service.sign, from capabilities. Gating the route on
+// NoteSignOwn would 403 a Resident before that logic could ever run.
+router.post('/:id/sign', authenticate, requirePermission(Permission.NoteWriteAssigned), signNote);
 router.post('/:id/addenda', authenticate, requirePermission(Permission.NoteAmendOwn), amendNote);
+
+router.post(
+  '/:id/cosign',
+  authenticate,
+  requirePermission(Permission.NoteCosignAssigned),
+  cosignNote,
+);
+router.post(
+  '/:id/return',
+  authenticate,
+  requirePermission(Permission.NoteCosignAssigned),
+  returnNoteToAuthor,
+);
 
 export { router as clinicalNoteRouter };

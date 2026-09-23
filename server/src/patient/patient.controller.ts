@@ -54,6 +54,28 @@ export const getPatient = asyncHandler(async (req: Request, res: Response): Prom
   res.status(200).json(ApiResponseBuilder.success('Patient retrieved.', { patient }));
 });
 
+/**
+ * The clinician's clinical view — demographics plus health history.
+ *
+ * ⚠️ Separate from GET /:shriPatientId rather than widening it, because the
+ * two have genuinely different audiences: the narrow shape is an identity
+ * confirmation (used during registration and duplicate-matching), this one
+ * is a clinical read. Widening the narrow one would have pushed allergies and
+ * medications into every registration screen that never needed them.
+ */
+export const getPatientClinical = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { shriPatientId } = shriIdParamSchema.parse(req.params);
+    const patient = await patientService.getClinicalByShriPatientId(
+      { id: req.user!.id, roleName: req.user!.roleName },
+      shriPatientId,
+      getRequestMeta(req),
+    );
+
+    res.status(200).json(ApiResponseBuilder.success('Patient retrieved.', { patient }));
+  },
+);
+
 export const linkAccount = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { shriPatientId } = shriIdParamSchema.parse(req.params);
   const { targetUserId } = linkAccountBodySchema.parse(req.body);

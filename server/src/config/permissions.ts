@@ -92,6 +92,43 @@ export const Permission = {
   NoteWriteAssigned: 'note:write:assigned',
   NoteSignOwn: 'note:sign:own',
   NoteAmendOwn: 'note:amend:own',
+  // `cosign` is a fifth distinct verb (UI_ATLAS §3.2: "counter-attest
+  // another's entry — held by a narrower set than `sign`"). It is what makes
+  // the Resident role work WITHOUT any code comparing a role name: a note
+  // whose author lacks NoteSignOwn enters CosignPending, and only a holder of
+  // NoteCosignAssigned can complete it.
+  NoteCosignAssigned: 'note:cosign:assigned',
+
+  // ── Problem list & diagnosis coding (M-06 / S-06-05) ────────────────────
+  ProblemReadAssigned: 'problem:read:assigned',
+  ProblemWriteAssigned: 'problem:write:assigned',
+
+  // ── Prescribing (M-06 / S-06-07) ────────────────────────────────────────
+  // Same write/sign split as notes, for the same reason. `override` is
+  // separate again and deliberately narrow: it is the G4 capability to
+  // proceed past a DETERMINISTIC hard stop, and holding it is not the same as
+  // being allowed to prescribe.
+  RxReadAssigned: 'rx:read:assigned',
+  RxWriteAssigned: 'rx:write:assigned',
+  RxSignOwn: 'rx:sign:own',
+  RxOverrideHardStop: 'rx:override:hard-stop',
+
+  // ── Patient instructions (M-06 / S-06-08) ───────────────────────────────
+  InstructionsWriteAssigned: 'instructions:write:assigned',
+
+  // ── Templates & order sets (M-06 / S-06-10) ─────────────────────────────
+  // Promoting a personal template to facility-wide is a GOVERNANCE act, not a
+  // convenience, so it is a different capability held by a different persona.
+  TemplateManageOwn: 'template:manage:own',
+  TemplatePromoteFacility: 'template:promote:facility',
+
+  // ── Break-glass (UI_ATLAS §3.2 / DD-014) ────────────────────────────────
+  // `request` is held by every clinician who can hold a care relationship —
+  // that is the whole point: "an authorization model that can block
+  // resuscitation is the wrong model". `review` is the 24-hour audit duty and
+  // is held by nobody clinical.
+  BreakGlassRequest: 'breakglass:request:any',
+  BreakGlassReview: 'breakglass:review:any',
 
   // ── Hospital Admin — scoped to the admin's own hospital, never global.
   // Row-level scoping (does this doctor/patient/appointment actually belong
@@ -147,6 +184,16 @@ const DOCTOR_PERMISSIONS: PermissionName[] = [
   Permission.NoteWriteAssigned,
   Permission.NoteSignOwn,
   Permission.NoteAmendOwn,
+  Permission.NoteCosignAssigned,
+  Permission.ProblemReadAssigned,
+  Permission.ProblemWriteAssigned,
+  Permission.RxReadAssigned,
+  Permission.RxWriteAssigned,
+  Permission.RxSignOwn,
+  Permission.RxOverrideHardStop,
+  Permission.InstructionsWriteAssigned,
+  Permission.TemplateManageOwn,
+  Permission.BreakGlassRequest,
   // Deliberately NOT PatientReadAny: that would let any Doctor read any
   // patient system-wide, which is exactly the unrestricted clinical-record
   // access careRelationship.service exists to prevent (the same reasoning
@@ -155,6 +202,40 @@ const DOCTOR_PERMISSIONS: PermissionName[] = [
   // membership, or having personally registered/opened an encounter on
   // them — via PatientReadAssigned + careRelationshipService's row check.
 ];
+
+/**
+ * Resident (UI_ATLAS persona `P-05`).
+ *
+ * Derived from the Doctor set by SUBTRACTION, so a capability added to Doctor
+ * is inherited here unless it is on the withheld list below. That direction
+ * matters: the failure mode to avoid is a new clinical capability silently
+ * bypassing co-sign because someone forgot to add it in two places.
+ *
+ * ⚠️ What a Resident may NOT do, and why:
+ *  - `note:sign:own`   — a Resident authors; a consultant attests. Their note
+ *                        lands in CosignPending (CMP-NABH-03).
+ *  - `rx:sign:own`     — same split for prescribing. They may draft an Rx.
+ *  - `rx:override:hard-stop` — a G4 override needs two consultants; a
+ *                        Resident is not one of them.
+ *  - `note:cosign:assigned`  — they cannot counter-attest anyone, including
+ *                        each other.
+ *  - `template:manage:own`   — template authorship is a consultant act.
+ *
+ * ⚠️ NOTHING in the codebase branches on the string 'Resident'. The behaviour
+ * above is produced entirely by which capabilities are absent here, which is
+ * what UI_ATLAS §3.2's "no authorization check compares a role name" requires.
+ */
+const RESIDENT_WITHHELD: readonly PermissionName[] = [
+  Permission.NoteSignOwn,
+  Permission.RxSignOwn,
+  Permission.RxOverrideHardStop,
+  Permission.NoteCosignAssigned,
+  Permission.TemplateManageOwn,
+];
+
+const RESIDENT_PERMISSIONS: PermissionName[] = DOCTOR_PERMISSIONS.filter(
+  (p) => !RESIDENT_WITHHELD.includes(p),
+);
 
 /**
  * Clinical support staff. Read-only on assigned patients — deliberately
@@ -195,6 +276,10 @@ const ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.DoctorVerify,
   Permission.AuditRead,
   Permission.PatientManageAny,
+  // The 24-hour break-glass review duty (DD-014). Deliberately given to the
+  // role with NO clinical read: reviewing THAT an access happened must not
+  // require the reviewer to be able to read what was accessed.
+  Permission.BreakGlassReview,
 ];
 
 /**
@@ -214,11 +299,16 @@ const HOSPITAL_ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.HospitalAppointmentRead,
   Permission.HospitalManageOwn,
   Permission.FeedbackReadHospitalScoped,
+  // Template governance (UI_ATLAS persona P-02, S-06-10). Promoting a
+  // personal template facility-wide is an administrative act with a named
+  // owner and a review date — not something a clinician does for themselves.
+  Permission.TemplatePromoteFacility,
 ];
 
 export const ROLE_PERMISSIONS: Record<RoleName, readonly PermissionName[]> = {
   [RoleName.Patient]: PATIENT_PERMISSIONS,
   [RoleName.Doctor]: DOCTOR_PERMISSIONS,
+  [RoleName.Resident]: RESIDENT_PERMISSIONS,
   [RoleName.HealthcareWorker]: HEALTHCARE_WORKER_PERMISSIONS,
   [RoleName.LabTechnician]: LAB_TECHNICIAN_PERMISSIONS,
   [RoleName.Admin]: ADMIN_PERMISSIONS,

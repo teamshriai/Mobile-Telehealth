@@ -12,6 +12,7 @@ export const doctorPatientsService = {
 
     return rows.map((row) => ({
       patientId: row.patient.id,
+      shriPatientId: row.patient.shriPatientId,
       name: `${row.patient.firstName} ${row.patient.lastName}`.trim(),
       careRole: row.careRole,
       isPrimary: row.isPrimary,

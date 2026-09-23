@@ -57,3 +57,30 @@ export type AddendumDto = z.infer<typeof addendumSchema>;
 export const listNotesQuerySchema = z.object({
   patientId: z.string().uuid('Please choose a valid patient.'),
 });
+
+/**
+ * ⚠️ Returning a note to its author requires a reason. UI_ATLAS S-06-09 marks
+ * it mandatory, and the author is notified — a note that silently reverts to
+ * a draft with no explanation reads as a bug, not as feedback.
+ */
+export const returnToAuthorSchema = z
+  .object({
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Please tell the author what needs to change (at least 10 characters).')
+      .max(1000),
+  })
+  .strict();
+
+export type ReturnToAuthorDto = z.infer<typeof returnToAuthorSchema>;
+
+/** The four narrative sections, all optional — a draft may be partial. */
+export const qualityCheckSchema = z
+  .object({
+    subjective: z.string().max(5000).nullable().optional(),
+    objective: z.string().max(5000).nullable().optional(),
+    assessment: z.string().max(5000).nullable().optional(),
+    plan: z.string().max(5000).nullable().optional(),
+  })
+  .strict();

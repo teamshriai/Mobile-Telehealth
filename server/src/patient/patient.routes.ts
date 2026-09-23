@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { registerPatient, searchPatients, getPatient, linkAccount } from './patient.controller';
+import {
+  registerPatient,
+  searchPatients,
+  getPatient,
+  getPatientClinical,
+  linkAccount,
+} from './patient.controller';
 import { createEncounter, listEncounters } from '../encounter/encounter.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission, requireAnyPermission } from '../middleware/authorize';
@@ -35,6 +41,15 @@ router.get(
   authenticate,
   requirePermission(Permission.PatientSearchAny),
   searchPatients,
+);
+
+// ⚠️ Registered BEFORE '/:shriPatientId' — Express matches in declaration
+// order, and a bare ':shriPatientId' would otherwise swallow this path.
+router.get(
+  '/:shriPatientId/clinical',
+  authenticate,
+  requireAnyPermission(Permission.PatientReadAssigned, Permission.PatientReadAny),
+  getPatientClinical,
 );
 
 router.get(

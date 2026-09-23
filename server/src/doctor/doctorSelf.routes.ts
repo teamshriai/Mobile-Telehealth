@@ -15,7 +15,7 @@ import {
   addLeave,
   removeLeave,
 } from './doctorAvailability.controller';
-import { listOwnPatients } from './doctorPatients.controller';
+import { listOwnPatients, listOpenEncounters } from './doctorPatients.controller';
 import { getMyDay, listOwnAppointments } from './doctorDashboard.controller';
 import {
   listOwnSlots,
@@ -131,6 +131,14 @@ router.patch(
   authenticate,
   requirePermission(Permission.AppointmentManageAssigned),
   updateAppointment,
+);
+
+/** Cross-patient list of this clinician's open encounters (S-06-01). */
+router.get(
+  '/encounters',
+  authenticate,
+  requirePermission(Permission.EncounterReadAssigned),
+  listOpenEncounters,
 );
 
 export { router as doctorSelfRouter };

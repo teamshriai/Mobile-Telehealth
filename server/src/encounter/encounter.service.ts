@@ -218,6 +218,47 @@ export const encounterService = {
     return toEncounterResponseShape(encounter);
   },
 
+  /**
+   * The clinician workspace header — everything `/encounter/:visitId/*` needs
+   * before it can render anything.
+   *
+   * One call rather than two, deliberately. The alternative is the client
+   * resolving encounter → patientId and then fetching the patient, which
+   * means a window where the workspace has an encounter on screen and does
+   * not yet know whose it is. On a screen whose whole job is stopping a
+   * wrong-patient error, that window must not exist.
+   *
+   * ⚠️ Access is checked against the PATIENT, not the encounter. Holding an
+   * encounter's visit id is not authorization — and because this goes through
+   * requirePatientAccess, a clinician with the capability but no relationship
+   * gets the break-glass offer here exactly as they would on the chart.
+   */
+  async getWorkspace(actor: Actor, visitId: string, meta: Meta) {
+    const encounter = await encounterRepository.findByVisitId(visitId);
+    if (encounter === null) {
+      throw new AppError('Encounter not found.', 404);
+    }
+    await careRelationshipService.requirePatientAccess(actor, encounter.patientId, meta);
+
+    const patient = await patientRepository.findById(encounter.patientId);
+    if (patient === null) {
+      // The encounter row outlived its patient (soft delete). Refuse rather
+      // than render a workspace with no subject.
+      throw new AppError('Encounter not found.', 404);
+    }
+
+    return {
+      encounter: {
+        id: encounter.id,
+        ...toEncounterResponseShape(encounter),
+      },
+      patient: {
+        id: patient.id,
+        shriPatientId: patient.shriPatientId,
+      },
+    };
+  },
+
   async close(
     actor: Actor,
     encounterId: string,

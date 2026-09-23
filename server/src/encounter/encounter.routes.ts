@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getEncounter,
+  getEncounterWorkspace,
   closeEncounter,
   getAssessment,
   upsertAssessment,
@@ -20,6 +21,16 @@ import { Permission } from '../config/permissions';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const router = Router();
+
+// Keyed on the human-readable visitId, unlike the routes below which take the
+// internal UUID. Both are unique, and the clinician workspace URLs use the
+// visit id because it is the number printed on the patient's paperwork.
+router.get(
+  '/:visitId/workspace',
+  authenticate,
+  requireAnyPermission(Permission.EncounterReadAssigned, Permission.EncounterReadOwn),
+  getEncounterWorkspace,
+);
 
 router.get(
   '/:id',

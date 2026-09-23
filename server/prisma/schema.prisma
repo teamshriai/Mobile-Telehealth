@@ -40,6 +40,12 @@ enum RoleName {
   Admin
   Patient
   Doctor
+  /// Authors clinical entries but may not attest them alone — a Resident's
+  /// note enters CosignPending and needs a consultant's counter-signature
+  /// (CMP-NABH-03). ⚠️ The distinction is enforced by CAPABILITY, never by
+  /// this name: Resident simply lacks `note:sign:own` and holds
+  /// `note:write:assigned`. See config/permissions.ts.
+  Resident
   HealthcareWorker
   LabTechnician
   /// Manages a single hospital's doctors, patients-in-context and operations.
@@ -199,6 +205,25 @@ enum AuditAction {
   NoteCreated
   NoteSigned
   NoteAmended
+  // ── Clinical authoring (M-06) ───────────────────────────────────────────
+  NoteCosigned
+  NoteReturnedToAuthor
+  ProblemAdded
+  ProblemResolved
+  PrescriptionCreated
+  PrescriptionSigned
+  InstructionsIssued
+  TemplateSaved
+  TemplatePromoted
+  // ── Deterministic safety (UI_ATLAS §4.9) ────────────────────────────────
+  // HardStopOverridden is the one event that must ALERT, not merely record:
+  // it is a G4 override of a deterministic rule and is reviewed within 24h.
+  HardStopTriggered
+  HardStopOverridden
+  // ── Break-glass (DD-014) ────────────────────────────────────────────────
+  BreakGlassRequested
+  BreakGlassGranted
+  BreakGlassReviewed
 
   @@map("audit_action")
 }
@@ -515,6 +540,12 @@ model PatientProfile {
   encounters    Encounter[]
   feedback      Feedback[]
   clinicalNotes ClinicalNote[]
+
+  // ── Clinical authoring (M-06) ─────────────────────────────────────────────
+  problems         Problem[]
+  prescriptions    Prescription[]
+  instructions     PatientInstruction[]
+  breakGlassGrants BreakGlassGrant[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
@@ -1328,6 +1359,11 @@ model Encounter {
   strokeAssessment StrokeAssessment?
   clinicalNotes    ClinicalNote[]
 
+  // ── Clinical authoring (M-06) ─────────────────────────────────────────────
+  problems      Problem[]
+  prescriptions Prescription[]
+  instructions  PatientInstruction[]
+
   @@index([patientId, startedAt])
   @@index([status])
   @@index([type, startedAt])
@@ -1479,6 +1515,10 @@ model StrokeLkwRevision {
 
 enum ClinicalNoteStatus {
   Draft
+  /// Authored by someone without `note:sign:own`. Read-only to the author
+  /// and NOT yet the legal record — it becomes Signed only when a consultant
+  /// counter-attests it in S-06-09.
+  CosignPending
   Signed
 
   @@map("clinical_note_status")
@@ -1532,6 +1572,21 @@ model ClinicalNote {
   signerName               String?   @map("signer_name")
   signerRegistrationNumber String?   @map("signer_registration_number")
 
+  /// Co-signature (CMP-NABH-03). Stamped ALONGSIDE the author's attestation,
+  /// never replacing it — the record must show who wrote it and who stood
+  /// behind it. `requiresCosign` is decided at sign time from the author's
+  /// capabilities, not from their role name.
+  requiresCosign             Boolean   @default(false) @map("requires_cosign")
+  cosignedAt                 DateTime? @map("cosigned_at")
+  cosignedByUserId           String?   @map("cosigned_by_user_id") @db.Uuid
+  cosignerName               String?   @map("cosigner_name")
+  cosignerRegistrationNumber String?   @map("cosigner_registration_number")
+
+  /// Returned to the author for revision instead of co-signed. The reason is
+  /// mandatory and ENCRYPTED; the author is notified.
+  returnedAt   DateTime? @map("returned_at")
+  returnReason String?   @map("return_reason")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1567,4 +1622,440 @@ model ClinicalNoteAddendum {
 
   @@index([noteId, createdAt])
   @@map("clinical_note_addenda")
+}
+
+// =============================================================================
+// CLINICAL AUTHORING — M-06 · Outpatient Consultation & Clinical Documentation
+//
+// UI_ATLAS §6122–7050. The module that owns clinical authoring for outpatients.
+//
+// ⚠️ THE RULE THAT GOVERNS EVERYTHING BELOW (CMP-NABH-10): a signed clinical
+// entry is NEVER edited — only amended, with the amendment attributed and
+// timestamped. Every authoring table here therefore either has no update path
+// after signing (enforced at the query level, see the repositories) or is
+// append-only by construction.
+//
+// ⚠️ SAFETY IS DETERMINISTIC. The Drug / AllergyRule / DoseRange tables are the
+// "deterministic floor retained locally" (§4.2). They are not a vendor
+// knowledge base and they do not depend on any model being reachable: the
+// prescription hard stop must fire identically with every AI capability off.
+// =============================================================================
+
+/// A problem stays on the list forever. Resolving it DATES it rather than
+/// deleting it — a resolved diagnosis is still clinical history (S-06-05:
+/// "never deletes history").
+enum ProblemStatus {
+  Active
+  Resolved
+
+  @@map("problem_status")
+}
+
+enum PrescriptionStatus {
+  Draft
+  Signed
+  Cancelled
+
+  @@map("prescription_status")
+}
+
+/// The atlas's fixed five (S-02-05 / GP-11). Not extensible without a spec
+/// change — a free-text-only reason is how break-glass becomes unreviewable.
+enum BreakGlassReason {
+  EmergencyCare
+  CoveringColleague
+  OnCallReview
+  QualityReview
+  Other
+
+  @@map("break_glass_reason")
+}
+
+enum BreakGlassOutcome {
+  Appropriate
+  Inappropriate
+
+  @@map("break_glass_outcome")
+}
+
+enum TemplateScope {
+  Personal
+  Facility
+
+  @@map("template_scope")
+}
+
+/// ICD-10 catalogue. `isLeaf` is the entire point of this table: S-06-05
+/// blocks coding a problem to a parent-only category. "J18" is a category,
+/// not a diagnosis; "J18.9" is. Seeded from UI_ATLAS §8.5's fixed list.
+model DiagnosisCode {
+  code  String @id
+  title String
+
+  /// Parent category, e.g. J18.9 → J18. Null at the top of a chapter.
+  parentCode String? @map("parent_code")
+
+  /// ⚠️ Only a leaf may be attached to a Problem or a ClinicalNote.
+  isLeaf   Boolean @default(true) @map("is_leaf")
+  isActive Boolean @default(true) @map("is_active")
+
+  problems Problem[]
+
+  @@index([title])
+  @@index([parentCode])
+  @@map("diagnosis_codes")
+}
+
+/// A patient-level problem list entry.
+///
+/// Distinct from ClinicalNote.problemCode, which records what ONE note was
+/// about. This persists across encounters and is what S-06-05 curates.
+model Problem {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+
+  /// The encounter it was first coded in, for provenance. Nullable — a problem
+  /// may be carried forward from before the system held the patient.
+  onsetEncounterId String? @map("onset_encounter_id") @db.Uuid
+
+  code String
+
+  /// Denormalised label, copied not joined, so the list still reads correctly
+  /// if the catalogue is later re-versioned. Same reasoning as ClinicalNote's
+  /// copied attestation.
+  codeTitle String @map("code_title")
+
+  status     ProblemStatus @default(Active)
+  onsetDate  DateTime?     @map("onset_date") @db.Date
+  resolvedAt DateTime?     @map("resolved_at")
+
+  /// Clinician free text about this problem — ENCRYPTED at rest.
+  note String?
+
+  recordedByUserId String   @map("recorded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  patient        PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  diagnosisCode  DiagnosisCode  @relation(fields: [code], references: [code], onDelete: Restrict)
+  onsetEncounter Encounter?     @relation(fields: [onsetEncounterId], references: [id], onDelete: SetNull)
+
+  /// ⚠️ One ACTIVE instance of a code per patient — the dedupe S-06-05
+  /// requires. Expressed as a partial unique index in the migration
+  /// (WHERE status = 'Active') so the same code may legitimately recur after
+  /// being resolved. Prisma cannot express a partial unique index.
+  @@index([patientId, status])
+  @@index([code])
+  @@map("problems")
+}
+
+/// A small local formulary.
+///
+/// ⚠️ NOT a vendor knowledge base. UI_ATLAS calls this the "deterministic floor
+/// retained locally" — it exists so the safety rules below keep working with
+/// every model switched off.
+model Drug {
+  id          String @id @default(uuid()) @db.Uuid
+  genericName String @map("generic_name")
+  form        String
+  strength    String
+  route       String
+
+  /// The allergen class this drug belongs to, e.g. "Penicillin". Null when the
+  /// drug belongs to no class anyone is recorded as allergic to. This single
+  /// column is what makes the hard stop work.
+  allergenClass String? @map("allergen_class")
+
+  /// What the drug is FOR, e.g. "Antibiotic". Distinct from allergenClass,
+  /// which is what it might cause a reaction to.
+  ///
+  /// ⚠️ Load-bearing for the hard stop's "three alternatives". Without it,
+  /// "find another drug that is not a penicillin" returns a statin — which
+  /// is not an alternative to an antibiotic, it is nonsense with a plausible
+  /// shape. Offering no alternative is better than offering a wrong one.
+  therapeuticClass String? @map("therapeutic_class")
+
+  /// National List of Essential Medicines — CMP-DRUG-03 prompts substitution.
+  isNlem   Boolean @default(false) @map("is_nlem")
+  isActive Boolean @default(true) @map("is_active")
+
+  /// ⚠️ False marks a drug added BEYOND UI_ATLAS §8.5's fixed vocabulary.
+  /// §8.6 forbids inventing data, but §8.5 contains no non-beta-lactam
+  /// antibiotic, so the "three alternatives" the hard stop must offer cannot
+  /// be drawn from it. The additions are flagged here rather than hidden so
+  /// they can be folded into §8 properly. See the migration header.
+  isAtlasVocabulary Boolean @default(true) @map("is_atlas_vocabulary")
+
+  doseRanges        DoseRange[]
+  prescriptionItems PrescriptionItem[]
+
+  @@unique([genericName, strength, form])
+  @@index([genericName])
+  @@map("drugs")
+}
+
+/// allergen × drug class → block.
+///
+/// ⚠️ THE HARD STOP IS THIS TABLE, evaluated server-side before commit. Cross
+/// reactivity is modelled explicitly: a documented penicillin allergy blocks
+/// piperacillin-tazobactam as well as co-amoxiclav, because both are
+/// beta-lactams. That is the rule working correctly, not a false positive.
+model AllergyRule {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Normalised form of what a clinician recorded in
+  /// PatientProfile.knownAllergies — e.g. "penicillin".
+  allergenKey String @map("allergen_key")
+
+  /// The Drug.allergenClass this allergen blocks.
+  blocksClass String @map("blocks_class")
+
+  /// Shown verbatim in the AIP-09 gate. The clinician must be told WHY.
+  rationale String
+
+  isActive Boolean @default(true) @map("is_active")
+
+  @@unique([allergenKey, blocksClass])
+  @@map("allergy_rules")
+}
+
+/// Static dose ranges. UI_ATLAS §4.2: "static dose-range tables — never fully
+/// off". Paediatric ranges are per-kg, and the UI must show the weight and its
+/// capture time beside the dose (§5.4).
+model DoseRange {
+  id     String @id @default(uuid()) @db.Uuid
+  drugId String @map("drug_id") @db.Uuid
+
+  /// 'Adult' | 'Paediatric'
+  cohort String
+
+  minDose Decimal @map("min_dose") @db.Decimal(10, 3)
+  maxDose Decimal @map("max_dose") @db.Decimal(10, 3)
+  unit    String
+
+  /// True when min/max are per kilogram of body weight.
+  perKg     Boolean  @default(false) @map("per_kg")
+  maxPerDay Decimal? @map("max_per_day") @db.Decimal(10, 3)
+
+  drug Drug @relation(fields: [drugId], references: [id], onDelete: Cascade)
+
+  @@unique([drugId, cohort])
+  @@map("dose_ranges")
+}
+
+/// A prescription. Signing is irreversible and stamps the prescriber's HPR ID
+/// (CMP-ABDM-07) alongside name and registration number.
+model Prescription {
+  id          String  @id @default(uuid()) @db.Uuid
+  patientId   String  @map("patient_id") @db.Uuid
+  encounterId String? @map("encounter_id") @db.Uuid
+
+  /// RX/{fy}/{seq} — the human-facing identifier (M-06.8).
+  rxNumber String @unique @map("rx_number")
+
+  status PrescriptionStatus @default(Draft)
+
+  authorUserId String @map("author_user_id") @db.Uuid
+
+  /// Attestation, stamped AT SIGN TIME FROM THE SESSION — never accepted from
+  /// the request. Same rule as ClinicalNote.
+  signedAt                 DateTime? @map("signed_at")
+  signedByUserId           String?   @map("signed_by_user_id") @db.Uuid
+  signerName               String?   @map("signer_name")
+  signerRegistrationNumber String?   @map("signer_registration_number")
+  signerHprId              String?   @map("signer_hpr_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  patient   PatientProfile         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter?             @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  items     PrescriptionItem[]
+  overrides PrescriptionOverride[]
+
+  @@index([patientId, createdAt])
+  @@index([encounterId])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String @id @default(uuid()) @db.Uuid
+  prescriptionId String @map("prescription_id") @db.Uuid
+  drugId         String @map("drug_id") @db.Uuid
+
+  dose         Decimal @db.Decimal(10, 3)
+  doseUnit     String  @map("dose_unit")
+  route        String
+  frequency    String
+  durationDays Int     @map("duration_days")
+
+  /// Links this line to the problem it treats (S-06-07 field 5).
+  indicationCode String? @map("indication_code")
+
+  /// Drives pharmacy dispensing (CMP-DRUG-03).
+  substitutionAllowed Boolean @default(true) @map("substitution_allowed")
+
+  /// Patient-facing directions — ENCRYPTED, printed bilingually.
+  instructions String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  drug         Drug         @relation(fields: [drugId], references: [id], onDelete: Restrict)
+
+  @@index([prescriptionId])
+  @@map("prescription_items")
+}
+
+/// A G4 override of a deterministic hard stop.
+///
+/// ⚠️ UI_ATLAS §4.9: `AI.SAF.HARD_STOP_OVERRIDDEN` is the ONE audit event that
+/// must ALERT, not merely record, and it is reviewed within 24 hours. Both
+/// identities are kept — the overriding clinician AND the second consultant
+/// who authenticated. A G4 gate is not satisfied by one person twice.
+model PrescriptionOverride {
+  id             String @id @default(uuid()) @db.Uuid
+  prescriptionId String @map("prescription_id") @db.Uuid
+
+  /// What was blocked, captured at override time so this record stands alone
+  /// even if the formulary or the rule set later changes.
+  drugName    String @map("drug_name")
+  allergenKey String @map("allergen_key")
+  ruleText    String @map("rule_text")
+
+  /// Mandatory justification — ENCRYPTED.
+  reason String
+
+  overriddenByUserId String @map("overridden_by_user_id") @db.Uuid
+  overriddenByName   String @map("overridden_by_name")
+
+  secondConsultantUserId             String  @map("second_consultant_user_id") @db.Uuid
+  secondConsultantName               String  @map("second_consultant_name")
+  secondConsultantRegistrationNumber String? @map("second_consultant_registration_number")
+
+  /// Review within 24h.
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewedByUserId String?   @map("reviewed_by_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([reviewedAt, createdAt])
+  @@index([prescriptionId])
+  @@map("prescription_overrides")
+}
+
+/// What the patient is told, in the language they read (S-06-08).
+/// CMP-DPDP-02 requires the patient's own language, not the clinician's.
+model PatientInstruction {
+  id          String  @id @default(uuid()) @db.Uuid
+  patientId   String  @map("patient_id") @db.Uuid
+  encounterId String? @map("encounter_id") @db.Uuid
+
+  title String
+
+  /// The issued text — ENCRYPTED.
+  body String
+
+  /// The clinician's original wording, retained ALONGSIDE any rewritten
+  /// version so the author's intent is never silently replaced. ENCRYPTED.
+  clinicianWording String? @map("clinician_wording")
+
+  /// BCP-47-ish short code: 'en', 'kn', 'hi', 'ta', 'ml'.
+  language String @default("en")
+
+  issuedAt       DateTime @default(now()) @map("issued_at")
+  issuedByUserId String   @map("issued_by_user_id") @db.Uuid
+  issuedByName   String   @map("issued_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter?     @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, issuedAt])
+  @@index([encounterId])
+  @@map("patient_instructions")
+}
+
+/// Personal and facility-wide note / order-set templates (S-06-10, ARC-18).
+///
+/// Effective-dated: a template has a window. ⚠️ Promotion to facility-wide is
+/// a GOVERNANCE ACT with a named owner and a review date, not a convenience —
+/// an unowned facility-wide template is how bad practice gets institutionalised.
+model ClinicalTemplate {
+  id    String        @id @default(uuid()) @db.Uuid
+  key   String        @unique
+  name  String
+  scope TemplateScope @default(Personal)
+
+  /// Which surface it fills: 'Subjective' | 'Objective' | 'Assessment' |
+  /// 'Plan' | 'Instructions' | 'OrderSet'.
+  category String
+
+  body String
+
+  ownerUserId String @map("owner_user_id") @db.Uuid
+  ownerName   String @map("owner_name")
+
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  /// Facility-wide templates carry a review date — the governance commitment.
+  reviewDueAt DateTime? @map("review_due_at")
+
+  promotionRequestedAt DateTime? @map("promotion_requested_at")
+  promotedAt           DateTime? @map("promoted_at")
+  promotedByUserId     String?   @map("promoted_by_user_id") @db.Uuid
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([scope, category])
+  @@index([ownerUserId])
+  @@map("clinical_templates")
+}
+
+/// Emergency access for a clinician who HOLDS the capability but has NO care
+/// relationship.
+///
+/// ⚠️ UI_ATLAS §3.2 / DD-014: such an actor is not refused — they are OFFERED
+/// break-glass. "An authorization model that can block resuscitation is the
+/// wrong model." They state a reason, proceed, and the access is logged and
+/// reviewed within 24 hours.
+///
+/// ⚠️ Grants EXPIRE. Expiry is the only thing stopping break-glass from
+/// silently becoming a permanent care relationship.
+model BreakGlassGrant {
+  id        String @id @default(uuid()) @db.Uuid
+  patientId String @map("patient_id") @db.Uuid
+
+  actorUserId String @map("actor_user_id") @db.Uuid
+  actorName   String @map("actor_name")
+
+  reasonCategory BreakGlassReason @map("reason_category")
+
+  /// Mandatory free text (≥10 chars) — ENCRYPTED. The category alone is not a
+  /// reason anyone can review.
+  reason String
+
+  grantedAt DateTime @default(now()) @map("granted_at")
+  expiresAt DateTime @map("expires_at")
+
+  reviewedAt       DateTime?          @map("reviewed_at")
+  reviewedByUserId String?            @map("reviewed_by_user_id") @db.Uuid
+  outcome          BreakGlassOutcome?
+  reviewNote       String?            @map("review_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId, expiresAt])
+  @@index([patientId, grantedAt])
+  @@index([reviewedAt, grantedAt])
+  @@map("break_glass_grants")
 }

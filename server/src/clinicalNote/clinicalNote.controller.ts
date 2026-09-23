@@ -5,6 +5,8 @@ import {
   updateNoteSchema,
   addendumSchema,
   listNotesQuerySchema,
+  returnToAuthorSchema,
+  qualityCheckSchema,
 } from './clinicalNote.validator';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -34,7 +36,11 @@ export const listNotes = asyncHandler(async (req: Request, res: Response): Promi
 });
 
 export const getNote = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const note = await clinicalNoteService.getById(actorFrom(req), noteIdFrom(req), getRequestMeta(req));
+  const note = await clinicalNoteService.getById(
+    actorFrom(req),
+    noteIdFrom(req),
+    getRequestMeta(req),
+  );
   res.status(200).json(ApiResponseBuilder.success('Note retrieved.', { note }));
 });
 
@@ -75,3 +81,47 @@ export const deleteNoteDraft = asyncHandler(async (req: Request, res: Response):
   await clinicalNoteService.deleteDraft(actorFrom(req), noteIdFrom(req), getRequestMeta(req));
   res.status(200).json(ApiResponseBuilder.success('Draft discarded.'));
 });
+
+// ── Co-sign (S-06-09) ───────────────────────────────────────────────────────
+
+export const listCosignQueue = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const notes = await clinicalNoteService.listCosignQueue(actorFrom(req));
+  res.status(200).json(ApiResponseBuilder.success('Co-sign queue retrieved.', { notes }));
+});
+
+export const cosignNote = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const note = await clinicalNoteService.cosign(
+    actorFrom(req),
+    noteIdFrom(req),
+    getRequestMeta(req),
+  );
+  res.status(200).json(ApiResponseBuilder.success('Note counter-signed.', { note }));
+});
+
+export const returnNoteToAuthor = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const { reason } = returnToAuthorSchema.parse(req.body);
+    await clinicalNoteService.returnToAuthor(
+      actorFrom(req),
+      noteIdFrom(req),
+      reason,
+      getRequestMeta(req),
+    );
+    res.status(200).json(ApiResponseBuilder.success('Note returned to its author.', undefined));
+  },
+);
+
+/**
+ * Documentation-quality check (CMP-NABH-05), called on blur by S-06-03.
+ *
+ * Takes the text rather than a note id so an unsaved draft can be checked as
+ * the clinician types — waiting for a save to validate would make the rule
+ * arrive too late to be useful.
+ */
+export const checkNoteQuality = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const dto = qualityCheckSchema.parse(req.body);
+    const findings = clinicalNoteService.checkQuality(dto);
+    res.status(200).json(ApiResponseBuilder.success('Quality check complete.', { findings }));
+  },
+);
