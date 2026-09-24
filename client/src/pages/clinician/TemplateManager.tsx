@@ -15,10 +15,20 @@ import type { ApiError } from '../../types/api'
 /**
  * S-06-10 · Template & Order-Set Manager (ARC-18, Compact).
  *
- * Templates are effective-dated rather than versioned in place, because a note
- * written last March was written from March's template and the record has to
- * stay explicable. Nothing here edits a template that is already in force —
- * saving creates a new effective period.
+ * Templates carry an effective window (`effectiveFrom` / `effectiveTo`) and the
+ * list only ever offers one that is currently in force.
+ *
+ * ⚠️ BUT SAVING EDITS THE ROW IN PLACE. It does not open a new effective
+ * period, because `ClinicalTemplate.key` is `@unique` and two rows cannot share
+ * a key — so real versioning needs a schema change (a composite unique on
+ * key + effectiveFrom), not a copy change.
+ *
+ * This screen used to SAY "saving creates a new effective period" while the
+ * server ran `upsert.update`. That is worse than the missing feature: a
+ * clinician reading it would believe a note written last March could still be
+ * explained by March's template, and it cannot — the old body is gone. The copy
+ * below now describes what actually happens. The versioning itself is recorded
+ * as outstanding rather than implied by wording nothing implements.
  *
  * ⚠️ **Read-only below 768px.** Authoring a template on a phone is how a typo
  * reaches every note in the department. The atlas makes this an explicit
@@ -28,6 +38,32 @@ import type { ApiError } from '../../types/api'
  * Facility-wide promotion is requested, never taken: a personal template
  * becomes departmental only after review.
  */
+
+/**
+ * ⚠️ MIRRORS `server/src/template/template.routes.ts` → `CATEGORIES`, which is
+ * the source of truth and enforces this set with zod on every write.
+ *
+ * These must stay in step. Until 23-Sep-2026 they did not: this list offered
+ * `Consultation | Order set | Discharge | Procedure | Follow-up` against a
+ * server enum that shared none of those values, so **every save from this
+ * screen 400'd** and the user saw only "Could not save this template."
+ * Creating a template through the UI was impossible, and nothing failed loudly
+ * enough for anyone to notice.
+ *
+ * `value` goes on the wire; `label` is only ever shown. `OrderSet` is one word
+ * stored and two words displayed — that difference is exactly how the previous
+ * mismatch hid.
+ */
+const CATEGORIES = [
+  { value: 'Consultation', label: 'Consultation' },
+  { value: 'Subjective', label: 'Subjective' },
+  { value: 'Objective', label: 'Objective' },
+  { value: 'Assessment', label: 'Assessment' },
+  { value: 'Plan', label: 'Plan' },
+  { value: 'Instructions', label: 'Instructions' },
+  { value: 'Procedure', label: 'Procedure' },
+  { value: 'OrderSet', label: 'Order set' },
+] as const
 
 export default function TemplateManager() {
   const { setPatient } = usePatientContext()
@@ -113,7 +149,12 @@ export default function TemplateManager() {
       {
         key: 'category', header: 'Category', card: 'meta', hideBelow: 'lg',
         sortValue: (r) => r.category,
-        render: (r) => <span className="text-ink-muted">{r.category}</span>,
+        // The stored value is one word (`OrderSet`); the label is two.
+        render: (r) => (
+          <span className="text-ink-muted">
+            {CATEGORIES.find((c) => c.value === r.category)?.label ?? r.category}
+          </span>
+        ),
       },
       {
         key: 'effective', header: 'In force from', card: 'meta',
@@ -282,7 +323,7 @@ function TemplateEditor({
       subtitle={
         template === null
           ? 'Saving creates a template effective from today.'
-          : `In force from ${formatDate(template.effectiveFrom)}. Saving creates a new effective period rather than editing this one.`
+          : `In force from ${formatDate(template.effectiveFrom)}. ⚠️ Saving REPLACES this content — notes already written from it keep their text, but the template's earlier wording is not kept.`
       }
     >
       <div className="space-y-3">
@@ -318,8 +359,8 @@ function TemplateEditor({
             onChange={(e) => setCategory(e.target.value)}
             className="focus-ring w-full rounded-lg border border-border-soft bg-surface-1 px-3 py-2 text-sm text-ink disabled:bg-surface-2 sm:max-w-xs"
           >
-            {['Consultation', 'Order set', 'Discharge', 'Procedure', 'Follow-up'].map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </div>
@@ -354,7 +395,7 @@ function TemplateEditor({
             )}
           {!readOnly && (
             <Button onClick={() => void save()} loading={busy}>
-              {template === null ? 'Create template' : 'Save as new version'}
+              {template === null ? 'Create template' : 'Replace content'}
             </Button>
           )}
         </div>

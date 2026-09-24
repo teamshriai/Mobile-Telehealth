@@ -33,9 +33,20 @@ client/test-results/
 client/playwright-report/
 client/e2e/screenshots/
 
+# ⚠️ Saved Playwright sessions. These are NOT fixtures — each file contains a
+# live `strokeai_refresh` cookie with a 30-day life, which is a credential for
+# a real seeded account. They are re-minted on every run, so there is never a
+# reason to commit one.
+client/e2e/.auth/
+
 # Database dumps. Never committed: a dump is a copy of whatever was in the
 # database at the time, and "it was only demo data" is a claim nobody can
 # verify from a diff a year later. Keep them locally, out of history.
 backups/
 *.sql.gz
 *.dump
+
+# Ad-hoc screenshot/inspection scripts. They live under client/ only because
+# ESM resolves @playwright/test from the nearest node_modules, not because they
+# are part of the app. Throwaway by design.
+client/.shot*.mjs

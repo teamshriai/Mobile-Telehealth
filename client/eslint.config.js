@@ -60,4 +60,23 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
+
+  /**
+   * The Playwright suite. Node, not a browser; Playwright, not React.
+   *
+   * ⚠️ `react-hooks/rules-of-hooks` fires on every Playwright fixture, because
+   * a fixture's second argument is conventionally named `use` and the rule
+   * reads any `use*` call as a hook. It is a name collision, not a finding —
+   * there is no React in `e2e/`. Scoping the React rules off here is the honest
+   * fix; disabling them inline in each fixture would be noise that outlives the
+   * reason for it.
+   */
+  {
+    files: ['e2e/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

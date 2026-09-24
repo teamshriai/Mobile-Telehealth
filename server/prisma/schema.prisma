@@ -1962,8 +1962,23 @@ model PatientInstruction {
   /// version so the author's intent is never silently replaced. ENCRYPTED.
   clinicianWording String? @map("clinician_wording")
 
-  /// BCP-47-ish short code: 'en', 'kn', 'hi', 'ta', 'ml'.
+  /// BCP-47-ish short code: 'en', 'kn', 'hi', 'ta', 'ml'. `title` and `body`
+  /// above are written IN this language — the patient's, not the clinician's.
   language String @default("en")
+
+  /// ⚠️ A6 — patient-facing documents are bilingual, and S-06-08's drawing
+  /// note is explicit: "draw BOTH languages on one printed artefact". These
+  /// hold the English counterpart of `title` / `body` when `language` is not
+  /// 'en'; they stay null when it is, because then `body` already IS English.
+  ///
+  /// Nullable on purpose. English-only is a legitimate fallback (the AI-110
+  /// guardrail says so in those words) and a clinician must never be blocked
+  /// from issuing instructions because a second language is missing. What the
+  /// nullability buys is that the printed sheet can SAY the counterpart is
+  /// absent instead of quietly printing half a bilingual document.
+  titleEnglish String? @map("title_english")
+  /// ENCRYPTED, same as `body`.
+  bodyEnglish  String? @map("body_english")
 
   issuedAt       DateTime @default(now()) @map("issued_at")
   issuedByUserId String   @map("issued_by_user_id") @db.Uuid
@@ -1990,8 +2005,14 @@ model ClinicalTemplate {
   name  String
   scope TemplateScope @default(Personal)
 
-  /// Which surface it fills: 'Subjective' | 'Objective' | 'Assessment' |
-  /// 'Plan' | 'Instructions' | 'OrderSet'.
+  /// Which surface it fills. A plain String rather than an enum so the set can
+  /// widen without a migration — but it is NOT free text: the closed set lives
+  /// in `src/template/template.routes.ts` (`CATEGORIES`) and is enforced by
+  /// zod on every write. That file is the source of truth; this comment
+  /// follows it.
+  ///
+  /// 'Consultation' | 'Subjective' | 'Objective' | 'Assessment' | 'Plan' |
+  /// 'Instructions' | 'Procedure' | 'OrderSet'.
   category String
 
   body String

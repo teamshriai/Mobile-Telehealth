@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ClipboardList, Check, X } from 'lucide-react'
+import { ClipboardList, Check, Lock, X } from 'lucide-react'
 import { useEncounter } from './useEncounterRoute'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
-import Combobox from '../../components/common/Combobox'
 import ConfirmDialog from '../../components/common/ConfirmDialog'
 import DataTable, { type Column } from '../../components/common/DataTable'
+import DiagnosisCodePicker from '../../components/clinical/DiagnosisCodePicker'
 import { Banner, EmptyState, ErrorState, LoadingState } from '../../components/feedback/States'
 import { formatDate } from '../../components/clinic/format'
 import { useToast } from '../../components/common/useToast'
 import { ProblemStatusChip } from './PatientChart'
 import * as problemService from '../../services/problem.service'
+import * as clinicalNoteService from '../../services/clinicalNote.service'
 import type { DiagnosisCode, Problem } from '../../types/domain'
 import type { ApiError } from '../../types/api'
 
@@ -38,14 +39,14 @@ export default function ProblemList() {
   const [problems, setProblems] = useState<Problem[] | null>(null)
   const [loadError, setLoadError] = useState<ApiError | null>(null)
   const [query, setQuery] = useState('')
-  const [codes, setCodes] = useState<DiagnosisCode[]>([])
-  const [searching, setSearching] = useState(false)
   const [picked, setPicked] = useState<DiagnosisCode | null>(null)
   const [note, setNote] = useState('')
   const [onsetDate, setOnsetDate] = useState('')
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
   const [toResolve, setToResolve] = useState<Problem | null>(null)
+  const [resolving, setResolving] = useState(false)
+  const [noteSigned, setNoteSigned] = useState(false)
 
   const load = useCallback(() => {
     setLoadError(null)
@@ -53,41 +54,46 @@ export default function ProblemList() {
   }, [patient.id])
   useEffect(load, [load])
 
+  /**
+   * `LOCKED` — coding closes when this visit's note is signed.
+   *
+   * ⚠️ THE PROBLEM LIST IS PATIENT-LEVEL, NOT ENCOUNTER-LEVEL, so "locked" here
+   * means something narrower than on the note: the list itself is never frozen
+   * — the patient will be coded again at the next visit — but a problem can no
+   * longer be attributed to THIS encounter once its note is signed. Adding one
+   * afterwards would stamp `onsetEncounterId` on a visit whose record is closed,
+   * which is the same thing `CMP-NABH-10` forbids on the note, arriving by a
+   * side door.
+   *
+   * The screen says where to go instead rather than just refusing.
+   */
+  useEffect(() => {
+    let live = true
+    clinicalNoteService
+      .listNotes(patient.id)
+      .then((notes) => {
+        if (!live) return
+        const forThis = notes.filter((n) => n.encounterId === encounter.id)
+        setNoteSigned(forThis.length > 0 && forThis.every((n) => n.status !== 'Draft'))
+      })
+      .catch(() => {
+        // ⚠️ Fails OPEN, deliberately. If the note's status cannot be read we
+        // do not know that it is signed, and locking a clinician out of coding
+        // on a guess is worse than the narrow risk of a late attribution — the
+        // server remains free to refuse.
+        if (live) setNoteSigned(false)
+      })
+    return () => { live = false }
+  }, [patient.id, encounter.id])
+
   const activeCodes = useMemo(
     () => new Set((problems ?? []).filter((p) => p.status === 'Active').map((p) => p.code)),
     [problems],
   )
 
-  // Debounced typeahead. The input is never disabled while a query is in
-  // flight — ARC-17 forbids it, and a clinician typing a code should never
-  // have characters swallowed by a network round-trip.
-  useEffect(() => {
-    const q = query.trim()
-    if (q.length < 2) { setCodes([]); return undefined }
-    const t = window.setTimeout(() => {
-      setSearching(true)
-      problemService
-        .searchDiagnosisCodes(q)
-        .then(setCodes)
-        .catch(() => setCodes([]))
-        .finally(() => setSearching(false))
-    }, 250)
-    return () => window.clearTimeout(t)
-  }, [query])
-
-  const selectCode = (c: DiagnosisCode) => {
-    if (!c.isLeaf) {
-      setAddError(`${c.code} is a category, not a diagnosis. Choose one of the codes beneath it.`)
-      return
-    }
-    if (activeCodes.has(c.code)) {
-      setAddError(`${c.code} is already on the active problem list.`)
-      return
-    }
-    setAddError('')
-    setPicked(c)
-    setQuery(`${c.code} — ${c.title}`)
-  }
+  // The typeahead, its debounce and the leaf/duplicate rules live in
+  // DiagnosisCodePicker — one implementation, shared with the consultation
+  // note. See that file's header for why it is not duplicated.
 
   const add = async () => {
     if (picked === null) return
@@ -112,7 +118,12 @@ export default function ProblemList() {
   }
 
   const resolve = async () => {
-    if (toResolve === null) return
+    // ⚠️ Guarded and reset in `finally`. The confirm dialog does not disable
+    // itself while the request is in flight, so a double-tap on a slow
+    // connection fired two resolves and the second came back 409 "already
+    // resolved" — an error the clinician did nothing wrong to earn.
+    if (toResolve === null || resolving) return
+    setResolving(true)
     try {
       await problemService.resolveProblem(toResolve.id)
       toast.notify(`${toResolve.codeTitle} marked resolved.`, 'success')
@@ -120,6 +131,8 @@ export default function ProblemList() {
       load()
     } catch (err) {
       toast.notify((err as ApiError).message || 'Could not resolve this problem.', 'error')
+    } finally {
+      setResolving(false)
     }
   }
 
@@ -183,36 +196,34 @@ export default function ProblemList() {
 
   return (
     <div className="space-y-4">
+      {noteSigned ? (
+        // ⚠️ LOCKED. Stated with the reason and the legitimate next action —
+        // §1.5 asks for "read-only naming who holds it and since when, plus the
+        // legitimate next action", and a bare disabled form names none of those.
+        <Card padding="md">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            <Lock size={14} aria-hidden="true" className="text-ink-muted" />
+            Coding for this visit is closed
+          </h2>
+          <p className="mt-1 max-w-prose text-sm text-ink-muted">
+            This visit&rsquo;s note has been signed, so a problem can no longer be attributed to
+            it. The problem list below is still the patient&rsquo;s live list and is unchanged.
+          </p>
+          <p className="mt-1.5 text-xs text-ink-subtle">
+            To record something you have since realised, add an addendum to the signed note. To
+            code a new problem, do it at the next visit.
+          </p>
+        </Card>
+      ) : (
       <Card padding="md">
         <h2 className="mb-3 text-sm font-semibold text-ink">Add a problem</h2>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr]">
-          <Combobox<DiagnosisCode>
-            label="ICD-10 code or diagnosis"
+          <DiagnosisCodePicker
             value={query}
             onValueChange={(v) => { setQuery(v); setPicked(null); setAddError('') }}
-            options={codes}
-            optionKey={(c) => c.code}
-            loading={searching}
-            placeholder="Start typing, e.g. pneumonia or J18"
-            hint="Only specific codes can be selected. Categories are shown for context but cannot be coded."
-            emptyMessage={query.trim().length < 2 ? 'Type at least two characters.' : 'No matching codes.'}
-            onSelect={selectCode}
-            renderOption={(c) => (
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-2xs text-ink-muted">{c.code}</span>
-                <span className={c.isLeaf ? 'text-ink' : 'text-ink-subtle'}>{c.title}</span>
-                {!c.isLeaf && (
-                  <span className="ml-auto rounded bg-surface-2 px-1 text-2xs text-ink-subtle">
-                    Category — not codable
-                  </span>
-                )}
-                {c.isLeaf && activeCodes.has(c.code) && (
-                  <span className="ml-auto rounded bg-warning-bg px-1 text-2xs text-warning-fg">
-                    Already active
-                  </span>
-                )}
-              </div>
-            )}
+            onPick={(c) => { setAddError(''); setPicked(c); setQuery(`${c.code} — ${c.title}`) }}
+            onReject={setAddError}
+            activeCodes={activeCodes}
           />
           <div>
             <label htmlFor="onset" className="mb-1.5 block text-sm font-medium text-ink-muted">
@@ -259,6 +270,7 @@ export default function ProblemList() {
           )}
         </div>
       </Card>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink">Active problems ({active.length})</h2>

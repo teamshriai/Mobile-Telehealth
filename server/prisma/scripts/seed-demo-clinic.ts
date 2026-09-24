@@ -25,6 +25,7 @@
 import 'dotenv/config';
 import { seedM06Clinical } from './m06ClinicalSeed';
 import {
+  Prisma,
   PrismaClient,
   RoleName,
   Gender,
@@ -82,13 +83,66 @@ function at(dayOffset: number, hour: number, minute = 0): Date {
   return d;
 }
 
-/** Now, rounded down to the half hour — so generated clinic times read as
- *  real appointment slots (14:30) rather than whatever minute the operator
- *  happened to run the script. */
-function halfHourAnchor(): Date {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() < 30 ? 0 : 30, 0, 0);
-  return d;
+/**
+ * The OPD working day. Every generated clinic slot must land inside it.
+ *
+ * ⚠️ These are real constraints, not styling. A consultant's outpatient list
+ * that starts at 05:00 is the single loudest tell that data was generated
+ * rather than recorded, and it undermines every screen that displays a time.
+ */
+const CLINIC_WINDOW = { startHour: 8, endHour: 17 } as const;
+
+/**
+ * "Now", rounded to the half hour and then **clamped so the whole clinic fits
+ * inside `CLINIC_WINDOW`**.
+ *
+ * Slots are placed relative to this anchor, so the anchor alone decides whether
+ * the day is believable. Rounding gives times that read as real appointment
+ * slots (14:30) rather than whatever minute the operator ran the script.
+ *
+ * ⚠️ THE SPAN IS DERIVED FROM THE PLAN, NOT HARDCODED. The clamp has to know
+ * how far the earliest and latest slots reach; wiring in ±240 by hand means the
+ * next person to add a `-300` slot silently reopens a 03:00 clinic and nothing
+ * complains. Passing the real offsets makes the guarantee survive edits.
+ *
+ * ⚠️ The seen/upcoming mixture is NOT affected by clamping. It is driven by
+ * appointment *status* (`doctorDashboard.service` counts `Completed`), not by
+ * comparing the slot to the wall clock, so a clamped anchor still yields
+ * "6 seen · 10 to come". Only the "next patient" badge reads the clock, and it
+ * still resolves inside the window.
+ */
+function clinicAnchor(offsetsMins: readonly number[]): Date {
+  const minOffset = Math.min(...offsetsMins);
+  const maxOffset = Math.max(...offsetsMins);
+
+  const dayStart = new Date();
+  dayStart.setHours(CLINIC_WINDOW.startHour, 0, 0, 0);
+  const dayEnd = new Date();
+  dayEnd.setHours(CLINIC_WINDOW.endHour, 0, 0, 0);
+
+  // The anchor may sit no earlier than "window start minus the earliest slot"
+  // and no later than "window end minus the latest slot".
+  const earliest = shiftMinutes(dayStart, -minOffset);
+  const latest = shiftMinutes(dayEnd, -maxOffset);
+
+  if (earliest.getTime() > latest.getTime()) {
+    // Fail loudly. A seed that quietly produces an impossible clinic is worse
+    // than one that refuses to run.
+    const spanHours = ((maxOffset - minOffset) / 60).toFixed(1);
+    throw new Error(
+      `Clinic plan spans ${spanHours}h but the ${CLINIC_WINDOW.startHour}:00–` +
+        `${CLINIC_WINDOW.endHour}:00 window is only ` +
+        `${CLINIC_WINDOW.endHour - CLINIC_WINDOW.startHour}h. ` +
+        `Shorten the slot offsets or widen CLINIC_WINDOW.`,
+    );
+  }
+
+  const rounded = new Date();
+  rounded.setMinutes(rounded.getMinutes() < 30 ? 0 : 30, 0, 0);
+
+  if (rounded.getTime() < earliest.getTime()) return earliest;
+  if (rounded.getTime() > latest.getTime()) return latest;
+  return rounded;
 }
 
 function shiftMinutes(base: Date, minutes: number): Date {
@@ -531,16 +585,18 @@ async function main(): Promise<void> {
 //
 // Slots are placed RELATIVE TO NOW, rounded to the half hour, so the dashboard
 // always shows a mix of "seen" and "still to come" no matter what time of day
-// the demo runs. Fixed clock times would leave the whole list in the past for
-// an evening demo, and "8 of 8 seen, nothing remaining" is a much weaker
-// screen than "4 seen, 4 to come".
+// the demo runs — and then CLAMPED into the OPD working day, so the times are
+// ones a consultant would recognise. See `clinicAnchor`.
+//
+// `mins` is an offset from that anchor. Negative slots carry a settled status
+// (Completed / NoShow / Cancelled), positive ones are still to come
+// (Confirmed / Requested) — which is what keeps the worklist's "6 seen · 10 to
+// come" true regardless of what time the seed itself was run.
 // ─────────────────────────────────────────────────────────────────────────────
 async function seedTodaysClinic(
   patientIdByRef: Map<string, string>,
   doctorIdByRef: Map<string, string>,
 ): Promise<void> {
-  const anchor = halfHourAnchor();
-
   const plan = [
     { doctor: 'SD-S-01', patient: 'SD-P-01', mins: -180, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Thyroid function review and dose adjustment' },
     { doctor: 'SD-S-01', patient: 'SD-P-04', mins: -150, mode: AppointmentMode.InPerson, status: AppointmentStatus.Completed, reason: 'Antenatal review at 32 weeks' },
@@ -576,23 +632,42 @@ async function seedTodaysClinic(
     { doctor: 'SD-S-02', patient: 'SD-P-01', mins: 120, mode: AppointmentMode.Phone, status: AppointmentStatus.Confirmed, reason: 'Telephone review of headache history' },
   ];
 
+  // Derived from the plan, never hardcoded — see `clinicAnchor`.
+  const anchor = clinicAnchor(plan.map((r) => r.mins));
+
   let created = 0;
+  const retime: Array<{ id: string; to: Date }> = [];
+
   for (const row of plan) {
     const patientId = patientIdByRef.get(row.patient);
     const doctorId = doctorIdByRef.get(row.doctor);
     if (patientId === undefined || doctorId === undefined) continue;
 
+    const scheduledAt = shiftMinutes(anchor, row.mins);
+
     // Existence is checked on the DECRYPTED reason, never on scheduledAt and
     // never on the ciphertext. AES-GCM uses a random IV per value, so the same
     // plaintext never matches by ciphertext; and these timestamps move every
     // run, so a time-based guard would duplicate the whole clinic daily.
-    if (await appointmentExists(doctorId, row.reason)) continue;
+    const existing = await findTodaysAppointment(doctorId, row.reason);
+
+    // ⚠️ CONVERGE, DO NOT SKIP. Skipping an existing row made the seed
+    // idempotent in the narrow sense and unable to correct itself: rows written
+    // by an earlier run kept whatever time that run chose, so the 05:00 clinic
+    // survived the fix that was supposed to remove it. The script's job is to
+    // make the configured state true — same rule as the care-team upsert above.
+    if (existing !== null) {
+      if (existing.scheduledAt.getTime() !== scheduledAt.getTime()) {
+        retime.push({ id: existing.id, to: scheduledAt });
+      }
+      continue;
+    }
 
     await prisma.appointment.create({
       data: {
         patientId,
         doctorId,
-        scheduledAt: shiftMinutes(anchor, row.mins),
+        scheduledAt,
         durationMins: 30,
         mode: row.mode,
         status: row.status,
@@ -606,11 +681,76 @@ async function seedTodaysClinic(
     });
     created++;
   }
-  console.log(`✓ today's clinic: ${created} new appointment(s)`);
+
+  await applyRetiming(retime);
+
+  console.log(
+    `✓ today's clinic: ${created} new appointment(s)` +
+      (retime.length > 0
+        ? `, ${retime.length} retimed into ${CLINIC_WINDOW.startHour}:00–${CLINIC_WINDOW.endHour}:00`
+        : ''),
+  );
 }
 
 /**
- * Does this clinic slot already exist **today**?
+ * Move a set of appointments to new times **without ever colliding**.
+ *
+ * ⚠️ TWO PHASES, AND IT HAS TO BE. `(doctor_id, scheduled_at)` is unique —
+ * correctly, since one slot holds one patient — and a whole clinic shifting by
+ * a constant delta means almost every row's destination is still occupied by
+ * the row that has not moved yet. Updating in place fails with P2002 on the
+ * second row, or worse, succeeds for some orderings and not others.
+ *
+ * So: park every row at a slot nothing can be using, then place them. Two
+ * writes per row is the price of not having to reason about orderings.
+ *
+ * The parking range is late evening, one minute apart. Nothing else seeds into
+ * it — `seedRecentWeeks` runs 09:15–15:45 on days strictly before today, and
+ * `seedHistory` is months back — and the rows do not survive the function.
+ */
+async function applyRetiming(retime: ReadonlyArray<{ id: string; to: Date }>): Promise<void> {
+  if (retime.length === 0) return;
+
+  const park = new Date();
+  park.setHours(22, 0, 0, 0);
+
+  for (const [i, r] of retime.entries()) {
+    await prisma.appointment.update({
+      where: { id: r.id },
+      data: { scheduledAt: shiftMinutes(park, i) },
+    });
+  }
+
+  for (const r of retime) {
+    // ⚠️ A destination can be held by an appointment this plan does not own —
+    // the base seed also books these doctors, and its rows are real clinic
+    // entries that may already carry an encounter. Stepping our slot forward is
+    // what a scheduler would do; evicting or deleting theirs is not.
+    let placed = false;
+    for (let step = 0; step < 12 && !placed; step++) {
+      try {
+        await prisma.appointment.update({
+          where: { id: r.id },
+          data: { scheduledAt: shiftMinutes(r.to, step * 5) },
+        });
+        placed = true;
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+        throw err;
+      }
+    }
+    if (!placed) {
+      throw new Error(
+        `Could not place appointment ${r.id} near ${r.to.toISOString()} — ` +
+          `12 consecutive 5-minute slots are occupied. The clinic plan and the base ` +
+          `seed have drifted into the same hour.`,
+      );
+    }
+  }
+}
+
+/**
+ * The existing row for this clinic slot **today**, or null.
  *
  * ⚠️ SCOPED TO TODAY, deliberately. An earlier version matched on the reason
  * alone, across all time — which made the seed idempotent in the narrow sense
@@ -622,20 +762,27 @@ async function seedTodaysClinic(
  * Day-scoping means re-running on the same day converges (nothing duplicates)
  * while re-running on a new day rebuilds today's clinic.
  *
- * Existence is still checked on the DECRYPTED reason, never on the
- * ciphertext — AES-GCM uses a random IV per value, so the same plaintext
- * never matches by ciphertext.
+ * ⚠️ Returns the row rather than a boolean so the caller can correct a slot's
+ * time in place. A pure existence check cannot repair rows an earlier run got
+ * wrong, which is how a 05:00 clinic outlived the fix for it.
+ *
+ * Matching is still on the DECRYPTED reason, never on the ciphertext —
+ * AES-GCM uses a random IV per value, so the same plaintext never matches by
+ * ciphertext.
  */
-async function appointmentExists(doctorId: string, reason: string): Promise<boolean> {
+async function findTodaysAppointment(
+  doctorId: string,
+  reason: string,
+): Promise<{ id: string; scheduledAt: Date } | null> {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart.getTime() + 86_400_000);
 
   const rows = await prisma.appointment.findMany({
     where: { doctorId, scheduledAt: { gte: dayStart, lt: dayEnd } },
-    select: { reason: true },
+    select: { id: true, scheduledAt: true, reason: true },
   });
-  return rows.some((r) => decryptFieldOptional(r.reason) === reason);
+  return rows.find((r) => decryptFieldOptional(r.reason) === reason) ?? null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

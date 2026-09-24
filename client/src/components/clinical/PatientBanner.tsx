@@ -3,7 +3,7 @@ import { ShieldAlert, IdCard, CircleUser } from 'lucide-react'
 import { usePatientContext } from '../../app/usePatientContext'
 import { formatDate } from '../clinic/format'
 import { Skeleton } from '../feedback/States'
-import { classifyAllergies, formatBloodGroup } from './patientDisplay'
+import { classifyAllergies, formatBloodGroup, patientFullName } from './patientDisplay'
 
 /**
  * `GP-05` — the patient context banner (`Z3`).
@@ -39,9 +39,7 @@ export default function PatientBanner() {
 
   if (patient === null) return null
 
-  const fullName = [patient.firstName, patient.middleName, patient.lastName]
-    .filter(Boolean)
-    .join(' ')
+  const fullName = patientFullName(patient)
 
   const ageSex = [
     patient.age !== null ? `${patient.age}${patient.dobIsEstimated ? '~' : ''}` : null,

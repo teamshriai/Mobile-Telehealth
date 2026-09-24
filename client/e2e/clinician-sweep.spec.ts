@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import {
-  BREAKPOINTS, DOCTOR, login, watchConsole, expectNoHorizontalOverflow, navigateTo,
+  BREAKPOINTS, openAuthed, watchConsole, expectNoHorizontalOverflow, navigateTo,
 } from './helpers'
 
 /**
@@ -38,7 +38,7 @@ test.describe('clinician portal sweep', () => {
     test(`all routes render clean at ${bp.name}`, async ({ page }) => {
       const watcher = watchConsole(page)
       await page.setViewportSize({ width: bp.width, height: bp.height })
-      await login(page, DOCTOR, watcher)
+      await openAuthed(page, undefined, watcher)
 
       for (const route of ROUTES) {
         // Below lg the rail collapses into a drawer; navigateTo opens it when

@@ -74,7 +74,7 @@ export default function PatientTimeline() {
       const missing: string[] = []
 
       if (enc.status === 'fulfilled') {
-        enc.value.forEach((e) =>
+        enc.value.results.forEach((e) =>
           out.push({
             id: `enc-${e.visitId}`,
             kind: 'encounter',
@@ -255,7 +255,7 @@ export default function PatientTimeline() {
                 >
                   <span
                     aria-hidden="true"
-                    className="absolute -left-[1.6875rem] top-3 h-2 w-2 rounded-full bg-border ring-4 ring-surface-0"
+                    className="absolute -left-[1.6875rem] top-3 h-2 w-2 rounded-full bg-border ring-4 ring-bg"
                   />
                   <Card padding="sm" className="clinical-row">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

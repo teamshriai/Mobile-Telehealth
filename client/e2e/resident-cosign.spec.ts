@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { RESIDENT, DOCTOR, login, watchConsole, navigateTo } from './helpers'
+import { test, expect } from './fixtures'
+import { openAuthed, watchConsole, navigateTo } from './helpers'
 
 /**
  * Rule 3, made visible: **authorization reads capabilities, never role names.**
@@ -15,12 +15,15 @@ import { RESIDENT, DOCTOR, login, watchConsole, navigateTo } from './helpers'
  * was renamed or a consultant was given a trainee's account.
  */
 
-test('a clinician without note:sign:own submits for co-signature instead of signing', async ({
+test.describe('as the resident', () => {
+  test.use({ demoUser: 'resident' })
+
+  test('a clinician without note:sign:own submits for co-signature instead of signing', async ({
   page,
 }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await login(page, RESIDENT, watcher)
+  await openAuthed(page, undefined, watcher)
 
   // A resident lands in the clinician portal, not the patient portal.
   await expect(page).toHaveURL(/\/clinician/)
@@ -50,12 +53,14 @@ test('a clinician without note:sign:own submits for co-signature instead of sign
   await page.screenshot({ path: 'e2e/screenshots/resident/02-submit-not-sign.png', fullPage: true })
 
   expect(watcher.errors, `console errors:\n${watcher.errors.join('\n')}`).toEqual([])
+  })
 })
 
+// The default session — the consultant who holds `note:cosign:assigned`.
 test('a consultant holding note:cosign:assigned sees the approve controls', async ({ page }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await login(page, DOCTOR, watcher)
+  await openAuthed(page, undefined, watcher)
 
   await navigateTo(page, /co-sign/i, /\/clinician\/cosign$/)
 

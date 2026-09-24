@@ -21,13 +21,33 @@ import { getRequestMeta } from '../utils/requestMeta';
 // clinician's habit silently becomes everyone's default.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Which surface a template fills. Closed set — matches the note's sections. */
+/**
+ * Which surface a template fills. Closed set.
+ *
+ * ⚠️ THIS IS THE SINGLE SOURCE OF TRUTH and the client mirrors it verbatim
+ * (`TemplateManager.tsx` → `CATEGORIES`). It did not until 23-Sep-2026: the
+ * client offered `Consultation | Order set | Discharge | Procedure | Follow-up`
+ * while this enum accepted a disjoint set, so **every template save from the UI
+ * was rejected with a 400** and surfaced as a generic "Could not save this
+ * template." Creating a template was completely impossible and no test noticed,
+ * because nothing exercised the write path end to end.
+ *
+ * `Consultation` and `Procedure` are here because the seeded library is full of
+ * whole-note structures — presenting complaint, examination, impression, plan —
+ * which are not any single section. Forcing them into `Subjective` would have
+ * made the enum true and the data wrong.
+ *
+ * `OrderSet` is one word on the wire. The UI shows "Order set"; what is stored
+ * and validated is `OrderSet`.
+ */
 const CATEGORIES = [
+  'Consultation',
   'Subjective',
   'Objective',
   'Assessment',
   'Plan',
   'Instructions',
+  'Procedure',
   'OrderSet',
 ] as const;
 

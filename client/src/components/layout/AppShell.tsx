@@ -10,6 +10,9 @@ import IdleWarning from '../feedback/IdleWarning'
 import { portalForRole, titleForPath, type PortalDescriptor } from '../../app/navigation'
 import PatientBanner from '../clinical/PatientBanner'
 import BreakGlassBanner from '../clinical/BreakGlassBanner'
+import OfflineStrip from './OfflineStrip'
+import AiDemoSwitch from '../../ai/components/AiDemoSwitch'
+import AssistantBubble from '../../ai/components/AssistantBubble'
 import { roleLabel } from '../clinical/clinicalLabels'
 import { useAuth } from '../../app/useAuth'
 import { useIdleTimeout } from '../../app/useIdleTimeout'
@@ -278,6 +281,8 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
             </button>
           ))}
 
+          <AiDemoSwitch />
+
           <div className="border-t border-border-soft">
             <button
               type="button"
@@ -420,6 +425,10 @@ export default function AppShell(): ReactNode {
             happen — its whole purpose is to be visible at the moment of a
             clinical action, not at the moment the page loaded. Both render
             null when they have nothing to say. */}
+        {/* GP-12 / C-37. Above the patient banner because losing the network
+            changes what every action on the page will do, whoever the patient
+            is. Renders null when online. */}
+        <OfflineStrip />
         <BreakGlassBanner />
         <PatientBanner />
       </header>
@@ -435,6 +444,13 @@ export default function AppShell(): ReactNode {
           </ErrorBoundary>
         </div>
       </main>
+
+      {/* ── Z7b · GP-17 ───────────────────────────────────────────────────
+          Mounted by the shell, not by a screen: §6.1 makes it "the only
+          element that appears on every screen in the product", and it floats
+          rather than occupying layout width, so no screen has to make room
+          for it. It hides itself entirely when assistance is off. */}
+      <AssistantBubble />
 
       {warning && <IdleWarning secondsLeft={secondsLeft} onStayActive={stayActive} />}
     </div>

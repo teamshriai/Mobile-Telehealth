@@ -20,7 +20,7 @@ import {
 // replaced — which is also what makes a later AI rewrite safe to add.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ENCRYPTED_FIELDS = ['body', 'clinicianWording'] as const;
+const ENCRYPTED_FIELDS = ['body', 'clinicianWording', 'bodyEnglish'] as const;
 
 /** The languages the demo cast actually reads (UI_ATLAS §8, Bengaluru hub). */
 export const SUPPORTED_LANGUAGES = ['en', 'kn', 'hi', 'ta', 'ml'] as const;
@@ -32,8 +32,33 @@ export const issueInstructionSchema = z
     title: z.string().trim().min(3).max(200),
     body: z.string().trim().min(10).max(5000),
     language: z.enum(SUPPORTED_LANGUAGES).default('en'),
+    // ⚠️ A6 — the English counterpart, for the bilingual printed sheet. Optional
+    // by design: a missing translation must never stop a clinician issuing
+    // instructions. The printout states its absence rather than hiding it.
+    titleEnglish: z.string().trim().min(3).max(200).nullable().optional(),
+    bodyEnglish: z.string().trim().min(10).max(5000).nullable().optional(),
   })
-  .strict();
+  .strict()
+  // Sending an English counterpart for an instruction that IS in English is
+  // not a harmless no-op — it creates two columns that can drift apart and a
+  // printed sheet with the same text twice. Reject it rather than silently
+  // dropping it, so the client learns it asked for something incoherent.
+  .refine((v) => v.language !== 'en' || (v.titleEnglish == null && v.bodyEnglish == null), {
+    message:
+      'These instructions are already in English, so they do not take a separate English version.',
+    path: ['bodyEnglish'],
+  })
+  // Half a translation is worse than none: a sheet headed in English whose
+  // body is not, or vice versa, reads as a fault rather than a fallback.
+  .refine(
+    (v) =>
+      (v.titleEnglish == null || v.titleEnglish === '') ===
+      (v.bodyEnglish == null || v.bodyEnglish === ''),
+    {
+      message: 'Give both an English title and an English body, or neither.',
+      path: ['titleEnglish'],
+    },
+  );
 
 export type IssueInstructionDto = z.infer<typeof issueInstructionSchema>;
 
@@ -84,6 +109,11 @@ export const instructionService = {
         // means the same thing before and after a rewrite feature exists.
         clinicianWording: encryptFieldOptional(dto.body),
         language: dto.language,
+        titleEnglish: dto.titleEnglish ?? null,
+        bodyEnglish:
+          dto.bodyEnglish == null || dto.bodyEnglish === ''
+            ? null
+            : encryptField(dto.bodyEnglish),
         issuedByUserId: actor.id,
         issuedByName: `Dr. ${doctor.firstName} ${doctor.lastName}`.trim(),
       },
@@ -96,7 +126,11 @@ export const instructionService = {
       resourceId: row.id,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
-      metadata: { patientId: dto.patientId, language: dto.language },
+      metadata: {
+        patientId: dto.patientId,
+        language: dto.language,
+        bilingual: dto.bodyEnglish != null && dto.bodyEnglish !== '',
+      },
     });
 
     return decryptInstruction(row);

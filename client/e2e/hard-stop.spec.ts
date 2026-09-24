@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { DOCTOR, login, watchConsole } from './helpers'
+import { test, expect } from './fixtures'
+import { openAuthed, watchConsole } from './helpers'
 
 /**
  * The deck's beat #8 — "the single most important frame".
@@ -20,10 +20,9 @@ const LAKSHMANAN = 'SHRI-8FJERZ-F'
 test('prescribing a beta-lactam to a penicillin-allergic patient is blocked', async ({ page }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await login(page, DOCTOR, watcher)
+  await openAuthed(page, `/patient/${LAKSHMANAN}/chart`, watcher)
 
-  // ── Open the chart and start a consultation ──
-  await page.goto(`/patient/${LAKSHMANAN}/chart`)
+  // ── The chart, deep-linked in the first load ──
   await expect(page.getByRole('heading', { name: /patient chart/i })).toBeVisible({ timeout: 20_000 })
 
   // The allergy must be stated as TEXT, not carried by an icon or a colour.

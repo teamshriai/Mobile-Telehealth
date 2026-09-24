@@ -14,10 +14,16 @@ import type { DayLoad } from './ClinicCalendar'
  * consultant actually wants from a week view. A single-series chart of
  * "appointments" would look tidier and say less.
  *
- * Colour is not the only carrier: the seen portion is a solid fill, the
- * remainder is a hatched outline, and every bar carries its figures in the
- * accessible name. The table beneath `sr-only` is the non-visual equivalent —
- * a chart no screen-reader user can read is not an accessible chart.
+ * Colour is not the only carrier: the seen portion is a solid fill against a
+ * near-transparent track of the same hue, so the two are separable by value
+ * alone, and the figures are stated in words in the header. The table beneath
+ * `sr-only` is the non-visual equivalent — a chart no screen-reader user can
+ * read is not an accessible chart.
+ *
+ * ⚠️ One green family, matching `ClinicCalendar`, so the two panes read as a
+ * single analytical region rather than two widgets that happen to be stacked.
+ * The earlier version outlined the booked bar, filled the seen bar and then
+ * printed a two-swatch legend — three encodings of one fact, in 0.55rem type.
  */
 
 interface VisitTrendProps {
@@ -60,66 +66,73 @@ export default function VisitTrend({ load, days = 7 }: VisitTrendProps) {
   }
 
   return (
-    <section aria-labelledby="visit-trend-heading">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h3 id="visit-trend-heading" className="text-xs font-semibold text-ink">
-          Patients this week
-        </h3>
-        <p className="text-2xs tabular-nums text-ink-muted">
-          <span className="font-semibold text-ink">{totalSeen}</span> seen of {totalBooked}
-        </p>
-      </div>
+    <section aria-labelledby="visit-trend-heading" className="w-full">
+      <h3
+        id="visit-trend-heading"
+        className="text-2xs font-medium uppercase tracking-wide text-ink-subtle"
+      >
+        Patients this week
+      </h3>
+      <p className="mb-3 mt-1.5 text-xs tabular-nums text-ink-muted">
+        <span className="text-sm font-semibold text-ink">{totalSeen}</span> seen of {totalBooked}{' '}
+        booked
+      </p>
 
       {/* ⚠️ The outer row must NOT be `items-end`. With align-items:end the
           columns size to their content instead of stretching, so the bar
           area's `flex-1` has no height to grow into and every bar collapses
           to a hairline. Stretch the columns; end-align inside each one. */}
-      <div aria-hidden="true" className="flex h-24 gap-1.5">
-        {series.map((d) => {
-          const bookedH = d.total === 0 ? 0 : Math.max(4, Math.round((d.total / peak) * 100))
-          const seenH = d.total === 0 ? 0 : Math.round((d.completed / peak) * 100)
-          const isToday = d.date.toDateString() === new Date().toDateString()
-          return (
-            <div key={d.date.toISOString()} className="flex flex-1 flex-col gap-1">
-              <div className="relative min-h-0 flex-1">
-                {d.total === 0 ? (
-                  // A day with no clinic is a flat rule, not a zero-height bar
-                  // — otherwise "closed" and "nobody came" look identical.
-                  <div className="absolute bottom-0 h-px w-full bg-border" />
-                ) : (
+      <div aria-hidden="true">
+        {/* ⚠️ One continuous baseline under the whole row, rather than a border
+            on each bar. Seven outlined bars is seven times the ink for the same
+            information, and it was the main reason this pane read as busy. */}
+        <div className="flex h-20 items-stretch gap-1.5 border-b border-border-soft sm:h-28 xl:h-20">
+          {series.map((d) => {
+            const bookedH = d.total === 0 ? 0 : Math.max(4, Math.round((d.total / peak) * 100))
+            const seenH = d.total === 0 ? 0 : Math.round((d.completed / peak) * 100)
+            return (
+              <div key={d.date.toISOString()} className="relative flex-1">
+                {/* A day with no clinic draws nothing; a day where patients
+                    were booked but none were seen draws an empty track. The
+                    two must not look alike — "closed" and "nobody came" are
+                    very different facts about a Tuesday. */}
+                {d.total > 0 && (
                   <>
                     <div
-                      className="absolute bottom-0 w-full rounded-t-sm border border-b-0 border-primary-300 bg-primary-50"
+                      className="absolute bottom-0 w-full rounded-t-sm bg-clinic-accent/15"
                       style={{ height: `${bookedH}%` }}
                     />
+                    {/* ⚠️ `clinic-accent` at full strength is correct HERE and
+                        wrong for text — it is 3.3:1 on white. A bar is a large
+                        shape with no letters in it; the axis label below uses
+                        `-accent-strong` for exactly this reason. */}
                     <div
-                      className="absolute bottom-0 w-full rounded-t-sm bg-primary-600"
+                      className="absolute bottom-0 w-full rounded-t-sm bg-clinic-accent"
                       style={{ height: `${seenH}%` }}
                     />
                   </>
                 )}
               </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-1.5 flex gap-1.5">
+          {series.map((d) => {
+            const isToday = d.date.toDateString() === new Date().toDateString()
+            return (
               <span
-                className={`text-center text-[0.55rem] leading-none ${
-                  isToday ? 'font-bold text-primary-700' : 'text-ink-subtle'
+                key={d.date.toISOString()}
+                className={`flex-1 text-center text-2xs leading-none tabular-nums ${
+                  isToday ? 'font-semibold text-clinic-accent-strong' : 'text-ink-subtle'
                 }`}
               >
                 {d.short}
               </span>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
-
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-subtle">
-        <span className="inline-flex items-center gap-1">
-          <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-primary-600" /> Seen
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span aria-hidden="true" className="h-2 w-2 rounded-sm border border-primary-300 bg-primary-50" />{' '}
-          Booked
-        </span>
-      </p>
 
       {/* The chart, as data.
 

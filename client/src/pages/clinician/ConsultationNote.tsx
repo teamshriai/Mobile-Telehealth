@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, LayoutTemplate, Lock, Save, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, LayoutTemplate, Lock, Mic, Save, ShieldCheck } from 'lucide-react'
 import { useEncounter } from './useEncounterRoute'
+import DiagnosisCodePicker from '../../components/clinical/DiagnosisCodePicker'
+import AmbientScribe from './AmbientScribe'
+import ConfidenceBandChip from '../../ai/components/ConfidenceBand'
+import { bandLabel } from '../../ai/confidence'
+import { useAiMode } from '../../ai/useAi'
+import type { ScribeDraft } from '../../ai/fixtures/scribe'
 import { useAuth } from '../../app/useAuth'
 import { useToast } from '../../components/common/useToast'
 import Card from '../../components/common/Card'
@@ -30,11 +36,30 @@ import type { ApiError } from '../../types/api'
  *     that is what will actually happen (see requiresCosign).
  *  4. **Validation on blur, never on keystroke.** The banned-abbreviation
  *     check (CMP-NABH-05) fires when a clinician leaves a field, so it never
- *     flags a half-typed word.
+ *     flags a half-typed word. It also re-runs once more when the clinician
+ *     asks to sign — see `openSign`. A check that only ever ran on blur meant
+ *     a term typed and never blurred left `Sign` enabled and the server
+ *     refused it; asking to sign is not a keystroke, so this keeps rule 4.
+ *  5. **The screen never claims a rule is softer than the server enforces.**
+ *     `CMP-NABH-05` is a hard block at sign time
+ *     (`clinicalNote.service.ts` — "Unsafe abbreviations must be written out
+ *     before signing"), and the atlas agrees: `S-06-03`'s Sign action is
+ *     "enabled when … banned abbreviations cleared" (§6520). This screen used
+ *     to print "These are advisory. They do not block saving or signing."
+ *     directly above a live Sign button, so the clinician wrote the note,
+ *     pressed Sign and met a 400 that contradicted what they had just read.
+ *     ⚠️ Any future validation added here must gate the control **and** say so
+ *     in the same breath.
  *
- * AI: `AI-OFF`. There is no draft generation, no suggested assessment and no
- * `◆` affordance anywhere on this screen — absent, not greyed (§4.8). The
- * quality check below is a static word list, and runs identically either way.
+ * AI: `◆AI-101` ambient scribe and `◆AI-103` section drafts, both **G2** — a
+ * drafted section is not in the note until it is dispositioned. Drafts render
+ * as ghost text inside the field with a left accent rule (§6565: "not a side
+ * card. That is the entire pitch"), each carrying its confidence band and the
+ * transcript span it came from.
+ *
+ * ⚠️ The quality check is NOT part of that. It is a static word list evaluated
+ * on the server and it runs identically with the fabric off — `CMP-NABH-05` is
+ * a rule, not a model output, and nothing here may make it look like one.
  */
 
 type SectionKey = 'subjective' | 'objective' | 'assessment' | 'plan'
@@ -48,6 +73,16 @@ const SECTIONS: Array<{ key: SectionKey; label: string; hint: string; rows: numb
 
 const AUTOSAVE_MS = 20_000
 
+/**
+ * ⚠️ The server labels a finding's section with a CAPITALISED name
+ * ("Subjective"), while `SectionKey` is lowercase. Bucketing on the raw label
+ * therefore never matched, every `NoteSection` received an empty array, and the
+ * per-section warning plus its `aria-invalid` were dead code that looked
+ * implemented. Normalise, and drop a label that is not one of the four rather
+ * than filing it into a bucket nothing reads.
+ */
+const SECTION_KEYS = new Set<string>(SECTIONS.map((s) => s.key))
+
 export default function ConsultationNote() {
   const { encounter, patient } = useEncounter()
   const { can } = useAuth()
@@ -59,6 +94,11 @@ export default function ConsultationNote() {
     subjective: '', objective: '', assessment: '', plan: '',
   })
   const [problemText, setProblemText] = useState('')
+  // The coded diagnosis. `problemText` stays as the free-text reason — the two
+  // are different facts and the server stores both.
+  const [problemCode, setProblemCode] = useState('')
+  const [codeQuery, setCodeQuery] = useState('')
+  const [codeError, setCodeError] = useState('')
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
@@ -67,12 +107,79 @@ export default function ConsultationNote() {
   const [confirmSign, setConfirmSign] = useState(false)
   const [addendumOpen, setAddendumOpen] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
+  const [scribeOpen, setScribeOpen] = useState(false)
+  /**
+   * Sections the scribe has drafted but the clinician has not yet dispositioned.
+   *
+   * ⚠️ G2 (§4.4): "Accept / Edit / Reject **before the value is committed**".
+   * These live apart from `draft` on purpose — while a section is in here it is
+   * rendered as ghost text and is NOT part of the note. Accepting is the only
+   * thing that writes it, which is also why an undispositioned draft can never
+   * be autosaved into the record by accident.
+   */
+  const [pendingDrafts, setPendingDrafts] = useState<ScribeDraft[]>([])
+  const { mode: aiMode } = useAiMode()
 
   // `can` reads the session's capability list. The role name is never
   // consulted — a Resident is simply a user without this capability.
   const canSignAlone = can('note:sign:own')
 
   const locked = note !== null && note.status !== 'Draft'
+
+  /* ── What stops this note being signed ────────────────────────────────────
+   *
+   * ⚠️ THE ORDER HERE MIRRORS THE SERVER'S, and that is not cosmetic. The
+   * server checks completeness first and abbreviations second; if the client
+   * reported them the other way round it would name a reason the server would
+   * never have reached, and fixing that reason would not unblock anything.
+   *
+   * ⚠️ ASSESSMENT AND PLAN ONLY. The atlas marks all four sections required,
+   * but the server requires only these two — so gating on all four would
+   * refuse notes the server would accept, which is a different kind of lying
+   * to the clinician. If the rule should tighten, it tightens on the server
+   * first and this follows.
+   *
+   * ⚠️ Trimmed, because the server trims. `save()` persists `|| null`, so a
+   * whitespace-only section reaches the server as whitespace and fails its
+   * `.trim()` check; measuring untrimmed here would show a green button for a
+   * note the server refuses.
+   */
+  const missingSections = SECTIONS.filter(
+    (s) => (s.key === 'assessment' || s.key === 'plan') && draft[s.key].trim() === '',
+  ).map((s) => s.label)
+
+  const signVerb = canSignAlone ? 'signing' : 'submitting'
+  /**
+   * ⚠️ THE G2 RULE, AND IT IS LAST ON PURPOSE. §4.4: "the page's primary action
+   * stays disabled until every G2 item has a disposition". It sits after the
+   * server's two rules because those are the ones that would actually refuse
+   * the request — naming an undispositioned draft while the note is also
+   * incomplete would send the clinician to fix the wrong thing.
+   *
+   * ⚠️ Deadlock is the risk this creates: a draft that is registered but never
+   * rendered would disable Sign forever. It cannot happen here because the
+   * pending list IS the render list — the ghost text and the lock read the same
+   * array, so an invisible pending item is not expressible.
+   */
+  // ⚠️ If the sections that are missing are exactly the ones sitting drafted in
+  // front of the clinician, telling them to "complete Assessment and Plan" sends
+  // them to type something that is already on screen. Name the real next action.
+  const missingButDrafted = missingSections.filter((label) =>
+    pendingDrafts.some((d) => d.section === label.toLowerCase()),
+  )
+
+  const signBlockedReason: string | null =
+    missingSections.length > 0
+      ? missingButDrafted.length === missingSections.length
+        ? `Accept or reject the drafted ${missingSections.join(' and ')} before ${signVerb}.`
+        : `Complete ${missingSections.join(' and ')} before ${signVerb}.`
+      : findings.length > 0
+        ? `Write out ${[...new Set(findings.map((f) => f.term))].join(', ')} before ${signVerb}.`
+        : pendingDrafts.length > 0
+          ? `Accept or reject the drafted ${pendingDrafts
+              .map((d) => d.section)
+              .join(', ')} before ${signVerb}.`
+          : null
 
   /* ── Load or create the draft ─────────────────────────────────────────── */
 
@@ -96,6 +203,8 @@ export default function ConsultationNote() {
             plan: existing.plan ?? '',
           })
           setProblemText(existing.problemText ?? '')
+          setProblemCode(existing.problemCode ?? '')
+          setCodeQuery(existing.problemCode ?? '')
           setSavedAt(existing.updatedAt)
           return
         }
@@ -108,6 +217,8 @@ export default function ConsultationNote() {
           .then((created) => {
             setNote(created)
             setProblemText(created.problemText ?? '')
+            setProblemCode(created.problemCode ?? '')
+            setCodeQuery(created.problemCode ?? '')
             setSavedAt(created.updatedAt)
           })
       })
@@ -121,12 +232,17 @@ export default function ConsultationNote() {
   // Held in a ref so the autosave interval can read the latest draft without
   // being torn down and rebuilt on every keystroke — a re-created interval
   // would reset its 20s clock each time and, on continuous typing, never fire.
-  const latest = useRef({ draft, problemText, dirty, note, locked })
-  latest.current = { draft, problemText, dirty, note, locked }
+  //
+  // ⚠️ ANYTHING A TIMER OR A KEYBOARD HANDLER MUST SEE BELONGS HERE. `findings`
+  // and `missingSections` are in it because Alt+Shift+S has to be gated by the
+  // same rules as the button — gating only the button leaves a second, unguarded
+  // route to the signature.
+  const latest = useRef({ draft, problemText, problemCode, dirty, note, locked, findings, missingSections })
+  latest.current = { draft, problemText, problemCode, dirty, note, locked, findings, missingSections }
 
   const save = useCallback(
     async (opts: { silent?: boolean } = {}): Promise<boolean> => {
-      const { draft: d, problemText: pt, note: n, locked: isLocked } = latest.current
+      const { draft: d, problemText: pt, problemCode: pc, note: n, locked: isLocked } = latest.current
       if (n === null || isLocked) return false
       setSaving(true)
       setSaveError('')
@@ -137,6 +253,7 @@ export default function ConsultationNote() {
           assessment: d.assessment || null,
           plan: d.plan || null,
           problemText: pt || null,
+          problemCode: pc || null,
         })
         setNote(updated)
         setSavedAt(updated.updatedAt)
@@ -179,7 +296,8 @@ export default function ConsultationNote() {
       if (!e.altKey || e.key.toLowerCase() !== 's') return
       e.preventDefault()
       if (latest.current.locked) return
-      if (e.shiftKey) setConfirmSign(true)
+      // Same gate as the button — see `openSign`.
+      if (e.shiftKey) void openSignRef.current()
       else void save()
     }
     window.addEventListener('keydown', onKey)
@@ -188,19 +306,68 @@ export default function ConsultationNote() {
 
   /* ── Quality check, on blur only ──────────────────────────────────────── */
 
-  const runQualityCheck = useCallback(() => {
+  const runQualityCheck = useCallback(async (): Promise<QualityFinding[]> => {
     const d = latest.current.draft
     if (Object.values(d).every((v) => v.trim() === '')) {
       setFindings([])
-      return
+      return []
     }
-    clinicalNoteService
-      .checkNoteQuality(d)
-      .then(setFindings)
-      // A failed quality check must never block documentation. Silent by
-      // design: the rule is advisory, the note is not.
-      .catch(() => undefined)
+    try {
+      const next = await clinicalNoteService.checkNoteQuality(d)
+      setFindings(next)
+      return next
+    } catch {
+      // ⚠️ A failed check returns the findings we already had, NOT an empty
+      // list. Returning [] would let an unreachable endpoint quietly unblock
+      // the Sign button, and the clinician would meet the server's refusal
+      // instead — which is the exact failure this whole change exists to
+      // remove. Documentation itself is never blocked: saving is untouched.
+      return latest.current.findings
+    }
   }, [])
+
+  /**
+   * The only route to the sign dialog.
+   *
+   * ⚠️ IT RE-RUNS THE CHECK FIRST. Findings otherwise reflect the last blur,
+   * and both stale directions are wrong: a banned term typed and never blurred
+   * would leave Sign enabled (and the server would refuse it), while a term
+   * corrected and never blurred would leave Sign stuck on a problem that no
+   * longer exists.
+   */
+  const openSign = useCallback(async () => {
+    if (latest.current.locked) return
+    if (latest.current.missingSections.length > 0) return
+    const next = await runQualityCheck()
+    if (next.length === 0) setConfirmSign(true)
+  }, [runQualityCheck])
+
+  // The Alt+Shift+S effect is registered above this point and must not
+  // re-subscribe whenever `openSign` is re-created. Same reasoning as `latest`.
+  const openSignRef = useRef(openSign)
+  openSignRef.current = openSign
+
+  const dispositionDraft = useCallback(
+    (section: SectionKey, action: 'accept' | 'edit' | 'reject') => {
+      const d = pendingDrafts.find((x) => x.section === section)
+      if (d === undefined) return
+      if (action !== 'reject') {
+        // Appended, never replacing. A clinician who has already typed
+        // something has said more than the scribe heard, and silently
+        // overwriting it would be the worst thing this feature could do.
+        setDraft((prev) => ({
+          ...prev,
+          [section]: prev[section].trim() === '' ? d.text : `${prev[section].trim()}\n\n${d.text}`,
+        }))
+        setDirty(true)
+      }
+      setPendingDrafts((prev) => prev.filter((x) => x.section !== section))
+      if (action === 'edit') {
+        window.setTimeout(() => document.getElementById(section)?.focus(), 0)
+      }
+    },
+    [pendingDrafts],
+  )
 
   /**
    * Insert a template's text into a section.
@@ -252,8 +419,11 @@ export default function ConsultationNote() {
   const sectionFindings = useMemo(() => {
     const map: Partial<Record<SectionKey, QualityFinding[]>> = {}
     findings.forEach((f) => {
-      const k = f.section as SectionKey
-      map[k] = [...(map[k] ?? []), f]
+      // See SECTION_KEYS — the wire label is capitalised, the key is not.
+      const k = f.section.toLowerCase()
+      if (!SECTION_KEYS.has(k)) return
+      const key = k as SectionKey
+      map[key] = [...(map[key] ?? []), f]
     })
     return map
   }, [findings])
@@ -284,8 +454,12 @@ export default function ConsultationNote() {
               </li>
             ))}
           </ul>
+          {/* ⚠️ This used to read "These are advisory. They do not block saving
+              or signing." It was false: the server refuses the signature on
+              exactly these findings (CMP-NABH-05). See rule 5 in the header. */}
           <p className="mt-1.5 text-2xs">
-            These are advisory. They do not block saving or signing.
+            {canSignAlone ? 'Signing' : 'Submitting'} stays unavailable until these are written
+            out. Saving and autosave are unaffected — nothing you have typed is at risk.
           </p>
         </Banner>
       )}
@@ -314,6 +488,50 @@ export default function ConsultationNote() {
             />
           </div>
 
+          {/* ── Atlas field 3 · the coded diagnosis ──────────────────────────
+              ⚠️ `ClinicalNote.problemCode` existed in the schema, in both
+              validators and in the client payload type, and NO screen had ever
+              written it — the column was dead. The atlas specifies this field
+              as a typeahead with leaf-only validation; the free-text reason
+              above is not a substitute for it and does not replace it, because
+              "why they came" and "what it is coded as" are different facts.
+
+              ⚠️ Optional here, unlike on the problem list. Coding a note is not
+              the same act as adding to the patient's problem list, and forcing
+              a code before a clinician has formed an impression would push them
+              to pick something wrong to get past the field. The server accepts
+              a null code and rejects a bad one. */}
+          {locked ? (
+            <div>
+              <p className="mb-1 block text-sm font-medium text-ink">Coded diagnosis</p>
+              <p className="rounded-lg bg-surface-2 px-3 py-2 font-mono text-sm text-ink-muted">
+                {problemCode === '' ? 'Not coded' : problemCode}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <DiagnosisCodePicker
+                label="Coded diagnosis (ICD-10)"
+                value={codeQuery}
+                onValueChange={(v) => { setCodeQuery(v); setProblemCode(''); setCodeError('') }}
+                onPick={(c) => {
+                  setProblemCode(c.code)
+                  setCodeQuery(`${c.code} — ${c.title}`)
+                  setCodeError('')
+                  setDirty(true)
+                }}
+                onReject={setCodeError}
+              />
+              {codeError !== '' && (
+                <p role="alert" className="mt-1 text-xs text-critical-fg">{codeError}</p>
+              )}
+              <p className="mt-1 text-2xs text-ink-subtle">
+                Optional. Coding here does not add the diagnosis to the patient&rsquo;s problem
+                list — use Problems &amp; coding for that.
+              </p>
+            </div>
+          )}
+
           {SECTIONS.map((s) => (
             <NoteSection
               key={s.key}
@@ -322,13 +540,29 @@ export default function ConsultationNote() {
               locked={locked}
               findings={sectionFindings[s.key] ?? []}
               onChange={(v) => { setDraft((d) => ({ ...d, [s.key]: v })); setDirty(true) }}
-              onBlur={runQualityCheck}
+              onBlur={() => void runQualityCheck()}
+              draft={pendingDrafts.find((d) => d.section === s.key) ?? null}
+              onAcceptDraft={() => dispositionDraft(s.key, 'accept')}
+              onEditDraft={() => dispositionDraft(s.key, 'edit')}
+              onRejectDraft={() => dispositionDraft(s.key, 'reject')}
             />
           ))}
         </div>
 
         {!locked && (
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-soft pt-4">
+            {/* ◆AI-101. Hidden entirely when the fabric is off (§4.8) — a
+                greyed Dictate button advertises a feature the clinician cannot
+                have, and the note is fully writable without it. */}
+            {aiMode !== 'off' && (
+              <Button
+                onClick={() => setScribeOpen(true)}
+                variant="ghost"
+                icon={<Mic size={14} />}
+              >
+                Dictate
+              </Button>
+            )}
             <Button
               onClick={() => setTemplateOpen(true)}
               variant="ghost"
@@ -339,9 +573,24 @@ export default function ConsultationNote() {
             <Button onClick={() => void save()} variant="secondary" loading={saving} icon={<Save size={14} />}>
               Save draft
             </Button>
-            <Button onClick={() => setConfirmSign(true)} disabled={saving} icon={<ShieldCheck size={14} />}>
+            <Button
+              onClick={() => void openSign()}
+              disabled={saving || signBlockedReason !== null}
+              icon={<ShieldCheck size={14} />}
+            >
               {canSignAlone ? 'Sign note' : 'Submit for co-signature'}
             </Button>
+            {/* ⚠️ Why the primary is unavailable, next to the primary. A
+                disabled button with the reason somewhere else up the page is
+                how a clinician ends up clicking it repeatedly. `Button` takes
+                no `title`, so this is a sibling line rather than a tooltip —
+                which is better anyway: a tooltip is invisible on a ward
+                tablet. */}
+            {signBlockedReason !== null && (
+              <p role="status" className="basis-full text-xs font-medium text-warning-fg">
+                {signBlockedReason}
+              </p>
+            )}
             <span className="text-2xs text-ink-subtle">
               <Kbd>Alt</Kbd>+<Kbd>S</Kbd> save · <Kbd>Alt</Kbd>+<Kbd>Shift</Kbd>+<Kbd>S</Kbd>{' '}
               {canSignAlone ? 'sign' : 'submit'}
@@ -365,6 +614,16 @@ export default function ConsultationNote() {
       </Card>
 
       <Addenda note={note} onAdd={() => setAddendumOpen(true)} locked={locked} />
+
+      {/* S-06-04 — an overlay over this screen, per §6585. The note stays
+          mounted and fully editable underneath: dictation is never the only
+          input path (§6630). */}
+      <AmbientScribe
+        open={scribeOpen}
+        onClose={() => setScribeOpen(false)}
+        patientName={`${patient.firstName} ${patient.lastName}`.trim()}
+        onAccept={(ds) => setPendingDrafts([...ds])}
+      />
 
       {confirmSign && (
         <ConfirmDialog
@@ -401,6 +660,7 @@ export default function ConsultationNote() {
 
 function NoteSection({
   section, value, locked, findings, onChange, onBlur,
+  draft, onAcceptDraft, onEditDraft, onRejectDraft,
 }: {
   section: { key: SectionKey; label: string; hint: string; rows: number }
   value: string
@@ -408,6 +668,11 @@ function NoteSection({
   findings: QualityFinding[]
   onChange: (v: string) => void
   onBlur: () => void
+  /** The AI draft awaiting a disposition, or null. */
+  draft: ScribeDraft | null
+  onAcceptDraft: () => void
+  onEditDraft: () => void
+  onRejectDraft: () => void
 }) {
   const hintId = `${section.key}-hint`
   return (
@@ -418,7 +683,11 @@ function NoteSection({
       <p id={hintId} className="mb-1.5 text-2xs text-ink-subtle">{section.hint}</p>
       <textarea
         id={section.key}
-        rows={section.rows}
+        // ⚠️ Shrunk while an undispositioned draft is showing and the field is
+        // empty. A full-height empty box above the draft makes the draft look
+        // like an afterthought parked below the field; the point of §6565 is
+        // that it reads as the note's content.
+        rows={draft !== null && value.trim() === '' ? 2 : section.rows}
         value={value}
         readOnly={locked}
         aria-describedby={hintId}
@@ -432,6 +701,51 @@ function NoteSection({
           <AlertTriangle size={11} aria-hidden="true" className="mt-0.5 shrink-0" />
           {findings.map((f) => f.term).join(', ')} — see the warning above.
         </p>
+      )}
+
+      {/* ── ◆AI-101/AI-103 · the drafted section ──────────────────────────────
+          ⚠️ GHOST TEXT INSIDE THE NOTE, NOT A SIDE CARD. §6565 is unusually
+          blunt about this — "85% opacity with a left accent rule — not a side
+          card. That is the entire pitch." A draft in a panel beside the note is
+          something to copy across; a draft in the field is something to correct.
+          The difference is the whole product claim.
+
+          ⚠️ G2: it is not in the note until it is dispositioned. `value` is
+          untouched while this is showing — accepting is what writes it. */}
+      {draft !== null && !locked && (
+        <section
+          role="region"
+          aria-label={`AI draft for ${section.label} · ${bandLabel(draft.band)}`}
+          className="mt-1.5 border-l-2 border-ai pl-3"
+        >
+          <p className="whitespace-pre-line text-sm leading-relaxed text-ink opacity-85">
+            {draft.text}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <ConfidenceBandChip band={draft.band} />
+            <button
+              type="button"
+              onClick={onAcceptDraft}
+              className="focus-ring rounded text-2xs font-semibold text-primary-700 underline underline-offset-2"
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={onEditDraft}
+              className="focus-ring rounded text-2xs font-medium text-primary-700 underline underline-offset-2"
+            >
+              Accept &amp; edit
+            </button>
+            <button
+              type="button"
+              onClick={onRejectDraft}
+              className="focus-ring rounded text-2xs font-medium text-ink-muted underline underline-offset-2"
+            >
+              Reject
+            </button>
+          </div>
+        </section>
       )}
     </div>
   )

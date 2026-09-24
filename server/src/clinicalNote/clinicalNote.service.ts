@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { careRelationshipService } from '../services/careRelationship.service';
+import { problemRepository } from '../problem/problem.repository';
 import { roleHasPermission, Permission } from '../config/permissions';
 import { clinicalNoteRepository } from './clinicalNote.repository';
 import { checkDocumentationQuality, type AbbreviationFinding } from './bannedAbbreviations';
@@ -49,6 +50,39 @@ async function attestationFor(userId: string) {
   };
 }
 
+/**
+ * `S-06-05`'s leaf rule, applied to a NOTE's coded problem.
+ *
+ * ⚠️ THE ZOD SCHEMA IS NOT A SUBSTITUTE FOR THIS. `problemCode` is validated
+ * there only as `z.string().trim().max(20)`, so before this existed a direct
+ * API call could persist `J18` — a category, not a diagnosis — or a code that
+ * is not in the catalogue at all, on a clinical record that a claim is later
+ * built from. The client picker enforces the same rule, but a client-side rule
+ * is a convenience, not a control.
+ *
+ * ⚠️ Same catalogue lookup and the same two refusals as `problemService.add`,
+ * with the strings copied verbatim so the two surfaces cannot drift apart.
+ *
+ * ⚠️ Deliberately NOT a `.refine()` on the zod schema: a zod failure surfaces
+ * as 400 "Validation failed." with the detail buried under `errors`, and the
+ * client renders `err.message` — the clinician would be told "Validation
+ * failed." instead of which code is wrong and what to do about it.
+ */
+async function requireLeafDiagnosisCode(problemCode: string | null | undefined): Promise<void> {
+  if (problemCode === undefined || problemCode === null || problemCode === '') return;
+
+  const code = await problemRepository.findCode(problemCode);
+  if (!code?.isActive) {
+    throw new AppError('That diagnosis code is not in the catalogue.', 400);
+  }
+  if (!code.isLeaf) {
+    throw new AppError(
+      `${code.code} is a category, not a diagnosis. Choose a more specific code beneath it.`,
+      400,
+    );
+  }
+}
+
 export const clinicalNoteService = {
   async listForPatient(actor: Actor, patientId: string, meta: Meta) {
     await careRelationshipService.requirePatientAccess(actor, patientId, meta);
@@ -91,6 +125,7 @@ export const clinicalNoteService = {
    */
   async create(actor: Actor, dto: CreateNoteDto, meta: Meta) {
     await careRelationshipService.requirePatientAccess(actor, dto.patientId, meta);
+    await requireLeafDiagnosisCode(dto.problemCode);
 
     if (dto.encounterId !== undefined && dto.encounterId !== null) {
       const existing = await clinicalNoteRepository.findOpenDraftForEncounter(
@@ -122,6 +157,7 @@ export const clinicalNoteService = {
     const patientId = await clinicalNoteRepository.findOwnerPatientId(noteId);
     if (patientId === null) throw new AppError('Note not found.', 404);
     await careRelationshipService.requirePatientAccess(actor, patientId, meta);
+    await requireLeafDiagnosisCode(dto.problemCode);
 
     const updated = await clinicalNoteRepository.updateDraft(noteId, dto);
     if (!updated) {

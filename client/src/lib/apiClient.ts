@@ -27,7 +27,44 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import type { ApiError } from '../types/api'
 
-const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
+/**
+ * Where the API lives.
+ *
+ * ⚠️ LAN HOSTING. `http://localhost:5000` is correct on the developer's own
+ * machine and wrong on every other device: opened from a phone on the same
+ * Wi-Fi, `localhost` resolves to *the phone*, so the page loads and then every
+ * request fails against nothing. Since the API is served from the same host as
+ * the dev server, only on a different port, the honest default is to follow
+ * whatever host the page was actually loaded from.
+ *
+ * Precedence, and it matters:
+ *  1. `VITE_API_BASE_URL` wins outright — an explicit setting is never
+ *     second-guessed, which is what staging and production builds rely on.
+ *  2. Loaded from localhost → `http://localhost:5000`, byte-identical to the
+ *     previous behaviour. Nothing about the normal dev loop changes.
+ *  3. Anything else (a LAN IP, a `.local` name) → same host and scheme as the
+ *     page, on the API port.
+ *
+ * ⚠️ The scheme is inherited, not assumed. Hard-coding `http:` here would make
+ * an https-served page issue mixed-content requests that the browser blocks.
+ */
+const API_PORT: string = import.meta.env.VITE_API_PORT ?? '5000'
+
+function resolveApiBaseUrl(): string {
+  const explicit = import.meta.env.VITE_API_BASE_URL
+  if (typeof explicit === 'string' && explicit !== '') return explicit
+
+  // SSR/test contexts have no `window`; fall back to the historical default.
+  if (typeof window === 'undefined') return `http://localhost:${API_PORT}`
+
+  const { hostname, protocol } = window.location
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+    return `http://localhost:${API_PORT}`
+  }
+  return `${protocol}//${hostname}:${API_PORT}`
+}
+
+const BASE_URL: string = resolveApiBaseUrl()
 
 // ── In-memory access token ───────────────────────────────────────────────────
 let accessToken: string | null = null

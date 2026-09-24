@@ -222,8 +222,28 @@ export const prescriptionRepository = {
       .slice(0, limit);
   },
 
-  /** Next sequence number for the RX/{fy}/{seq} identifier. */
-  async countForFinancialYear(prefix: string): Promise<number> {
-    return prisma.prescription.count({ where: { rxNumber: { startsWith: prefix } } });
+  /**
+   * Highest sequence issued so far under the RX/{fy}/ prefix, or 0.
+   *
+   * ⚠️ NOT A COUNT. `count + 1` was the original implementation and it is
+   * wrong the moment the series has a gap: delete one prescription out of
+   * twenty and the next allocation reuses a number that still exists, which
+   * surfaces as a unique-constraint violation and an unopenable prescription
+   * screen. Abandoned empty baskets are cleaned up routinely, so gaps are the
+   * normal state of this table, not an edge case.
+   *
+   * `rxNumber` is a fixed-width zero-padded suffix, so ordering the string
+   * descending orders the sequence descending.
+   */
+  async maxSequenceForFinancialYear(prefix: string): Promise<number> {
+    const latest = await prisma.prescription.findFirst({
+      where: { rxNumber: { startsWith: prefix } },
+      orderBy: { rxNumber: 'desc' },
+      select: { rxNumber: true },
+    });
+    if (latest === null) return 0;
+
+    const seq = Number.parseInt(latest.rxNumber.slice(prefix.length), 10);
+    return Number.isFinite(seq) ? seq : 0;
   },
 };

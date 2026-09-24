@@ -9,6 +9,7 @@ import { ThemeProvider } from './app/ThemeContext'
 import { RequireAuth, RequireAnonymous } from './app/guards'
 import { PatientContextProvider } from './app/PatientContextProvider'
 import { ToastProvider } from './components/common/ToastProvider'
+import { AiProvider } from './ai/AiProvider'
 import { homeForRole } from './app/roleHome'
 import { setSessionExpiredHandler } from './lib/apiClient'
 import ErrorBoundary from './components/feedback/ErrorBoundary'
@@ -176,6 +177,11 @@ export default function App() {
                   both. */}
               <ToastProvider>
               <PatientContextProvider>
+              {/* The AI fabric sits above the route table so the demo mode
+                  survives navigation — switching to AI-OFF and then walking
+                  the portal is the whole point of having the switch. It holds
+                  no clinical state and reaches no network. */}
+              <AiProvider>
               <SessionExpiryBridge />
               <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
                 <Routes>
@@ -346,6 +352,7 @@ export default function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              </AiProvider>
               </PatientContextProvider>
               </ToastProvider>
             </AccessibilityProvider>

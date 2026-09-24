@@ -62,3 +62,24 @@ export function formatBloodGroup(value: string | null | undefined): string | nul
   if (value === null || value === undefined || value === '' || value === 'Unknown') return null
   return value.replace('_Positive', '+').replace('_Negative', '−')
 }
+
+/**
+ * The patient's name, as one string.
+ *
+ * ⚠️ Here, not inlined, for the same reason as the two above. §5.4's naming
+ * rule and the §8.2 cast both include a patient whose record carries a middle
+ * name and one whose does not; composing it ad hoc produces a stray double
+ * space in some places and not others, and a name that renders differently on
+ * `Z3` and `Z4` of the same screen is exactly the wrong-patient cue `Z3` exists
+ * to prevent.
+ *
+ * `filter(Boolean)` drops both `null` and `''` — a middle name stored as an
+ * empty string is as absent as one stored as null.
+ */
+export function patientFullName(patient: {
+  firstName: string
+  middleName?: string | null
+  lastName: string
+}): string {
+  return [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
+}

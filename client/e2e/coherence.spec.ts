@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { DOCTOR, login, watchConsole, navigateTo } from './helpers'
+import { test, expect } from './fixtures'
+import { openAuthed, watchConsole, navigateTo } from './helpers'
 
 /**
  * The coherence walk.
@@ -16,7 +16,7 @@ import { DOCTOR, login, watchConsole, navigateTo } from './helpers'
 test('a visit opens onto the work that was done at it', async ({ page }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await login(page, DOCTOR, watcher)
+  await openAuthed(page, undefined, watcher)
 
   await navigateTo(page, /patients/i, /\/clinician\/patients$/)
   await page.getByRole('tab', { name: /my panel/i }).click()

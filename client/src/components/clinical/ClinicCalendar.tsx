@@ -11,14 +11,27 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
  * workload, which is why it earns rail space on a dense clinical screen.
  *
  * ⚠️ COLOUR IS NEVER THE ONLY CARRIER (§5.3). Load is encoded three ways: the
- * shade of the cell, a count printed in the cell, and the accessible name
- * ("Mon 22 September, 16 appointments"). Roughly 8% of male clinicians have a
- * colour-vision deficiency, and a rota nobody can read is worse than no rota.
+ * SIZE of the load dot, its opacity, and the accessible name ("Mon 22
+ * September, 16 appointments"). Size is the primary carrier precisely because
+ * it survives a colour-vision deficiency, which roughly 8% of male clinicians
+ * have — a rota nobody can read is worse than no rota.
  *
- * The palette is a single-hue ramp of the brand tone rather than a
- * green→amber→red scale. Busy is not *bad* — a full clinic is a normal
- * Tuesday — and borrowing the clinical severity palette for workload would
- * make an ordinary day look like an alert.
+ * ⚠️ The load dot replaced a filled cell. Shading all ~25 clinic days turned
+ * the grid into a wall of saturated chips that fought the worklist beside it
+ * for attention and made *today* — the one cell that matters — the hardest to
+ * find. The dot carries the same information and lets the date numerals be the
+ * loudest thing in the component, which is what a calendar is for.
+ *
+ * ⚠️ The accent is the scoped `clinic-accent` family, used by this component
+ * and `VisitTrend`. The portal theme is `primary-*` blue; these two panes read
+ * as one analytical region against it. Busy is not *bad* — a full clinic is a
+ * normal Tuesday — so the severity palette (amber/red) is never borrowed for
+ * workload, and the ramp is one green at three opacities rather than a march
+ * across hues.
+ *
+ * ⚠️ `clinic-accent` for marks, `clinic-accent-strong` for anything with
+ * letters in it. The bright tone is 3.3:1 on white: fine for a dot, below AA
+ * for a date numeral. See the token block in `index.css`.
  */
 
 export interface DayLoad {
@@ -78,54 +91,68 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
 
   const monthLabel = cursor.toLocaleString('en-IN', { month: 'long', year: 'numeric' })
 
-  /** Four steps, so a glance distinguishes them. 0 stays unshaded. */
-  function intensity(total: number): string {
-    if (total === 0) return 'bg-transparent text-ink-subtle'
+  /**
+   * The load dot. Three steps, differentiated by size *and* opacity so the
+   * ordering survives greyscale. A day with no clinic gets no dot at all —
+   * absence is the clearest possible "nothing booked".
+   */
+  function loadDot(total: number): string | null {
+    if (total === 0) return null
     const ratio = total / busiest
-    if (ratio > 0.66) return 'bg-primary-600 text-on-primary font-semibold'
-    if (ratio > 0.33) return 'bg-primary-300 text-ink font-medium'
-    return 'bg-primary-100 text-ink'
+    if (ratio > 0.66) return 'h-1.5 w-1.5 bg-clinic-accent'
+    if (ratio > 0.33) return 'h-1 w-1 bg-clinic-accent/60'
+    return 'h-1 w-1 bg-clinic-accent/30'
   }
 
   return (
-    <section aria-labelledby="clinic-cal-heading" className="select-none">
+    // ⚠️ Capped width. The cells are `aspect-square`, so in a container wider
+    // than the Z6 rail — which is exactly what happens below 1280, where the
+    // rail drops under the worklist at full page width — each day grows into a
+    // 139px block and the month becomes a wall. The cap is the rail's own
+    // width, so this looks identical in the rail and sane everywhere else.
+    <section aria-labelledby="clinic-cal-heading" className="w-full max-w-[22rem] select-none">
       {/* ⚠️ Heading and month-nav on separate rows.
           Both on one row with a fixed-width month label overflowed the 19rem
           rail by 22px at 1440 and by 71px at 375 — the sweep caught it as
           horizontal page scroll, which on a ward tablet is the difference
           between a usable screen and an unusable one. Nothing here may have a
           hard minimum width. */}
-      <h3 id="clinic-cal-heading" className="mb-1.5 text-xs font-semibold text-ink">
+      <h3
+        id="clinic-cal-heading"
+        className="text-2xs font-medium uppercase tracking-wide text-ink-subtle"
+      >
         Clinic calendar
       </h3>
-      <div className="mb-2 flex items-center justify-between gap-1">
-        <button
-          type="button"
-          aria-label="Previous month"
-          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
-          className="focus-ring flex-shrink-0 rounded p-1 text-ink-muted hover:bg-surface-2 hover:text-ink"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-        </button>
-        <span className="min-w-0 truncate text-center text-2xs font-medium text-ink-muted">
-          {monthLabel}
-        </span>
-        <button
-          type="button"
-          aria-label="Next month"
-          onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
-          className="focus-ring flex-shrink-0 rounded p-1 text-ink-muted hover:bg-surface-2 hover:text-ink"
-        >
-          <ChevronRight size={14} aria-hidden="true" />
-        </button>
+      <div className="mb-3 mt-1.5 flex items-center justify-between gap-1">
+        {/* The month is the dominant label here, not the section heading —
+            the heading says what the pane is, the month says where you are. */}
+        <span className="min-w-0 truncate text-xs font-semibold text-ink">{monthLabel}</span>
+        <div className="flex flex-shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
+            className="focus-ring rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+          >
+            <ChevronLeft size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
+            className="focus-ring rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+          >
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-0.5" role="grid" aria-label="Clinic days by workload">
+      <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Clinic days by workload">
         {WEEKDAYS.map((d, i) => (
           <div
             key={`${d}-${i}`}
             aria-hidden="true"
-            className="pb-1 text-center text-2xs font-medium text-ink-subtle"
+            className="pb-1.5 text-center text-2xs font-medium text-ink-subtle"
           >
             {d}
           </div>
@@ -138,6 +165,7 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
           const total = day?.total ?? 0
           const isSelected = cell.k === selected
           const isToday = cell.k === todayKey
+          const dot = loadDot(total)
 
           const label = cell.date.toLocaleDateString('en-IN', {
             weekday: 'short',
@@ -160,30 +188,45 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
                   : `${label}, ${total} appointment${total === 1 ? '' : 's'}`
               }
               onClick={() => onSelect(cell.k)}
-              className={`focus-ring relative flex aspect-square items-center justify-center rounded text-2xs tabular-nums transition-colors ${intensity(total)} ${
-                isSelected ? 'ring-2 ring-primary-600 ring-offset-1 ring-offset-surface-1' : ''
-              } ${isToday && !isSelected ? 'outline outline-1 outline-border' : ''}`}
+              // ⚠️ Selection is a ring and nothing else. Giving it a fill as
+              // well hid today's disc underneath it on the commonest case of
+              // all — today selected — which is the one cell that must stay
+              // identifiable.
+              className={`focus-ring flex aspect-square flex-col items-center justify-center gap-1 rounded-md transition-colors hover:bg-surface-2 ${
+                isSelected ? 'ring-1 ring-clinic-accent/50' : ''
+              }`}
             >
-              {cell.date.getDate()}
-              {/* The count, so load is legible without relying on shade. */}
-              {total > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute bottom-0 right-0.5 text-[0.5rem] leading-none opacity-80"
-                >
-                  {total}
-                </span>
-              )}
+              {/* ⚠️ Today is a soft green disc, not a badge or a heavy outline.
+                  It has to be the first thing the eye lands on, and it is the
+                  only cell that gets a fill — which is what makes it findable
+                  at a glance without shouting. */}
+              <span
+                aria-hidden="true"
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-xs tabular-nums leading-none ${
+                  isToday
+                    ? 'bg-clinic-accent-soft font-semibold text-clinic-accent-strong'
+                    : total === 0
+                      ? 'text-ink-subtle'
+                      : 'text-ink'
+                }`}
+              >
+                {cell.date.getDate()}
+              </span>
+              {/* Workload, quietly. Size is the carrier; see the header note. */}
+              <span
+                aria-hidden="true"
+                className={`rounded-full ${dot ?? 'h-1 w-1 bg-transparent'}`}
+              />
             </button>
           )
         })}
       </div>
 
-      <p className="mt-2 flex flex-wrap items-center gap-1.5 text-2xs text-ink-subtle">
-        <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-primary-100" />
-        <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-primary-300" />
-        <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-primary-600" />
-        Quieter to busier · the number in each day is its appointment count
+      <p className="mt-3 flex items-center gap-1.5 text-2xs text-ink-subtle">
+        <span aria-hidden="true" className="h-1 w-1 rounded-full bg-clinic-accent/30" />
+        <span aria-hidden="true" className="h-1 w-1 rounded-full bg-clinic-accent/60" />
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-clinic-accent" />
+        <span>Quieter to busier</span>
       </p>
     </section>
   )

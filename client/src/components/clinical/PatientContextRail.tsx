@@ -23,6 +23,14 @@ import type { EncounterListItem } from '../../services/clinicalPatient.service'
  * ⚠️ It loads INDEPENDENTLY of the tab content and degrades on its own. A rail
  * that fails should never take the chart down with it, and a rail still
  * loading should never delay the clinical content behind it.
+ *
+ * ⚠️ SECTIONS, NOT CARDS. The parent supplies one bordered container and these
+ * are divided by hairlines inside it — the same treatment as My Day's `Z6`.
+ * Four separate bordered boxes made the rail read as a dashboard of unrelated
+ * widgets, which is the opposite of what a clinician re-checking an allergy
+ * mid-consultation needs. The one exception is the allergy section, which keeps
+ * a tinted background because it is the only thing here that changes what may
+ * safely be prescribed.
  */
 
 interface PatientContextRailProps {
@@ -44,7 +52,7 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
       const missing: string[] = []
       if (p.status === 'fulfilled') setProblems(p.value)
       else { setProblems([]); missing.push('problems') }
-      if (e.status === 'fulfilled') setEncounters(e.value)
+      if (e.status === 'fulfilled') setEncounters(e.value.results)
       else { setEncounters([]); missing.push('visits') }
       setFailed(missing)
     })
@@ -58,15 +66,30 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
   const openVisit = (encounters ?? []).find((e) => e.status === 'InProgress')
 
   return (
-    <aside aria-label="Patient context" className="space-y-3">
+    <div className="divide-y divide-border-soft">
+      {/* ⚠️ PARTIAL (§1.5) — the failed region NAMES what is missing and offers
+          a retry, rather than showing an empty section. An allergy rail that
+          silently renders "None coded." when the request failed is telling a
+          clinician something clinically false. */}
+      {failed.length > 0 && (
+        <p
+          role="status"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-warning-bg px-5 py-2.5 text-2xs text-warning-fg"
+        >
+          <span>
+            Could not load {failed.join(' or ')}. What is shown below is incomplete.
+          </span>
+          <button
+            type="button"
+            onClick={load}
+            className="focus-ring rounded font-semibold underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </p>
+      )}
       {/* ── Allergies: first, because it changes what may be prescribed ── */}
-      <section
-        className={`rounded-xl border p-3 ${
-          allergy.kind === 'documented'
-            ? 'border-critical-fg/30 bg-critical-bg'
-            : 'border-border-soft bg-surface-1'
-        }`}
-      >
+      <section className={`p-5 ${allergy.kind === 'documented' ? 'bg-critical-bg' : ''}`}>
         <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
           <AlertTriangle size={12} aria-hidden="true" />
           Allergies
@@ -86,7 +109,7 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
       </section>
 
       {/* ── Active problems ─────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border-soft bg-surface-1 p-3">
+      <section className="p-5">
         <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
           <ClipboardList size={12} aria-hidden="true" />
           Active problems{active.length > 0 && ` (${active.length})`}
@@ -98,7 +121,9 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
           </div>
         ) : active.length === 0 ? (
           <p className="mt-1 text-xs text-ink-subtle">
-            {failed.includes('problems') ? 'Could not load.' : 'None coded.'}
+            {/* ⚠️ Never "None coded." when the request failed — see the
+                PARTIAL banner above. The two are clinically opposite. */}
+            {failed.includes('problems') ? 'Not available.' : 'None coded.'}
           </p>
         ) : (
           <ul className="mt-1.5 space-y-1">
@@ -116,7 +141,7 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
       </section>
 
       {/* ── Current medication, as the patient reports it ───────────────── */}
-      <section className="rounded-xl border border-border-soft bg-surface-1 p-3">
+      <section className="p-5">
         <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
           <Pill size={12} aria-hidden="true" />
           Current medication
@@ -134,7 +159,7 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
       </section>
 
       {/* ── Visit context ───────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border-soft bg-surface-1 p-3">
+      <section className="p-5">
         <h3 className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
           <CalendarClock size={12} aria-hidden="true" />
           Visits
@@ -167,6 +192,6 @@ export default function PatientContextRail({ patient }: PatientContextRailProps)
           </dl>
         )}
       </section>
-    </aside>
+    </div>
   )
 }

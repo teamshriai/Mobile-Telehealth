@@ -44,6 +44,13 @@ export interface IssueInstructionPayload {
   body: string
   /** ⚠️ The PATIENT's language, not the clinician's (CMP-DPDP-02). */
   language: string
+  /**
+   * ⚠️ A6 — the English counterpart printed alongside. Omit both when
+   * `language` is `'en'`; the server rejects sending them in that case rather
+   * than storing the same text twice. Send both or neither.
+   */
+  titleEnglish?: string | null
+  bodyEnglish?: string | null
 }
 
 export async function issueInstructions(

@@ -1,4 +1,5 @@
 import { verify } from '@node-rs/argon2';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
@@ -64,6 +65,46 @@ function financialYear(at: Date): string {
   return `${String(startYear).slice(2)}-${String(startYear + 1).slice(2)}`;
 }
 
+/**
+ * Allocate the next RX number and create the basket, retrying on collision.
+ *
+ * ⚠️ The allocation is read-then-write, so two clinicians opening a basket in
+ * the same moment can read the same maximum. The unique index on `rxNumber` is
+ * what actually guarantees the identifier, and this loop is how a loser of that
+ * race recovers instead of showing "a record with this value already exists" on
+ * the prescription screen. Bounded, because a failure that survives five
+ * attempts is not contention — it is a bug, and it should surface as one.
+ *
+ * The number is never reused: allocation reads the maximum issued, not the
+ * count, so a gap left by a deleted draft stays a gap. A prescription number is
+ * a dispensing-facing identifier and reissuing one would point a pharmacist at
+ * the wrong record.
+ */
+async function createWithNextRxNumber(
+  patientId: string,
+  encounterId: string,
+  authorUserId: string,
+): Promise<PrescriptionWithItems> {
+  const prefix = `RX/${financialYear(new Date())}/`;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const seq = (await prescriptionRepository.maxSequenceForFinancialYear(prefix)) + 1 + attempt;
+    try {
+      return await prescriptionRepository.create({
+        patientId,
+        encounterId,
+        rxNumber: `${prefix}${String(seq).padStart(6, '0')}`,
+        authorUserId,
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') continue;
+      throw err;
+    }
+  }
+
+  throw new AppError('Could not allocate a prescription number. Please try again.', 503);
+}
+
 async function attestationFor(userId: string): Promise<{
   signerName: string;
   signerRegistrationNumber: string | null;
@@ -109,16 +150,7 @@ export const prescriptionService = {
     const existing = await prescriptionRepository.findDraftForEncounter(encounterId, actor.id);
     if (existing !== null) return existing;
 
-    const now = new Date();
-    const prefix = `RX/${financialYear(now)}/`;
-    const seq = (await prescriptionRepository.countForFinancialYear(prefix)) + 1;
-
-    const created = await prescriptionRepository.create({
-      patientId: encounter.patientId,
-      encounterId,
-      rxNumber: `${prefix}${String(seq).padStart(6, '0')}`,
-      authorUserId: actor.id,
-    });
+    const created = await createWithNextRxNumber(encounter.patientId, encounterId, actor.id);
 
     auditService.log({
       action: AuditAction.PrescriptionCreated,

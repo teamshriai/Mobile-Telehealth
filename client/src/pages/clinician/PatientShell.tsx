@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import { useClinicalPatient } from '../../components/clinical/useClinicalPatient'
 import BreakGlassGate from '../../components/clinical/BreakGlassGate'
+import DeniedPanel from '../../components/clinical/DeniedPanel'
 import { ErrorState, LoadingState, Skeleton } from '../../components/feedback/States'
 import type { PatientOutletContext } from './usePatientRoute'
 
@@ -48,14 +49,10 @@ export default function PatientShell() {
   }
 
   if (state.status === 'denied') {
-    // The uniform refusal. Deliberately says nothing about whether this
-    // patient exists — see §3.2 on the enumeration oracle.
-    return (
-      <ErrorState
-        title="This record is not available to you"
-        description="You do not have access to this record, or it does not exist. If you believe you should have access, ask the patient's consultant to add you to the care team."
-      />
-    )
+    // C-36, not an ErrorState: the atlas wants what is missing, who grants it
+    // and a request action. The uniform refusal deliberately says nothing about
+    // whether this patient exists — see §3.2 on the enumeration oracle.
+    return <DeniedPanel />
   }
 
   if (state.status === 'error') {

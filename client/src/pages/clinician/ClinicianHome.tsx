@@ -205,7 +205,9 @@ export default function ClinicianHome() {
           the context a consultant actually asks for. Below xl it falls under
           the worklist rather than squeezing it, because the worklist is the
           job and the rail is the context. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      {/* 20rem is the atlas's Z6 width (§5.2, 320px). The rail was 19rem and
+          the calendar was measurably cramped inside it. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="min-w-0 space-y-4">
 
       {/* ── Z5 · needs attention, pinned at the top ──────────────────────── */}
@@ -367,20 +369,31 @@ export default function ClinicianHome() {
       </div>
 
       {/* ── Z6 · context rail ─────────────────────────────────────────────── */}
-      <aside aria-label="Clinic context" className="space-y-4">
-        <div className="rounded-xl border border-border-soft bg-surface-1 p-4">
-          <ClinicCalendar
-            load={dashboard.dailyLoad}
-            selected={selectedDay}
-            onSelect={setSelectedDay}
-          />
-          <p className="mt-3 border-t border-border-soft pt-2.5 text-2xs text-ink-muted">
-            {selectedDayLabel}
-          </p>
-        </div>
+      {/* ⚠️ ONE card, two panes, divided by a hairline — not two cards.
+          The calendar and the week chart answer the same question ("what does
+          my clinic look like") from two directions, and stacking them as
+          separate bordered boxes made the rail read as a dashboard of unrelated
+          widgets. One container, one accent family, one region. */}
+      <aside aria-label="Clinic context">
+        {/* Between 768 and 1279 the rail sits under the worklist at full page
+            width, so the two panes go side by side rather than leaving one
+            stretched across 900px. The divider follows the axis. */}
+        <div className="grid grid-cols-1 divide-y divide-border-soft rounded-xl border border-border-soft bg-surface-1 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-1 xl:divide-x-0 xl:divide-y">
+          <div className="p-5">
+            <ClinicCalendar
+              load={dashboard.dailyLoad}
+              selected={selectedDay}
+              onSelect={setSelectedDay}
+            />
+            <p className="mt-4 text-2xs leading-relaxed text-ink-muted">{selectedDayLabel}</p>
+          </div>
 
-        <div className="rounded-xl border border-border-soft bg-surface-1 p-4">
-          <VisitTrend load={dashboard.dailyLoad} />
+          {/* Centred, because side by side the calendar pane is the taller of
+              the two and a chart pinned to the top of a half-empty pane reads
+              as a gap waiting to be filled. */}
+          <div className="flex items-center p-5">
+            <VisitTrend load={dashboard.dailyLoad} />
+          </div>
         </div>
       </aside>
 

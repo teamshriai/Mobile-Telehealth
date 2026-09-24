@@ -114,6 +114,39 @@
   --color-therapy-bg: #EDEAF4;
   --color-therapy-fg: #574B7D;
 
+  /* ── Clinic analytics accent ───────────────────────────────────────────
+     SCOPED TO ONE REGION: the calendar and week chart in `Z6` on My Day.
+     Nothing else may use it. The portal theme is `primary-*` blue and this
+     does not change it.
+
+     ⚠️ It is a SEPARATE family from `success` deliberately. `success-fg` is
+     the desaturated sea-green that means "this went well" on banners and
+     chips across the whole product; brightening that token to suit one chart
+     would repaint every success state in the app.
+
+     ⚠️ TWO STRENGTHS, AND THE DIFFERENCE MATTERS. `-accent` is 3.3:1 on
+     white — ample for a bar or a dot, which are large shapes carrying no
+     text, and below AA for anything with letters in it. Text uses
+     `-accent-strong` (5.0:1 on white, 4.6:1 on `-accent-soft`). Do not use
+     `-accent` for text. */
+  --color-clinic-accent:        #16A34A;
+  --color-clinic-accent-strong: #15803D;
+  --color-clinic-accent-soft:   #DCFCE7;
+
+  /* ── AI ────────────────────────────────────────────────────────────────
+     §5.3's separation rule: brand, clinical semantics and AI are three
+     independent palettes that never borrow from each other. A blue that
+     means "brand" in Z1 and "normal result" in Z5 is an error waiting to
+     happen — and an AI suggestion tinted with the primary blue would read as
+     a product affordance rather than a model output.
+
+     ⚠️ Indigo is reserved for AI and for nothing else, including the `◆`
+     glyph (§5.5, 12px). Contrast of #4F46E5 on white is 7.0:1 — AA for text
+     as well as for marks, so unlike `clinic-accent` this needs no second
+     strength. */
+  --color-ai:      #4F46E5;
+  --color-ai-soft: #EEF0FD;
+
   /* Emergency only. Not a status colour. */
   --color-danger:    #DC2626;
   --color-danger-fg: #B91C1C;
@@ -268,6 +301,15 @@
   --color-critical-bg:#33201C;  --color-critical-fg:#F0A99A;
   --color-info-bg:    #1E2A38;  --color-info-fg:    #9CC0E8;
   --color-therapy-bg: #262238;  --color-therapy-fg: #BCB0E0;
+
+  /* Scoped clinic analytics accent — see the light-mode block. */
+  --color-clinic-accent:        #3FB973;
+  --color-clinic-accent-strong: #7FD9A4;
+  --color-clinic-accent-soft:   #17301F;
+
+  /* AI — the third palette. See the light-mode block. */
+  --color-ai:      #A5A0F5;
+  --color-ai-soft: #22203A;
 
   --color-accent-sky:     #1E2A38;  --color-accent-sky-fg:  #9CC0E8;
   --color-accent-teal:    #1A2B29;  --color-accent-teal-fg: #93C6BC;
@@ -583,4 +625,126 @@ html[data-high-contrast='true']:root.dark {
     display: none;
   }
 
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT
+   ───────────────────────────────────────────────────────────────────────────
+   ⚠️ Deliberately UNLAYERED, and it must stay that way. Every rule below has
+   to beat a Tailwind utility sitting in `@layer utilities`, and unlayered
+   styles outrank layered ones regardless of specificity. Moving this into a
+   layer would silently stop it working.
+
+   The product prints exactly one artefact today — S-06-08's patient
+   instruction sheet — and the Atlas is blunt about why it matters: "A
+   discharge instruction the patient cannot read is not an instruction" (A6).
+   The screen already called `window.print()`; what came out was the clinician
+   application, dark theme and navigation included, on A4.
+
+   A page that wants to print declares its sheet with `data-print-root`.
+   Everything outside it is hidden. A page that declares nothing still prints
+   sensibly — chrome removed, ink on paper — rather than printing blank.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /* Ink on paper. The app's dark theme on a printer is unreadable and wastes
+     most of a cartridge, so the sheet is forced light regardless of the
+     viewer's theme — `color-scheme` alone does not override our own tokens.
+     ⚠️ The shell paints its own background on a wrapper div (AppShell's
+     `min-h-screen bg-bg`), so clearing it on `body` alone leaves the page
+     tinted; `#root` and its descendants have to be cleared too. */
+  html,
+  body,
+  #root,
+  #root > * {
+    background: #fff !important;
+    color: #000 !important;
+    min-height: 0 !important;
+  }
+
+  /* `overflow-x: clip` on body and `overflow-x: hidden` on <main> both truncate
+     a printed document at the viewport width instead of paginating it. */
+  body,
+  main {
+    overflow: visible !important;
+  }
+
+  /* Z1 app bar, Z2 nav, Z6 rail, Z7 sticky bars and the assistant bubble are
+     screen furniture, not document content. */
+  header,
+  nav,
+  aside,
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  /* ⚠️ …but a printed document has its own masthead, and it is a <header>.
+     Hiding every <header> on the page took the patient's name, ID, visit and
+     print date off the sheet — the four things that make a loose piece of paper
+     attributable to a person. Scoped back in by higher specificity. */
+  [data-print-root] header,
+  [data-print-root] nav,
+  [data-print-root] aside {
+    display: revert !important;
+  }
+
+  /* Sticky and fixed elements repeat on every printed page in most engines. */
+  .sticky,
+  .fixed {
+    position: static !important;
+  }
+
+  /* ── The declared sheet ───────────────────────────────────────────────────
+     `visibility` rather than `display`, because a print root is nested several
+     layouts deep and CSS cannot hide an ancestor without hiding its
+     descendants. Hidden ancestors still occupy layout, so the root is lifted
+     to the page origin. */
+  body:has([data-print-root]) * {
+    visibility: hidden;
+  }
+  body:has([data-print-root]) [data-print-root],
+  body:has([data-print-root]) [data-print-root] * {
+    visibility: visible;
+  }
+  body:has([data-print-root]) [data-print-root] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* One instruction is one unit. Splitting a patient's "come back immediately
+     if…" list across a page break is exactly where a reader stops reading. */
+  [data-print-block] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Cards on paper are boxes-within-boxes; the sheet supplies its own rules. */
+  [data-print-root] [class*='shadow'] {
+    box-shadow: none !important;
+  }
+
+  /* A patient handout is not a web page. Printing every href as a URL — the
+     common `a[href]::after` trick — is noise here. */
+  a[href]::after {
+    content: none !important;
+  }
+
+  /* Forced light tokens for anything inside the sheet that still reads them. */
+  [data-print-root] {
+    --color-ink: #000;
+    --color-ink-muted: #333;
+    --color-ink-subtle: #555;
+    --color-bg: #fff;
+    --color-surface-1: #fff;
+    --color-surface-2: #fff;
+    --color-border-soft: #999;
+  }
 }

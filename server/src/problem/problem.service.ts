@@ -1,3 +1,5 @@
+import { ClinicalNoteStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction } from '../services/audit.service';
 import { careRelationshipService } from '../services/careRelationship.service';
@@ -41,6 +43,33 @@ export const problemService = {
         `${code.code} is a category, not a diagnosis. Choose a more specific code beneath it.`,
         400,
       );
+    }
+
+    /**
+     * ⚠️ A PROBLEM CANNOT BE ATTRIBUTED TO A VISIT WHOSE NOTE IS SIGNED.
+     *
+     * `CMP-NABH-10` closes a signed note to editing, and `onsetEncounterId`
+     * writes into that closed record by another route: it says "this diagnosis
+     * was made at that visit", after the visit's account of itself was final.
+     * The screen hides the form, but a form is not a control — this is.
+     *
+     * Scoped to the encounter, not the patient: the problem list is
+     * patient-level and must stay open. Only the attribution is refused, and
+     * the message says where the record is still writable.
+     */
+    if (dto.encounterId !== undefined && dto.encounterId !== null) {
+      const notes = await prisma.clinicalNote.findMany({
+        where: { encounterId: dto.encounterId },
+        select: { status: true },
+      });
+      const closed = notes.length > 0 && notes.every((n) => n.status !== ClinicalNoteStatus.Draft);
+      if (closed) {
+        throw new AppError(
+          "That visit's note has been signed, so a problem can no longer be coded against it. " +
+            'Add an addendum to the note, or code the problem at the next visit.',
+          409,
+        );
+      }
     }
 
     // ⚠️ Dedupe against the ACTIVE list only — the same code may legitimately

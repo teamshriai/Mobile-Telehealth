@@ -661,7 +661,15 @@ export interface PatientInstruction {
   title: string
   body: string
   clinicianWording: string | null
+  /** The language `title` and `body` above are written in — the patient's. */
   language: string
+  /**
+   * ⚠️ A6 — the English counterpart, for the bilingual printed sheet. Null when
+   * `language` is `'en'` (the body already is English) and null when nobody
+   * recorded one, which the printout states rather than papering over.
+   */
+  titleEnglish: string | null
+  bodyEnglish: string | null
   issuedAt: string
   issuedByUserId: string
   issuedByName: string

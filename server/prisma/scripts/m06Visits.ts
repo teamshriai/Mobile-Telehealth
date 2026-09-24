@@ -95,6 +95,15 @@ interface InstructionSpec {
   title: string;
   language: string;
   body: string;
+  /**
+   * ⚠️ A6 — the English counterpart printed alongside. Required here for every
+   * non-English instruction, even though the column is nullable in the schema:
+   * the nullable case exists so a clinician in clinic is never blocked, not so
+   * the seeded demo can skip it. A demo that only ever prints one language does
+   * not demonstrate the requirement the screen exists to satisfy.
+   */
+  titleEnglish?: string;
+  bodyEnglish?: string;
 }
 
 interface VisitSpec {
@@ -214,6 +223,12 @@ const VISITS: VisitSpec[] = [
       language: 'ta',
       body:
         'உங்கள் நுரையீரல் தொற்றுக்கான மருந்தை முழுமையாக எடுத்துக்கொள்ளுங்கள் — நன்றாக உணர்ந்தாலும் நிறுத்த வேண்டாம்.\n\nநிறைய தண்ணீர் குடியுங்கள் மற்றும் ஓய்வு எடுங்கள்.\n\nஉடனடியாக மருத்துவமனைக்கு வரவும்: மூச்சுத் திணறல் அதிகரித்தால், காய்ச்சல் மீண்டும் வந்தால், அல்லது இரத்தம் கக்கினால்.\n\n⚠️ உங்களுக்கு பெனிசிலின் ஒவ்வாமை உள்ளது. எந்த மருத்துவரிடமும் இதை தெரிவிக்கவும்.',
+      titleEnglish: 'Going home after your chest infection',
+      bodyEnglish:
+        'Finish the whole course of medicine for your lung infection — do not stop early even if '
+        + 'you feel better.\n\nDrink plenty of water and rest.\n\nCome to hospital straight away if: '
+        + 'your breathing gets worse, the fever comes back, or you cough up blood.\n\n'
+        + '⚠️ You are allergic to penicillin. Tell every doctor who treats you.',
     }],
   },
   {
@@ -322,6 +337,14 @@ const VISITS: VisitSpec[] = [
       language: 'kn',
       body:
         'ನಿಮ್ಮ ಥೈರಾಯ್ಡ್ ಮಾತ್ರೆಯನ್ನು ಪ್ರತಿದಿನ ಬೆಳಿಗ್ಗೆ ಖಾಲಿ ಹೊಟ್ಟೆಯಲ್ಲಿ ತೆಗೆದುಕೊಳ್ಳಿ.\n\nಮಾತ್ರೆ ತೆಗೆದುಕೊಂಡ ನಂತರ ಕನಿಷ್ಠ 30 ನಿಮಿಷ ಏನನ್ನೂ ತಿನ್ನಬೇಡಿ ಅಥವಾ ಕುಡಿಯಬೇಡಿ — ನೀರು ಹೊರತುಪಡಿಸಿ.\n\nಕಬ್ಬಿಣದ ಮಾತ್ರೆ ಅಥವಾ ಕ್ಯಾಲ್ಸಿಯಂ ಜೊತೆಗೆ ತೆಗೆದುಕೊಳ್ಳಬೇಡಿ. ಕನಿಷ್ಠ ನಾಲ್ಕು ಗಂಟೆಗಳ ಅಂತರವಿರಲಿ.\n\nಪ್ರತಿ ಆರು ತಿಂಗಳಿಗೊಮ್ಮೆ ರಕ್ತ ಪರೀಕ್ಷೆ ಮಾಡಿಸಿಕೊಳ್ಳಿ.',
+      // ⚠️ UI_ATLAS S-06-08 names this exact pair as the screen's sample data:
+      // "SD-P-01 — thyroid medication timing, in Kannada and English".
+      titleEnglish: 'How to take your thyroid medicine',
+      bodyEnglish:
+        'Take your thyroid tablet every morning on an empty stomach.\n\nAfter taking the tablet, '
+        + 'do not eat or drink anything for at least 30 minutes — water is fine.\n\nDo not take it '
+        + 'with iron tablets or calcium. Leave a gap of at least four hours.\n\nHave a blood test '
+        + 'every six months.',
     }],
   },
   {
@@ -437,6 +460,12 @@ const VISITS: VisitSpec[] = [
       language: 'hi',
       body:
         'अपनी आयरन की गोली रोज़ लें, खाने के साथ नहीं। संतरे का रस या नींबू पानी के साथ लेने से यह बेहतर काम करती है।\n\nबच्चे की हलचल पर ध्यान दें। हर दिन जैसी सामान्य हलचल होती है, वैसी ही होनी चाहिए।\n\nतुरंत अस्पताल आएं यदि: बच्चे की हलचल कम हो जाए, खून आए, पानी जाए, तेज़ सिरदर्द हो, या धुंधला दिखाई दे।',
+      titleEnglish: 'Your pregnancy — what to watch for',
+      bodyEnglish:
+        'Take your iron tablet every day, not with food. It works better with orange juice or '
+        + 'lemon water.\n\nPay attention to the baby’s movements. They should feel the same each '
+        + 'day as they usually do.\n\nCome to hospital straight away if: the baby moves less, you '
+        + 'bleed, your waters break, you get a bad headache, or your vision becomes blurred.',
     }],
   },
 
@@ -724,7 +753,7 @@ export async function seedM06Visits(
   const drugByName = new Map(drugs.map((d) => [d.genericName, d]));
 
   let rxSeq = await prisma.prescription.count();
-  const made = { visits: 0, notes: 0, problems: 0, rx: 0, instructions: 0 };
+  const made = { visits: 0, notes: 0, problems: 0, rx: 0, instructions: 0, instructionsBackfilled: 0 };
 
   for (const visit of VISITS) {
     const patientId = visit.patient.startsWith('email:')
@@ -916,9 +945,30 @@ export async function seedM06Visits(
     for (const spec of visit.instructions ?? []) {
       const instrExists = await prisma.patientInstruction.findFirst({
         where: { encounterId: encounter.id, title: spec.title },
-        select: { id: true },
+        select: { id: true, bodyEnglish: true },
       });
-      if (instrExists !== null) continue;
+      if (instrExists !== null) {
+        // ⚠️ BACKFILL, not skip. The English counterpart columns were added
+        // after these rows were first seeded, so a plain existence check would
+        // leave every demo database permanently one-language — the seed would
+        // report success while the screen it feeds could not demonstrate the
+        // bilingual requirement it exists for.
+        //
+        // Only ever fills a gap: a row that already has an English body is left
+        // exactly as it is, so this cannot overwrite an instruction someone
+        // issued through the UI.
+        if (instrExists.bodyEnglish === null && spec.bodyEnglish !== undefined) {
+          await prisma.patientInstruction.update({
+            where: { id: instrExists.id },
+            data: {
+              titleEnglish: spec.titleEnglish ?? null,
+              bodyEnglish: encryptField(spec.bodyEnglish),
+            },
+          });
+          made.instructionsBackfilled += 1;
+        }
+        continue;
+      }
 
       await prisma.patientInstruction.create({
         data: {
@@ -927,6 +977,8 @@ export async function seedM06Visits(
           title: spec.title,
           body: encryptField(spec.body),
           language: spec.language,
+          titleEnglish: spec.titleEnglish ?? null,
+          bodyEnglish: spec.bodyEnglish === undefined ? null : encryptField(spec.bodyEnglish),
           issuedAt: new Date(startedAt.getTime() + 40 * 60_000),
           issuedByUserId: consultant,
           issuedByName: 'Dr. Ananya Iyer',
@@ -939,6 +991,9 @@ export async function seedM06Visits(
   console.log(
     `✓ visits: +${made.visits} encounters, each carrying its own content — ` +
       `+${made.notes} notes, +${made.problems} problems, +${made.rx} prescriptions, ` +
-      `+${made.instructions} instructions`,
+      `+${made.instructions} instructions` +
+      (made.instructionsBackfilled > 0
+        ? ` (+${made.instructionsBackfilled} given their English counterpart)`
+        : ''),
   );
 }

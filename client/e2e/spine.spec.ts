@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { DOCTOR, login, watchConsole, expectNoHorizontalOverflow, navigateTo } from './helpers'
+import { test, expect } from './fixtures'
+import { openAuthed, watchConsole, expectNoHorizontalOverflow, navigateTo } from './helpers'
 
 /**
  * The W-06-1 spine, walked end to end at the ward-tablet breakpoint (1024 —
@@ -17,7 +17,7 @@ import { DOCTOR, login, watchConsole, expectNoHorizontalOverflow, navigateTo } f
 test('W-06-1 spine is walkable', async ({ page }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1024, height: 768 })
-  await login(page, DOCTOR, watcher)
+  await openAuthed(page, undefined, watcher)
 
   // ── My Day ──
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -47,7 +47,7 @@ test('W-06-1 spine is walkable', async ({ page }) => {
 
   // ── Timeline, via ARC-02's standing escape to the unsummarised record ──
   await page.getByRole('tab', { name: /summary/i }).click()
-  await page.getByRole('link', { name: /open full timeline/i }).click()
+  await page.getByRole('button', { name: /view full record/i }).click()
   await expect(page.getByRole('heading', { name: /clinical timeline/i })).toBeVisible({
     timeout: 20_000,
   })

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Pill, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { AlertTriangle, Pill, Plus, ShieldCheck, ShoppingBasket, Trash2, X } from 'lucide-react'
 import { useEncounter } from './useEncounterRoute'
 import { useAuth } from '../../app/useAuth'
+import { useMediaQuery } from '../../app/useMediaQuery'
 import { useToast } from '../../components/common/useToast'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
@@ -63,6 +65,41 @@ export default function PrescriptionWriter() {
   const seenStops = useRef<Set<string>>(new Set())
 
   const canSignRx = can('rx:sign:own')
+  // ⚠️ `rx:override:hard-stop` is a DIFFERENT capability from prescribing, and
+  // it is withheld from residents. Rendering the override path to someone who
+  // does not hold it meant the refusal arrived only after a second consultant
+  // had walked over and typed their password — the worst possible moment to
+  // discover a permission, and one that teaches people the safety control is
+  // flaky rather than deliberate.
+  const canOverride = can('rx:override:hard-stop')
+
+  /**
+   * The Atlas's `md` band. Expressed in `matchMedia` rather than Tailwind
+   * because the two branches are not "render both, hide one": a drawer and an
+   * in-flow pane would put the basket in the accessibility tree twice, and
+   * every item would carry two Remove buttons with the same accessible name.
+   */
+  const drawerBand = useMediaQuery('(min-width: 1024px) and (max-width: 1279px)')
+  const [basketOpen, setBasketOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // `/` focuses search (§6836). Skipped while already typing, and while a
+  // modal is open — stealing focus out of the hard-stop dialog would defeat its
+  // focus trap on the one screen where the trap is the point.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/') return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return
+      if (document.querySelector('[role="alertdialog"], [role="dialog"]') !== null) return
+      e.preventDefault()
+      setBasketOpen(false)
+      searchRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const applySafety = useCallback((next: SafetyEvaluation) => {
     setSafety(next)
@@ -130,7 +167,10 @@ export default function PrescriptionWriter() {
   const signed = rx.status !== 'Draft'
 
   return (
-    <div className="space-y-4">
+    // ⚠️ The extra bottom padding in the drawer band is not cosmetic: the basket
+    // trigger is fixed to the bottom of the viewport, and without it the trigger
+    // covers the Sign button once the page is scrolled to the end.
+    <div className={`space-y-4 ${drawerBand ? 'pb-20' : ''}`}>
       <AllergyStrip allergens={safety.documentedAllergens} raw={patient.knownAllergies} />
 
       {signed ? (
@@ -158,19 +198,56 @@ export default function PrescriptionWriter() {
         )
       )}
 
-      {/* Two panes at md and up — the atlas's ARC-07 basket. Below that they
-          stack, search first, because on a phone you cannot see both and the
-          basket is worthless until something is in it. */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        {!signed && <AddItemPane rxId={rx.id} onAdded={afterMutation} />}
-        <BasketPane
-          rx={rx}
-          safety={safety}
-          signed={signed}
-          onRemove={removeItem}
-          onReviewStop={setActiveStop}
-        />
+      {/*
+        ⚠️ THREE LAYOUTS, one per Atlas band (§6834):
+          ≥1280        two panes side by side
+          1024–1279    the basket becomes a `Z8` drawer with a count badge
+          <1024        sequential — search first, then the basket below
+
+        The middle band is the one that matters. The Atlas calls 1024–1279 "a
+        workstation-on-wheels at the bedside… a tablet held by someone wearing
+        gloves", and before this it rendered byte-identically to a 375px phone:
+        the basket sat below the fold, so a prescriber typing into search had no
+        sight of what they had already added. On a screen whose job is to stop a
+        duplicate or a collision, losing the basket is the failure mode.
+      */}
+      <div
+        className={
+          drawerBand
+            ? 'grid grid-cols-1 gap-4'
+            : 'grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]'
+        }
+      >
+        {!signed && <AddItemPane rxId={rx.id} onAdded={afterMutation} searchRef={searchRef} />}
+        {!drawerBand && (
+          <BasketPane
+            rx={rx}
+            safety={safety}
+            signed={signed}
+            onRemove={removeItem}
+            onReviewStop={setActiveStop}
+          />
+        )}
       </div>
+
+      {drawerBand && (
+        <BasketDrawer
+          open={basketOpen}
+          onOpen={() => setBasketOpen(true)}
+          onClose={() => setBasketOpen(false)}
+          count={rx.items.length}
+          blocked={safety.hardStops.length}
+        >
+          <BasketPane
+            rx={rx}
+            safety={safety}
+            signed={signed}
+            onRemove={removeItem}
+            onReviewStop={setActiveStop}
+            bare
+          />
+        </BasketDrawer>
+      )}
 
       {!signed && (
         <Card padding="md">
@@ -203,6 +280,7 @@ export default function PrescriptionWriter() {
           stop={activeStop}
           prescriptionId={rx.id}
           documentedAllergens={safety.documentedAllergens}
+          canOverride={canOverride}
           onRemoveItem={async () => { await removeItem(activeStop.itemId); setActiveStop(null) }}
           onOverridden={(nextSafety) => { setSafety(nextSafety); setActiveStop(null) }}
         />
@@ -267,10 +345,11 @@ function AllergyStrip({ allergens, raw }: { allergens: string[]; raw: string | n
 /* ── Add-item pane ───────────────────────────────────────────────────────── */
 
 function AddItemPane({
-  rxId, onAdded,
+  rxId, onAdded, searchRef,
 }: {
   rxId: string
   onAdded: (res: { prescription: Prescription; safety: SafetyEvaluation }) => void
+  searchRef: React.RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState('')
   const [drugs, setDrugs] = useState<Drug[]>([])
@@ -342,8 +421,22 @@ function AddItemPane({
     <Card padding="md">
       <h2 className="mb-3 text-sm font-semibold text-ink">Add a medicine</h2>
 
+      {/*
+        ⚠️ `Enter` ADDS TO THE BASKET, AND NEVER SUBMITS IT (§6836). Those are
+        two different acts and the Atlas separates them deliberately: adding is
+        reversible, signing is not. This <form> is what makes Enter add — and
+        the basket is not inside it and has no form of its own, so there is no
+        keystroke anywhere on this screen that can sign a prescription.
+        Signing goes through the button and its confirm dialog, always.
+
+        Enter while the formulary list is open still selects the highlighted
+        drug: `Combobox` calls preventDefault in that case, so submission
+        cannot fire on the same keystroke that chooses the medicine.
+      */}
+      <form onSubmit={(e) => { e.preventDefault(); void add() }}>
       <Combobox<Drug>
         label="Medicine"
+        inputRef={searchRef}
         value={query}
         onValueChange={(v) => { setQuery(v); setDrug(null); setError('') }}
         options={drugs}
@@ -421,10 +514,16 @@ function AddItemPane({
       {error !== '' && <div className="mt-3"><Banner tone="error">{error}</Banner></div>}
 
       <div className="mt-3">
-        <Button onClick={() => void add()} loading={busy} disabled={drug === null} icon={<Plus size={14} />}>
+        <Button type="submit" loading={busy} disabled={drug === null} icon={<Plus size={14} />}>
           Add to prescription
         </Button>
+        <p className="mt-1.5 text-2xs text-ink-subtle">
+          <kbd className="rounded border border-border-soft bg-surface-2 px-1 font-mono">/</kbd>{' '}
+          focuses search · <kbd className="rounded border border-border-soft bg-surface-2 px-1 font-mono">Enter</kbd>{' '}
+          adds to the prescription
+        </p>
       </div>
+      </form>
 
       {drug !== null && drug.allergenClass !== null && (
         <p className="mt-2 text-2xs text-ink-subtle">
@@ -452,34 +551,147 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
   )
 }
 
+/* ── Z8 basket drawer (1024–1279) ────────────────────────────────────────── */
+
+/**
+ * The basket as an overlay, for the band where two panes will not fit but the
+ * basket must not disappear.
+ *
+ * ⚠️ THE COUNT BADGE IS THE POINT. A drawer that hides the basket without
+ * saying what is in it is strictly worse than the stacked layout it replaces:
+ * at least a pane below the fold can be scrolled to. The trigger therefore
+ * always states the item count, and states separately when something in there
+ * is blocked — because "3 items" and "3 items, one of which collides with a
+ * documented allergy" are different facts and the second one is the urgent one.
+ *
+ * ⚠️ Deliberately NOT a focus trap, and dismissible with Escape. It is a
+ * convenience surface holding information the prescriber already has a right
+ * to. The one overlay on this screen that traps focus and refuses Escape is
+ * `HardStopDialog`, and that distinction is the whole reason the trap there
+ * carries weight.
+ */
+function BasketDrawer({
+  open, onOpen, onClose, count, blocked, children,
+}: {
+  open: boolean
+  onOpen: () => void
+  onClose: () => void
+  count: number
+  blocked: number
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    if (!open) return undefined
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  const label =
+    count === 0
+      ? 'Prescription — empty'
+      : `Prescription — ${count} item${count === 1 ? '' : 's'}${
+          blocked > 0 ? `, ${blocked} blocked` : ''
+        }`
+
+  return (
+    <>
+      {/* The trigger sits above the assistant bubble's corner, not over it. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-expanded={open}
+        aria-label={label}
+        className="focus-ring fixed bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-border-soft bg-surface-1 px-4 py-3 text-sm font-medium text-ink shadow-card-lg"
+      >
+        <ShoppingBasket size={16} aria-hidden="true" />
+        Prescription
+        <span
+          className={`inline-flex min-w-6 justify-center rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums ${
+            blocked > 0 ? 'bg-critical-fg text-white' : 'bg-primary-600 text-white'
+          }`}
+        >
+          {count}
+        </span>
+        {/* Text, never the red pill alone (§5.3). */}
+        {blocked > 0 && <span className="text-2xs font-semibold text-critical-fg">blocked</span>}
+      </button>
+
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <button
+              type="button"
+              aria-label="Close the prescription basket"
+              onClick={onClose}
+              className="absolute inset-0 bg-black/30"
+            />
+            <aside
+              role="dialog"
+              aria-label="Prescription basket"
+              className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border-soft bg-surface-1 shadow-2xl"
+            >
+              <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-border-soft bg-surface-1 px-4 py-3">
+                <h2 className="text-sm font-semibold text-ink">{label}</h2>
+                <button
+                  type="button" onClick={onClose}
+                  className="focus-ring tap-target rounded-lg text-ink-muted hover:bg-surface-2"
+                >
+                  <X size={18} aria-hidden="true" />
+                  <span className="sr-only">Close</span>
+                </button>
+              </div>
+              <div className="p-4">{children}</div>
+            </aside>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
 /* ── Basket ──────────────────────────────────────────────────────────────── */
 
 function BasketPane({
-  rx, safety, signed, onRemove, onReviewStop,
+  rx, safety, signed, onRemove, onReviewStop, bare = false,
 }: {
   rx: Prescription
   safety: SafetyEvaluation
   signed: boolean
   onRemove: (itemId: string) => void
   onReviewStop: (stop: HardStop) => void
+  /** Inside the `Z8` drawer, which supplies its own heading and padding. */
+  bare?: boolean
 }) {
   const stopFor = (itemId: string) => safety.hardStops.find((h) => h.itemId === itemId) ?? null
   const doseFor = (itemId: string) => safety.doseWarnings.find((d) => d.itemId === itemId) ?? null
 
+  const Frame = bare
+    ? ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+    : ({ children }: { children: React.ReactNode }) => <Card padding="md">{children}</Card>
+
   return (
-    <Card padding="md">
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink">
-          Prescription {rx.items.length > 0 && `(${rx.items.length})`}
-        </h2>
-        <span className="font-mono text-2xs text-ink-muted">{rx.rxNumber}</span>
-      </div>
+    <Frame>
+      {!bare && (
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ink">
+            Prescription {rx.items.length > 0 && `(${rx.items.length})`}
+          </h2>
+          <span className="font-mono text-2xs text-ink-muted">{rx.rxNumber}</span>
+        </div>
+      )}
+      {bare && <p className="mb-3 font-mono text-2xs text-ink-muted">{rx.rxNumber}</p>}
 
       {rx.items.length === 0 ? (
         <EmptyState
           icon={Pill}
           title="Nothing prescribed yet"
-          description="Search the formulary on the left and add a medicine. Safety checks run as soon as the first item is added."
+          // ⚠️ Not "on the left". The search pane is only to the left at ≥1280;
+          // it is behind this drawer at 1024–1279 and above it below that, so a
+          // directional instruction is wrong on two of the three layouts.
+          description="Search the formulary and add a medicine. Safety checks run as soon as the first item is added."
         />
       ) : (
         <ul className="space-y-2">
@@ -546,6 +758,6 @@ function BasketPane({
           })}
         </ul>
       )}
-    </Card>
+    </Frame>
   )
 }

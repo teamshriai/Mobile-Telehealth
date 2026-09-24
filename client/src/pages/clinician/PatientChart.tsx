@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Activity, ClipboardList, FileText, FlaskConical, Folder, Pill, Stethoscope,
+  Activity, ClipboardList, FileText, FlaskConical, Folder, Pill, ReceiptText, Stethoscope,
 } from 'lucide-react'
 import { usePatient } from './usePatientRoute'
+import { useAuth } from '../../app/useAuth'
+import { useMediaQuery } from '../../app/useMediaQuery'
+import PatientContextRail from '../../components/clinical/PatientContextRail'
+import ChartAiPanel from '../../ai/components/ChartAiPanel'
 import Tabs from '../../components/common/Tabs'
+import BottomSheet from '../../components/common/BottomSheet'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import DataTable, { type Column } from '../../components/common/DataTable'
-import { Banner, EmptyState, ErrorState, LoadingState } from '../../components/feedback/States'
+import { EmptyState, ErrorState, Skeleton } from '../../components/feedback/States'
 import { formatDate, formatTime } from '../../components/clinic/format'
 import * as problemService from '../../services/problem.service'
 import * as clinicalNoteService from '../../services/clinicalNote.service'
 import * as clinicalPatientService from '../../services/clinicalPatient.service'
 import { useToast } from '../../components/common/useToast'
-import { classifyAllergies, formatBloodGroup } from '../../components/clinical/patientDisplay'
+import { formatBloodGroup, patientFullName } from '../../components/clinical/patientDisplay'
 import {
   encounterStatusLabel,
   noteStatusLabel,
@@ -22,8 +27,14 @@ import {
   problemStatusLabel,
 } from '../../components/clinical/clinicalLabels'
 import { encounterTypeLabel } from '../../components/clinical/encounterLabels'
-import type { ClinicalNote, PrescriptionStatus, Problem, ProblemStatus } from '../../types/domain'
-import type { EncounterListItem } from '../../services/clinicalPatient.service'
+import type {
+  ClinicalNote,
+  ClinicalPatient,
+  PrescriptionStatus,
+  Problem,
+  ProblemStatus,
+} from '../../types/domain'
+import type { EncounterPage } from '../../services/clinicalPatient.service'
 import type { ApiError } from '../../types/api'
 
 /**
@@ -33,37 +44,99 @@ import type { ApiError } from '../../types/api'
  * shape it:
  *
  *  1. **A summary must be visibly a summary.** ARC-02 requires a standing
- *     escape to the unsummarised record, so "Open full timeline" is a
- *     permanent control, not a link buried in a tab.
- *  2. **Nothing here is generated.** Every panel is a direct read of a stored
- *     row. With AI off there is no narrative summary and the screen does not
- *     pretend there is one (§4.8 — the affordance is absent, not greyed).
+ *     escape to the unsummarised record, so "View full record" is a permanent
+ *     `Z4` control — enabled always, never gated, never hidden when AI is off.
+ *  2. **Nothing in `Z5` is generated.** Every tab panel is a direct read of a
+ *     stored row. The only generated content on this screen is in `Z6`, is
+ *     marked with `◆`, carries its confidence band, and links back to the
+ *     unsummarised record. With AI off it disappears entirely (§4.8 — the
+ *     affordance is absent, not greyed) and the screen is unchanged otherwise.
  *
- * Tabs are the atlas's six, in its order. `1`–`9` jump between them; the
- * active tab is in the query string so a chart can be linked or refreshed
+ * Tabs are the atlas's seven, in its order (§6437). `1`–`9` jump between them;
+ * the active tab is in the query string so a chart can be linked or refreshed
  * without losing the clinician's place.
+ *
+ * ⚠️ `Z6` IS NEVER DROPPED, ONLY RELOCATED — three behaviours, per §6474 and
+ * §5.1: drawn as a rail at ≥1280, a tab at 768–1279, a bottom sheet below 768.
+ * Its content is the one thing a clinician re-checks constantly, so it stays
+ * one gesture away at every width rather than being hidden on the narrow ones.
+ *
+ * ⚠️ Where the two sections disagree, the screen line wins. §5.1's generic
+ * table makes `Z6` a bottom sheet from `md` (1024) down; §6474 says it collapses
+ * to a tab at 1024–1279. §5.2 — "a screen specification describes only the
+ * zones it changes" — makes the screen spec the deviation that governs.
+ *
+ * **States.** §1.5 permits a screen to declare a state `n/a` "but only with a
+ * reason", so the two that are:
+ *
+ *   `VALIDATION` — n/a. This screen commits nothing. The only input is the
+ *     assistant's question box, where an empty question simply does not submit;
+ *     there is no field whose value could be invalid and no primary action to
+ *     hold disabled.
+ *   `LOCKED`     — n/a. The chart is a read-only projection of records that are
+ *     locked, or not, on the screens that own them. A lock here would be
+ *     reporting someone else's state and could disagree with it.
+ *
+ * Every other state is reachable: `SAVING` on Start consultation, `STALE` on
+ * the freshness stamp, `OFFLINE` from the shell's `C-37` strip, `PARTIAL` from
+ * the rail, `DENIED`/`BREAKGLASS` from `PatientShell`, and the three AI states
+ * from the demo switcher in the account menu.
  */
 
-type TabId = 'summary' | 'problems' | 'medications' | 'results' | 'notes' | 'documents'
+type TabId =
+  | 'summary'
+  | 'problems'
+  | 'medications'
+  | 'results'
+  | 'notes'
+  | 'documents'
+  | 'billing'
+  /** ⚠️ Not an atlas tab — the `Z6` rail, reachable below 1280. See above. */
+  | 'context'
 
-const TABS: Array<{ id: TabId; label: string }> = [
+const ATLAS_TABS: Array<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Summary' },
   { id: 'problems', label: 'Problems' },
   { id: 'medications', label: 'Medications' },
   { id: 'results', label: 'Results' },
   { id: 'notes', label: 'Notes' },
   { id: 'documents', label: 'Documents' },
+  { id: 'billing', label: 'Billing' },
 ]
 
+const CONTEXT_TAB = { id: 'context' as const, label: 'Context' }
+
 function isTabId(v: string | null): v is TabId {
-  return TABS.some((t) => t.id === v)
+  return v === 'context' || ATLAS_TABS.some((t) => t.id === v)
 }
 
 export default function PatientChart() {
-  const { patient } = usePatient()
+  const { patient, reload } = usePatient()
+  const navigate = useNavigate()
+  const { can } = useAuth()
   const [params, setParams] = useSearchParams()
   const raw = params.get('tab')
   const tab: TabId = isTabId(raw) ? raw : 'summary'
+
+  /**
+   * ⚠️ `xl` (1280px) is the rail's breakpoint, matching §6474's "≥1280 as
+   * drawn". Read once through `matchMedia` and kept in sync by its change
+   * event — not a `resize` listener, which fires on every pixel of a drag.
+   */
+  const wide = useMediaQuery('(min-width: 1280px)')
+  /**
+   * ⚠️ THREE BEHAVIOURS, NOT TWO (§6474 + §5.1):
+   *   ≥1280      the rail is drawn
+   *   768–1279   it collapses to a tab
+   *   <768       it is a bottom sheet
+   * A tab at phone width would sit in a horizontally scrolling strip past six
+   * others, which is not "one gesture away" for the one thing on this screen a
+   * clinician re-checks constantly.
+   */
+  const phone = useMediaQuery('(max-width: 767px)')
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  const railHref = `/patient/${patient.shriPatientId}/timeline`
 
   const setTab = useCallback(
     (id: string) => {
@@ -76,40 +149,275 @@ export default function PatientChart() {
     [setParams],
   )
 
+  // The Context tab exists only in the 768–1279 band. Above it the rail is
+  // drawn, below it the sheet takes over — and the same content must never be
+  // reachable two ways at once.
+  const tabs = wide || phone ? ATLAS_TABS : [...ATLAS_TABS, CONTEXT_TAB]
+
+  // If the viewport leaves that band while the Context tab is open, the tab
+  // disappears. Fall back to Summary rather than rendering nothing.
+  useEffect(() => {
+    if ((wide || phone) && tab === 'context') setTab('summary')
+  }, [wide, phone, tab, setTab])
+
+  /**
+   * §6476 — "`Esc` returns to the caller". Browser history is the honest
+   * definition of "the caller": the clinician came from My Day, a search, or
+   * the timeline, and only history knows which.
+   *
+   * ⚠️ CAPTURE PHASE, AND THAT IS LOAD-BEARING. `Esc` must close the topmost
+   * overlay and nothing else — so this has to know whether one is open. Every
+   * other dismisser in the app (`useDismissable`, `Drawer`, `Modal`) listens on
+   * `document` in the bubble phase, which runs BEFORE a bubble-phase listener
+   * on `window`. Registered that way, this handler saw a DOM from which the
+   * menu had already been closed and navigated the clinician off the chart on
+   * the same keypress that was only meant to shut a popover. Capture runs
+   * first, while the overlay is still mounted, so the guard below is reliable
+   * rather than a race.
+   *
+   * ⚠️ Also ignored while a text field has focus: `Esc` in a search box means
+   * "clear this", never "leave the patient".
+   */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const overlay = document.querySelector(
+        '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
+      )
+      if (overlay !== null) return
+      const el = document.activeElement
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return
+      navigate(-1)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [navigate])
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-            Patient chart
-          </h1>
-          <p className="mt-0.5 text-xs text-ink-muted">
-            A summary of the record. Everything shown here is stored data, not a generated
-            narrative.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* ARC-02's standing escape hatch — a summary must always offer the
-              unsummarised record, on every tab. */}
-          <Link
-            to={`/patient/${patient.shriPatientId}/timeline`}
-            className="focus-ring inline-flex h-9 items-center rounded-lg border border-border-soft bg-surface-1 px-3 text-sm font-medium text-ink hover:bg-surface-2"
-          >
-            Open full timeline
-          </Link>
-          <StartConsultationButton shriPatientId={patient.shriPatientId} />
+      {/* ── Z4 · breadcrumb, title, status chips, actions ─────────────────── */}
+      <div className="space-y-2">
+        <ChartBreadcrumb name={patientFullName(patient)} />
+
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+              Patient chart
+            </h1>
+            <ChartStatusChips />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* ⚠️ §6446 — "View full record", enabled ALWAYS. Not gated on a
+                capability and not hidden when AI is off: it is the escape hatch
+                behind every summary in the product, and §6485 is explicit that
+                "a summary nobody can go behind is not trusted". */}
+            <Button variant="secondary" size="sm" onClick={() => navigate(railHref)}>
+              View full record
+            </Button>
+            {/* §6443 — primary, needs note.write + relationship. The server is
+                the real gate; hiding it here just avoids offering an action
+                that would be refused. */}
+            {can('note:write:assigned') && (
+              <StartConsultationButton shriPatientId={patient.shriPatientId} />
+            )}
+          </div>
         </div>
       </div>
 
-      <Tabs label="Chart sections" activeId={tab} onChange={setTab} tabs={TABS}>
-        {tab === 'summary' && <SummaryTab />}
-        {tab === 'problems' && <ProblemsTab />}
-        {tab === 'medications' && <MedicationsTab />}
-        {tab === 'results' && <ResultsTab />}
-        {tab === 'notes' && <NotesTab />}
-        {tab === 'documents' && <DocumentsTab />}
-      </Tabs>
+      <StaleStamp onRefresh={reload} />
+
+      {/* ≥1280: Z5 + Z6 as drawn. Below: one column, rail as a tab. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          <Tabs label="Chart sections" activeId={tab} onChange={setTab} tabs={tabs}>
+            {tab === 'summary' && <SummaryTab />}
+            {tab === 'problems' && <ProblemsTab />}
+            {tab === 'medications' && <MedicationsTab />}
+            {tab === 'results' && <ResultsTab />}
+            {tab === 'notes' && <NotesTab />}
+            {tab === 'documents' && <DocumentsTab />}
+            {tab === 'billing' && <BillingTab />}
+            {tab === 'context' && (
+              <ContextRegion patient={patient} timelineHref={railHref} inRail={false} />
+            )}
+          </Tabs>
+        </div>
+
+        {wide && <ContextRegion patient={patient} timelineHref={railHref} inRail />}
+      </div>
+
+      {/* <768 · Z6 as a bottom sheet, with a persistent trigger. */}
+      {phone && (
+        <>
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            className="focus-ring fixed inset-x-4 bottom-4 z-30 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border-soft bg-surface-1 px-4 text-sm font-medium text-ink shadow-card-lg"
+          >
+            Patient context
+          </button>
+          {/* Clears the fixed trigger so the last card is never behind it. */}
+          <div aria-hidden="true" className="h-16" />
+          <BottomSheet
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            title="Patient context"
+          >
+            <ContextRegion patient={patient} timelineHref={railHref} inRail={false} />
+          </BottomSheet>
+        </>
+      )}
     </div>
+  )
+}
+
+/**
+ * `Z6` — the context rail and the AI panel, as one region.
+ *
+ * ⚠️ ONE CARD, NOT A STACK. The same treatment as My Day's `Z6`: separate
+ * bordered boxes per section make a rail read as a dashboard of unrelated
+ * widgets, which is exactly what a clinician re-checking an allergy does not
+ * need. Hairline dividers, one container.
+ *
+ * Rendered in two places — the rail at ≥1280 and the Context tab below it — so
+ * the content is defined once and cannot drift between the two.
+ */
+function ContextRegion({
+  patient,
+  timelineHref,
+  inRail,
+}: {
+  patient: ClinicalPatient
+  timelineHref: string
+  inRail: boolean
+}) {
+  return (
+    <aside
+      aria-label="Patient context"
+      className={inRail ? '' : 'mx-auto w-full max-w-2xl'}
+    >
+      <div className="overflow-hidden rounded-xl border border-border-soft bg-surface-1">
+        <PatientContextRail patient={patient} />
+        <ChartAiPanel patientName={patientFullName(patient)} timelineHref={timelineHref} />
+      </div>
+    </aside>
+  )
+}
+
+/**
+ * `Z4` breadcrumb.
+ *
+ * ⚠️ It is a `<nav>` with an accessible name, not a row of chevrons. The
+ * breadcrumb's job on a clinical screen is to answer "how did I get into this
+ * patient's record" — which matters when the answer is "from a search" and the
+ * clinician needs to be sure they opened the right person.
+ */
+function ChartBreadcrumb({ name }: { name: string }) {
+  return (
+    <nav aria-label="Breadcrumb">
+      <ol className="flex flex-wrap items-center gap-1 text-2xs text-ink-subtle">
+        <li>
+          <Link
+            to="/clinician"
+            className="focus-ring rounded underline-offset-2 hover:text-ink hover:underline"
+          >
+            My Day
+          </Link>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li>
+          <Link
+            to="/clinician/patients"
+            className="focus-ring rounded underline-offset-2 hover:text-ink hover:underline"
+          >
+            Patients
+          </Link>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li className="font-medium text-ink-muted" aria-current="page">
+          {name}
+        </li>
+      </ol>
+    </nav>
+  )
+}
+
+/**
+ * `Z4` status chips.
+ *
+ * ⚠️ The chips state what kind of record this is, not how the patient is. A
+ * clinical status chip in `Z4` would compete with `Z3`'s allergy flag, which is
+ * the one thing on this screen that must win the eye (§6485).
+ */
+function ChartStatusChips() {
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-ink-muted">
+      <span>Read-only summary</span>
+      <span aria-hidden="true">·</span>
+      <span>Stored data, not a generated narrative</span>
+    </div>
+  )
+}
+
+/**
+ * `STALE` — "Data as of HH:MM · Refresh" (§6468).
+ *
+ * ⚠️ IT GOES AMBER, AND THAT IS THE WHOLE POINT. A timestamp that always looks
+ * the same is decoration; the atlas asks for the moment it stops being
+ * trustworthy to be visible. A chart open on a ward computer for two hours
+ * while another clinician prescribes is the case this exists for.
+ *
+ * The threshold is deliberately generous. A chart is a reference document, not
+ * a monitor — going amber after five minutes would cry wolf and teach people to
+ * ignore the colour.
+ */
+const STALE_AFTER_MS = 10 * 60 * 1000
+
+function StaleStamp({ onRefresh }: { onRefresh: () => void }) {
+  const [loadedAt, setLoadedAt] = useState(() => new Date())
+  const [now, setNow] = useState(() => new Date())
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    // One minute is fine: the threshold is ten, so a minute of lag on the
+    // colour change costs nothing and this costs almost nothing to run.
+    const t = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const stale = now.getTime() - loadedAt.getTime() > STALE_AFTER_MS
+
+  async function refresh() {
+    setBusy(true)
+    try {
+      onRefresh()
+      setLoadedAt(new Date())
+      setNow(new Date())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <p
+      className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs ${
+        stale ? 'text-warning-fg' : 'text-ink-subtle'
+      }`}
+    >
+      <span>
+        Data as of {formatTime(loadedAt)}
+        {stale && ' — this may have changed'}
+      </span>
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={busy}
+        className="focus-ring rounded font-medium underline underline-offset-2 disabled:opacity-60"
+      >
+        {busy ? 'Refreshing…' : 'Refresh'}
+      </button>
+    </p>
   )
 }
 
@@ -144,38 +452,42 @@ function StartConsultationButton({ shriPatientId }: { shriPatientId: string }) {
 
 function SummaryTab() {
   const { patient } = usePatient()
-  const allergy = classifyAllergies(patient.knownAllergies)
 
+  /**
+   * ⚠️ NO ALLERGY CARD HERE, DELIBERATELY. The allergy is already rendered
+   * twice on this screen by design: `Z3` carries it as text on every
+   * patient-scoped screen (§6485 — "unmissable in `Z3` as text, not an icon
+   * alone"), and `Z6` carries it as the first thing in the context rail. A
+   * third copy in `Z5` made the same sentence appear three times above the
+   * fold, which does not make it more unmissable — it makes the screen look
+   * like it is shouting and pushes the actual record below the fold.
+   *
+   * Nothing is lost at any width: `Z3` is always visible, and below 1280 the
+   * rail is one tap away on the Context tab.
+   */
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-      {/* Allergies first and largest. This is the one panel whose absence is
-          itself clinically meaningful, so it never collapses to "—". */}
-      <Card padding="md" className="lg:col-span-2 2xl:col-span-1">
-        <PanelHeading icon={Activity} title="Allergies" />
-        {/* Three states, not two — see patientDisplay.ts. The classification is
-            shared with the Z3 banner so the two can never disagree about
-            whether this patient has an allergy. */}
-        {allergy.kind === 'unrecorded' ? (
-          <Banner tone="warning">
-            <span className="font-medium">Allergies not recorded.</span> This is not the same as
-            &ldquo;no known allergies&rdquo; — nobody has asked yet. Ask before prescribing.
-          </Banner>
-        ) : allergy.kind === 'none' ? (
-          <p className="text-sm text-ink">
-            {patient.knownAllergies}.{' '}
-            <span className="text-ink-subtle">Recorded, not assumed.</span>
-          </p>
-        ) : (
-          <Banner tone="error">
-            <span className="whitespace-pre-line font-medium">{allergy.text}</span>
-          </Banner>
-        )}
+    // ⚠️ `items-start`. Grid items stretch to the row height by default, which
+    // made the short cards grow tall columns of nothing next to the long one —
+    // the single biggest source of dead space on this screen.
+    <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+      {/* ⚠️ ONE CARD FOR THE WHOLE BACKGROUND, not four. Two of these fields
+          are empty for most patients, and a card whose entire content is "Not
+          recorded." is a box drawn around nothing. As rows, an unrecorded
+          field costs one muted line and the recorded ones read as a list a
+          clinician can scan in one pass. */}
+      <Card padding="md">
+        <PanelHeading icon={Stethoscope} title="Clinical background" />
+        <dl className="divide-y divide-border-soft">
+          <FreeTextRow label="Known conditions" body={patient.existingDiseases} />
+          <FreeTextRow label="Current medications" body={patient.currentMedications} />
+          <FreeTextRow label="Past surgery" body={patient.previousSurgeries} />
+          <FreeTextRow label="Family history" body={patient.familyHistory} />
+        </dl>
+        <p className="mt-3 text-2xs text-ink-subtle">
+          As recorded by the patient. Coded problems are on the Problems tab and prescriptions
+          issued here are on the Medications tab.
+        </p>
       </Card>
-
-      <FreeTextPanel icon={Stethoscope} title="Known conditions" body={patient.existingDiseases} />
-      <FreeTextPanel icon={Pill} title="Current medications" body={patient.currentMedications} />
-      <FreeTextPanel icon={ClipboardList} title="Past surgery" body={patient.previousSurgeries} />
-      <FreeTextPanel icon={ClipboardList} title="Family history" body={patient.familyHistory} />
 
       <Card padding="md">
         <PanelHeading icon={ClipboardList} title="Social and lifestyle" />
@@ -222,6 +534,49 @@ function SummaryTab() {
   )
 }
 
+/**
+ * `C-45` — a skeleton matching the loaded geometry (§6460).
+ *
+ * ⚠️ A SPINNER IS NOT A SKELETON, and the difference is not cosmetic. A spinner
+ * says "something is happening"; a skeleton says "a table of about this shape
+ * is arriving here", so the layout does not jump when it does and the clinician
+ * can already aim at where the first row will be. Every tab on this screen
+ * loads a table, so one component covers all of them.
+ *
+ * `role="status"` with the label in an `sr-only` span: a screen-reader user
+ * gets the words, a sighted user gets the shape, and neither gets both.
+ */
+function TableSkeleton({ rows = 4, label }: { rows?: number; label: string }) {
+  return (
+    <div role="status" aria-live="polite" className="space-y-2">
+      <span className="sr-only">{label}</span>
+      <Skeleton className="h-8 w-full" />
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A free-text record field as a row.
+ *
+ * ⚠️ "Not recorded." in words, never an em-dash and never blank. On a clinical
+ * record the difference between "the patient has no family history" and "nobody
+ * asked" is the whole of the information, and a dash reads as the former.
+ */
+function FreeTextRow({ label, body }: { label: string; body: string | null }) {
+  const empty = body === null || body.trim() === ''
+  return (
+    <div className="py-2 first:pt-0 last:pb-0">
+      <dt className="text-2xs font-medium uppercase tracking-wide text-ink-subtle">{label}</dt>
+      <dd className={`mt-0.5 whitespace-pre-line text-sm ${empty ? 'text-ink-subtle' : 'text-ink'}`}>
+        {empty ? 'Not recorded.' : body}
+      </dd>
+    </div>
+  )
+}
+
 function PanelHeading({
   icon: Icon,
   title,
@@ -234,27 +589,6 @@ function PanelHeading({
       <Icon size={15} aria-hidden="true" className="text-ink-muted" />
       {title}
     </h2>
-  )
-}
-
-function FreeTextPanel({
-  icon,
-  title,
-  body,
-}: {
-  icon: typeof Activity
-  title: string
-  body: string | null
-}) {
-  return (
-    <Card padding="md">
-      <PanelHeading icon={icon} title={title} />
-      {body === null || body.trim() === '' ? (
-        <p className="text-sm text-ink-subtle">Not recorded.</p>
-      ) : (
-        <p className="whitespace-pre-line text-sm text-ink">{body}</p>
-      )}
-    </Card>
   )
 }
 
@@ -324,7 +658,7 @@ function ProblemsTab() {
   if (error !== null) {
     return <ErrorState title="Could not load the problem list" description={error} onRetry={load} />
   }
-  if (problems === null) return <LoadingState label="Loading problems…" />
+  if (problems === null) return <TableSkeleton label="Loading problems…" />
 
   const active = problems.filter((p) => p.status === 'Active')
   const inactive = problems.filter((p) => p.status !== 'Active')
@@ -431,7 +765,7 @@ function PrescriptionHistory() {
   if (error !== null) {
     return <ErrorState title="Could not load prescriptions" description={error} onRetry={load} />
   }
-  if (rows === null) return <LoadingState label="Loading prescriptions…" />
+  if (rows === null) return <TableSkeleton rows={3} label="Loading prescriptions…" />
 
   return (
     <section>
@@ -502,6 +836,44 @@ function ResultsTab() {
   )
 }
 
+/* ── Billing ─────────────────────────────────────────────────────────────── */
+
+/**
+ * §6437 lists Billing as the seventh tab. Billing itself is M-19/M-21, outside
+ * this module.
+ *
+ * ⚠️ AN ENABLED TAB STATING A BOUNDARY, NOT A DISABLED ONE. `Tabs` supports
+ * `disabled` + `disabledReason`, and using it here would be worse: a greyed tab
+ * advertises a feature and invites the question "when do I get it?", while the
+ * clinician still cannot find out what it would have shown. The same reasoning
+ * §4.8 applies to AI affordances applies to module boundaries — and the Results
+ * tab beside it already sets this precedent.
+ *
+ * ⚠️ It says explicitly that nothing is being asserted about the patient's
+ * account. An empty billing panel that looked like data would read as "nothing
+ * owing", which is a financial statement this system is in no position to make.
+ */
+function BillingTab() {
+  return (
+    <div className="rounded-xl border border-dashed border-border-soft p-6">
+      <div className="flex items-start gap-3">
+        <ReceiptText size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-ink-muted" />
+        <div>
+          <h2 className="text-sm font-semibold text-ink">Billing is a separate module</h2>
+          <p className="mt-1 max-w-prose text-sm text-ink-muted">
+            Charges, payer cover and settlement (modules M-19 and M-21) are not part of this
+            release. Nothing is shown here rather than an empty ledger — an empty ledger would
+            say this patient owes nothing, which this system cannot tell you.
+          </p>
+          <p className="mt-1.5 text-xs text-ink-subtle">
+            Check the billing system for this patient&rsquo;s account.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Notes ───────────────────────────────────────────────────────────────── */
 
 function NotesTab() {
@@ -519,7 +891,7 @@ function NotesTab() {
   if (error !== null) {
     return <ErrorState title="Could not load notes" description={error} onRetry={load} />
   }
-  if (notes === null) return <LoadingState label="Loading notes…" />
+  if (notes === null) return <TableSkeleton label="Loading notes…" />
 
   return (
     <DataTable
@@ -540,8 +912,18 @@ function NotesTab() {
           header: 'Reason',
           card: 'title',
           render: (r) => (
-            <span className="font-medium text-ink">
-              {r.problemText ?? r.assessment?.slice(0, 80) ?? 'Consultation note'}
+            <span className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="font-medium text-ink">
+                {r.problemText ?? r.assessment?.slice(0, 80) ?? 'Consultation note'}
+              </span>
+              {/* ⚠️ A row that cannot be opened must SAY so. This one swallowed
+                  the click and did nothing, which reads as a broken table
+                  rather than as a note with no visit attached. The coherence
+                  gate makes this unreachable in seeded data; it is here so the
+                  failure is legible if that ever stops being true. */}
+              {r.encounterVisitId === null && (
+                <span className="text-2xs text-ink-subtle">· not linked to a visit</span>
+              )}
             </span>
           ),
         },
@@ -605,19 +987,22 @@ export function NoteStatusChip({ note }: { note: ClinicalNote }) {
 function DocumentsTab() {
   const { patient } = usePatient()
   const navigate = useNavigate()
-  const [rows, setRows] = useState<EncounterListItem[] | null>(null)
+  const [page, setPage] = useState<EncounterPage | null>(null)
   const [error, setError] = useState<ApiError | null>(null)
 
   const load = useCallback(() => {
     setError(null)
-    clinicalPatientService.listEncountersForPatient(patient.shriPatientId).then(setRows).catch(setError)
+    clinicalPatientService.listEncountersForPatient(patient.shriPatientId).then(setPage).catch(setError)
   }, [patient.shriPatientId])
   useEffect(load, [load])
 
   if (error !== null) {
     return <ErrorState title="Could not load encounters" description={error} onRetry={load} />
   }
-  if (rows === null) return <LoadingState label="Loading encounters…" />
+  if (page === null) return <TableSkeleton rows={5} label="Loading encounters…" />
+
+  const rows = page.results
+  const truncated = page.total > rows.length
 
   return (
     <div className="space-y-3">
@@ -625,6 +1010,13 @@ function DocumentsTab() {
         Scanned and uploaded documents (module M-16) are not in this release. What follows is the
         encounter record held in this system.
       </p>
+      {/* ⚠️ Said out loud, never silent. A visit list that stops without
+          saying so reads as a complete history. */}
+      {truncated && (
+        <p className="text-xs text-warning-fg">
+          Showing the {rows.length} most recent of {page.total} visits.
+        </p>
+      )}
       <DataTable
         caption="Encounters"
         rows={rows}

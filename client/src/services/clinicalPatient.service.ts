@@ -89,13 +89,31 @@ export interface EncounterListItem {
   createdAt: string
 }
 
+export interface EncounterPage {
+  results: EncounterListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/**
+ * ⚠️ RETURNS THE PAGE, NOT JUST THE ROWS. This previously discarded `total`,
+ * `page` and `pageSize` and handed back `results` alone — so a patient with
+ * more encounters than one page showed a silently truncated visit history with
+ * nothing on screen to say so. On a clinical record, a list that quietly stops
+ * is worse than one that refuses to load: the clinician has no cue to go
+ * looking for the rest.
+ *
+ * The server caps `pageSize` at 50 (`encounter.validator.ts`), so callers ask
+ * for the cap and state the truncation when `total` exceeds what they hold.
+ */
 export async function listEncountersForPatient(
   shriPatientId: string,
-): Promise<EncounterListItem[]> {
-  const res = await apiClient.get<{ results: EncounterListItem[] }>(
-    `/patients/${shriPatientId}/encounters`,
+  pageSize = 50,
+): Promise<EncounterPage> {
+  return apiClient.get<EncounterPage>(
+    `/patients/${shriPatientId}/encounters?pageSize=${pageSize}`,
   )
-  return res.results
 }
 
 export interface EncounterWorkspace {

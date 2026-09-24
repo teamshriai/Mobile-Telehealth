@@ -47,6 +47,53 @@ export function watchConsole(page: Page): ConsoleWatcher {
   return { errors, reset: () => { errors.length = 0 } }
 }
 
+/**
+ * Open the app on an already-authenticated session and wait for it to settle.
+ *
+ * This replaces `login()` in every spec. The session comes from the
+ * `storageState` minted by `auth.setup.ts`, so there is no form to fill and no
+ * `/auth/login` round-trip — but note that the **page load itself still costs
+ * one `/auth/refresh`**, because the access token lives in page memory and
+ * `AuthContext` re-mints it on every boot. Loads are the budget; logins are not.
+ *
+ * ⚠️ It asserts we did not land on `/login`. A rate-limited or revoked session
+ * fails by *redirecting*, not by throwing, and without this assertion the next
+ * line would fail on a missing selector and read as a broken screen rather than
+ * a broken session.
+ *
+ * `path` defaults to the clinician home. Pass a deep link to save a navigation
+ * where a spec needs one — every avoided load is one back in the budget.
+ */
+export async function openAuthed(
+  page: Page,
+  path = '/clinician',
+  watcher?: ConsoleWatcher,
+): Promise<void> {
+  await page.goto(path)
+
+  // The guard renders a full-page loader while the boot refresh resolves, so
+  // wait for real content rather than for the URL.
+  await page.getByRole('heading', { level: 1 }).first().waitFor({ state: 'visible', timeout: 30_000 })
+
+  expect(
+    page.url(),
+    'landed on /login — the saved session was rejected. Either DEMO_CLINIC_PASSWORD is wrong, ' +
+      'the refresh budget is exhausted (60 per 15 min per IP), or a stale state file replayed ' +
+      'a revoked token. See e2e/fixtures.ts.',
+  ).not.toMatch(/\/login/)
+
+  // Everything from here on is asserted on. See watchConsole.
+  watcher?.reset()
+}
+
+/**
+ * Sign in through the form.
+ *
+ * ⚠️ Kept for the two specs that are ABOUT authentication — the logout test
+ * needs a session it is allowed to destroy, and destroying a `storageState`
+ * session would poison the file for every later test. Everything else uses
+ * `openAuthed`.
+ */
 export async function login(page: Page, email: string, watcher?: ConsoleWatcher): Promise<void> {
   await page.goto('/login')
   await page.getByLabel(/email/i).first().fill(email)

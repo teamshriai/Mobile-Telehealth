@@ -14,7 +14,7 @@
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts src/prescription/__tests__/*.test.ts src/clinicalNote/__tests__/*.test.ts src/services/__tests__/*.test.ts",
+    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts src/prescription/__tests__/*.test.ts src/clinicalNote/__tests__/*.test.ts src/services/__tests__/*.test.ts src/config/__tests__/*.test.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",

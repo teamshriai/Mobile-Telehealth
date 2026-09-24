@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test'
-import { SECOND_CONSULTANT, login, watchConsole } from './helpers'
+import { test, expect } from './fixtures'
+import { openAuthed, watchConsole } from './helpers'
 
 /**
  * DD-014 · emergency access.
@@ -22,12 +22,17 @@ import { SECOND_CONSULTANT, login, watchConsole } from './helpers'
 // silently exercising an ordinary authorized read.
 const NOT_HIS_PATIENT = 'SHRI-TCHT81-S'
 
+// ⚠️ Dr Desai, who has no care relationship with this patient — that is the
+// whole premise. Running it as the default consultant would silently exercise
+// an ordinary authorized read.
+test.use({ demoUser: 'desai' })
+
 test('a clinician with no care relationship is offered emergency access, not refused', async ({ page }) => {
   const watcher = watchConsole(page)
   await page.setViewportSize({ width: 1440, height: 900 })
-  await login(page, SECOND_CONSULTANT, watcher)
-
-  await page.goto(`/patient/${NOT_HIS_PATIENT}/chart`)
+  // Deep-linked: one page load, not two. The break-glass gate renders instead
+  // of the chart, so there is nothing to click through to get here.
+  await openAuthed(page, `/patient/${NOT_HIS_PATIENT}/chart`, watcher)
 
   // ── The gate, instead of the chart ──
   await expect(
@@ -79,7 +84,7 @@ test('a clinician with no care relationship is offered emergency access, not ref
   await page.screenshot({ path: 'e2e/screenshots/break-glass/03-granted.png', fullPage: true })
 
   // It survives a navigation — it is tied to the grant, not to the screen.
-  await page.getByRole('link', { name: /open full timeline/i }).click()
+  await page.getByRole('button', { name: /view full record/i }).click()
   await expect(page.getByTestId('break-glass-banner')).toBeVisible({ timeout: 20_000 })
   await page.screenshot({ path: 'e2e/screenshots/break-glass/04-banner-persists.png', fullPage: true })
 

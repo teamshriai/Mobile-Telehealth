@@ -38,10 +38,19 @@ interface HardStopDialogProps {
   documentedAllergens: string[]
   onRemoveItem: () => void | Promise<void>
   onOverridden: (safety: SafetyEvaluation) => void
+  /**
+   * ⚠️ `rx:override:hard-stop`, which is a DIFFERENT capability from
+   * prescribing and is withheld from residents. Offering the override path to
+   * someone who cannot take it meant the 403 arrived only after a second
+   * consultant had come over and typed their password — which teaches people
+   * that the safety control is unreliable rather than deliberate, and burns
+   * the goodwill you need the next time it fires for real.
+   */
+  canOverride: boolean
 }
 
 export default function HardStopDialog({
-  stop, prescriptionId, documentedAllergens, onRemoveItem, onOverridden,
+  stop, prescriptionId, documentedAllergens, onRemoveItem, onOverridden, canOverride,
 }: HardStopDialogProps) {
   const [mode, setMode] = useState<'choose' | 'override'>('choose')
   const [removing, setRemoving] = useState(false)
@@ -99,7 +108,14 @@ export default function HardStopDialog({
         aria-modal="true"
         aria-labelledby={headingId}
         tabIndex={-1}
-        className="focus-ring flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-2xl border border-critical-fg/40 bg-surface-0 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+        // ⚠️ `bg-surface-1`, and it must stay a real surface token. This read
+        // `bg-surface-0` until 23-Sep-2026 — and `--color-surface-0` is not
+        // defined anywhere in index.css, which only declares `surface-1` and
+        // `surface-2`. Tailwind emitted nothing, so the panel had NO background:
+        // the one dialog in the product that exists to stop a prescriber was
+        // rendering see-through, with the page text it was blocking legible
+        // straight through the middle of it.
+        className="focus-ring flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-2xl border border-critical-fg/40 bg-surface-1 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
       >
         <div className="flex shrink-0 items-start gap-3 border-b border-border-soft bg-critical-bg p-4">
           <AlertOctagon size={22} aria-hidden="true" className="mt-0.5 shrink-0 text-critical-fg" />
@@ -184,14 +200,24 @@ export default function HardStopDialog({
         </div>
 
         {mode === 'choose' && (
-          <div className="flex shrink-0 flex-col gap-2 border-t border-border-soft bg-surface-0 p-4 sm:flex-row sm:justify-end">
+          <div className="flex shrink-0 flex-col gap-2 border-t border-border-soft bg-surface-1 p-4 sm:flex-row sm:justify-end">
             {/* The safe action is primary and first in the tab order. */}
             <Button onClick={() => void remove()} loading={removing}>
               Remove {stop.drugName}
             </Button>
-            <Button variant="secondary" onClick={() => setMode('override')}>
-              Override with a second consultant
-            </Button>
+            {canOverride ? (
+              <Button variant="secondary" onClick={() => setMode('override')}>
+                Override with a second consultant
+              </Button>
+            ) : (
+              // ⚠️ Says who can, rather than showing a dead control. §4.8's rule
+              // — hidden, not greyed — plus the reason, because a prescriber who
+              // cannot proceed still has to know what the next step is.
+              <p className="self-center text-2xs text-ink-subtle sm:max-w-xs sm:text-right">
+                You do not hold override rights. A consultant who does can record a formal
+                override with a second consultant.
+              </p>
+            )}
           </div>
         )}
       </div>

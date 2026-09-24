@@ -34,6 +34,12 @@ interface ComboboxProps<T> {
   hint?: string
   error?: string
   autoFocus?: boolean
+  /**
+   * Lets a parent focus the field — `S-06-07`'s `/` shortcut, per the atlas's
+   * keyboard row. Optional, and the component keeps its own internal ref
+   * either way, so nothing depends on a caller supplying one.
+   */
+  inputRef?: React.RefObject<HTMLInputElement | null>
   className?: string
 }
 
@@ -51,12 +57,14 @@ export default function Combobox<T>({
   hint,
   error,
   autoFocus = false,
+  inputRef: externalRef,
   className = '',
 }: ComboboxProps<T>) {
   const baseId = useId()
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const ownRef = useRef<HTMLInputElement>(null)
+  const inputRef = externalRef ?? ownRef
   const panelRef = useRef<HTMLDivElement>(null)
 
   const close = useCallback(() => setOpen(false), [])
