@@ -604,7 +604,7 @@ function BasketDrawer({
         onClick={onOpen}
         aria-expanded={open}
         aria-label={label}
-        className="focus-ring fixed bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-border-soft bg-surface-1 px-4 py-3 text-sm font-medium text-ink shadow-card-lg"
+        className="focus-ring safe-inset-b fixed left-4 z-30 flex items-center gap-2 rounded-full border border-border-soft bg-surface-1 px-4 py-3 text-sm font-medium text-ink shadow-card-lg"
       >
         <ShoppingBasket size={16} aria-hidden="true" />
         Prescription

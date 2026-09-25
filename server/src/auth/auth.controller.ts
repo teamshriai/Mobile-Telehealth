@@ -1,11 +1,12 @@
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema, changePasswordSchema, deleteAccountSchema } from './auth.validator';
+import { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema, changePasswordSchema, deleteAccountSchema } from './auth.validator';
 import { authService } from './auth.service';
+import { otpService } from './otp.service';
+import { OtpChannel } from '@prisma/client';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
-import { env } from '../config/env.config';
-import { emailService } from '../services/email.service';
+import { passwordLinkDelivery } from '../services/passwordLinkDelivery';
 import { getRequestMeta } from '../utils/requestMeta';
 import { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie } from '../utils/authCookies';
 
@@ -42,6 +43,107 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
   const dto = loginSchema.parse(req.body);
   const result = await authService.login(dto, getRequestMeta(req));
 
+  setRefreshCookie(res, result.refreshToken);
+
+  res.status(200).json(
+    ApiResponseBuilder.success('Login successful.', {
+      token: result.token,
+      user: result.user,
+    }),
+  );
+});
+
+/**
+ * POST /api/v1/auth/otp/request
+ *
+ * ⚠️ ALWAYS ANSWERS THE SAME WAY. Registered or not, valid or not, this
+ * returns 200 with the same message and the same fields. A mobile number is a
+ * directory key, and "does this number belong to one of your doctors" is not a
+ * question an anonymous caller gets to ask. The only branch is a genuine
+ * cooldown, which is about the requester's own behaviour and leaks nothing
+ * about whose number it is.
+ *
+ * ⚠️ A `challengeId` is issued either way, so the client's second step is
+ * indistinguishable too. Verifying against a challenge with no account behind
+ * it simply fails like a wrong code.
+ */
+export const requestOtp = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = otpRequestSchema.parse(req.body);
+  const result = await otpService.request(
+    dto.channel === 'Sms' ? OtpChannel.Sms : OtpChannel.Email,
+    dto.identifier,
+    getRequestMeta(req),
+  );
+
+  if ('tooSoon' in result) {
+    res.status(429).json(
+      ApiResponseBuilder.error('A code was just sent. Wait before asking for another.', {
+        resendAvailableAt: result.resendAvailableAt.toISOString(),
+      } as never),
+    );
+    return;
+  }
+
+  res.status(200).json(
+    ApiResponseBuilder.success(
+      // ⚠️ IDENTICAL WORDING FOR BOTH CHANNELS AND FOR REGISTERED OR NOT. The
+      // only variable is the noun, which the caller already knows because they
+      // chose it. Saying anything conditional here would rebuild the
+      // enumeration oracle the whole flow is built to avoid.
+      dto.channel === 'Sms'
+        ? 'If an account is registered with this mobile number, a 6-digit code has been sent.'
+        : 'If an account is registered with this email address, a 6-digit code has been sent.',
+      {
+        challengeId: result.challengeId,
+        // ⚠️ The client countdown is driven by THIS, not by a local timer, so
+        // a backgrounded tab or a clock skew cannot make the UI disagree with
+        // the server about whether a code is still live.
+        expiresAt: result.expiresAt.toISOString(),
+        resendAvailableAt: result.resendAvailableAt.toISOString(),
+        channel: result.channel,
+        maskedIdentifier: result.maskedIdentifier,
+      },
+    ),
+  );
+});
+
+/**
+ * POST /api/v1/auth/otp/verify
+ *
+ * On success this is a login: same cookie, same body, same session as
+ * `POST /auth/login`, because both end in `establishSession`.
+ */
+export const verifyOtp = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const dto = otpVerifySchema.parse(req.body);
+  const outcome = await otpService.verify(dto.challengeId, dto.code, getRequestMeta(req));
+
+  if (!outcome.ok) {
+    // ⚠️ Three of these are told apart because all three are ACTIONABLE — the
+    // user needs a new code and deserves to be told which wall they hit.
+    // Naming them leaks nothing: a challengeId is an unguessable UUID that was
+    // handed to this client, so "that challenge is finished" tells a caller
+    // only about a challenge they already hold.
+    //
+    // `invalid` and `no_account` stay collapsed, and that one matters: telling
+    // them apart would confirm whether an account exists behind the number,
+    // which is the enumeration oracle the request endpoint works to avoid.
+    //
+    // This used to leave `consumed` in the generic bucket, so the attempt
+    // AFTER the cap burned the challenge said "that code is not correct" —
+    // sending the user back to re-read a code that could never work again.
+    const message =
+      outcome.reason === 'expired'
+        ? 'That code has expired. Request a new one.'
+        : outcome.reason === 'attempts_exceeded'
+          ? 'Too many incorrect attempts. Request a new code.'
+          : outcome.reason === 'consumed'
+            ? 'That code has already been used. Request a new one.'
+            : 'That code is not correct.';
+    res.status(401).json(ApiResponseBuilder.error(message, { reason: outcome.reason } as never));
+    return;
+  }
+
+  const result = await authService.loginWithVerifiedOtp(outcome.userId, getRequestMeta(req));
   setRefreshCookie(res, result.refreshToken);
 
   res.status(200).json(
@@ -127,24 +229,19 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
 
   const result = await authService.forgotPassword(dto, meta);
 
-  if (result.token) {
-    const resetLink = `${env.CLIENT_URL}/reset-password?token=${result.token}`;
-
-    if (emailService.isConfigured) {
-      // Fire-and-forget: awaiting the SMTP round-trip here would make this
-      // response measurably slower than the "account doesn't exist" branch
-      // above, which is itself a (smaller) enumeration side-channel. Failures
-      // are still logged inside the service — just never surfaced to the
-      // caller, since the public response must stay identical either way.
-      emailService.sendPasswordResetEmail(result.email, resetLink).catch(() => {
-        // sendPasswordResetEmail already catches internally; this is a
-        // last-resort guard so an unexpected rejection can never crash the process.
-      });
-    } else {
-      // Development-only fallback: no EMAIL_* vars configured (required in
-      // production — see env.config.ts). Never logged once real SMTP is set up.
-      console.warn(`[auth] DEV MODE — email not configured. Reset link: ${resetLink}`);
-    }
+  if (result.token !== null && result.expiresAt !== null) {
+    // Fire-and-forget: awaiting the SMTP round-trip here would make this
+    // response measurably slower than the "account doesn't exist" branch
+    // above, which is itself a (smaller) enumeration side-channel.
+    // `passwordLinkDelivery` never throws, and falls back to the development
+    // outbox when the email was not actually sent — not merely when EMAIL_* is
+    // unset, which is what used to lose the link on a bad SMTP password.
+    void passwordLinkDelivery.send({
+      kind: 'password-reset',
+      to: result.email,
+      rawToken: result.token,
+      expiresAt: result.expiresAt,
+    });
   }
 
   res.status(200).json(

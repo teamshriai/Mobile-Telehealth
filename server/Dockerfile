@@ -55,6 +55,14 @@ COPY --from=build /app/dist ./dist
 # it ships in the image so a container can run fully offline and so the
 # model a deployment uses is exactly the one pinned in models/manifest.json.
 COPY models ./models
+# ⚠️ Includes the speech-to-text model when it was fetched before the build
+# (`npm run models:fetch:whisper`, ~240 MB; see models/whisper-manifest.json).
+# With STT_PROVIDER=local the server refuses to start if it is missing.
+
+# ⚠️ Encrypted patient files (voice-note audio) must live on a MOUNTED, backed-up
+# volume, never inside the image — and this container runs as a non-root user
+# that cannot write to /app. Mount a volume and point FILE_STORAGE_DIR at it,
+# e.g.  -v /srv/indostates/storage:/data/storage -e FILE_STORAGE_DIR=/data/storage
 
 # Runs as a non-root user — never run a production Node process as root.
 # Debian's useradd/groupadd, not Alpine's busybox addgroup/adduser.

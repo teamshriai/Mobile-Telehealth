@@ -32,6 +32,21 @@ export const Permission = {
   CareTeamReadOwn: 'careteam:read:own',
   AiInsightsUseOwn: 'ai:use:own',
   FeedbackSubmitOwn: 'feedback:submit:own',
+  // Moving one's own appointment is a different act from cancelling it: it
+  // takes a slot the clinic published, so it is grantable independently.
+  AppointmentRescheduleOwn: 'appointment:reschedule:own',
+  // ⚠️ READ-ONLY windows onto clinician-authored records. The patient sees
+  // what was SIGNED and issued to them — never a draft, never the SOAP body
+  // (see portal.service.ts for exactly what a visit summary exposes). Row
+  // scope is the authenticated user's own PatientProfile, resolved on the
+  // server; no route takes a patient id.
+  RxReadOwn: 'rx:read:own',
+  ProblemReadOwn: 'problem:read:own',
+  InstructionReadOwn: 'instruction:read:own',
+  VisitReadOwn: 'visit:read:own',
+  // Patient-GENERATED notes (voice or typed). Create, edit, delete and
+  // listen back — all on the patient's own notes only.
+  HealthNoteWriteOwn: 'healthnote:write:own',
 
   // ── Clinician access (Phase 6 doctor portal; enforced from today) ───────
   PatientReadAssigned: 'patient:read:assigned',
@@ -116,6 +131,11 @@ export const Permission = {
   // ── Patient instructions (M-06 / S-06-08) ───────────────────────────────
   InstructionsWriteAssigned: 'instructions:write:assigned',
 
+  // ── Patient-reported notes, read by the care team ───────────────────────
+  // ⚠️ Only notes the patient chose to SHARE, only once confirmed, and only
+  // with a care relationship. A private note is unreadable by every role.
+  HealthNoteReadAssigned: 'healthnote:read:assigned',
+
   // ── Templates & order sets (M-06 / S-06-10) ─────────────────────────────
   // Promoting a personal template to facility-wide is a GOVERNANCE act, not a
   // convenience, so it is a different capability held by a different persona.
@@ -140,6 +160,10 @@ export const Permission = {
   HospitalDoctorManage: 'doctor:manage:hospital-scoped',
   HospitalPatientRead: 'patient:read:hospital-scoped',
   HospitalAppointmentRead: 'appointment:read:hospital-scoped',
+  // ⚠️ APPROVING A PATIENT'S REQUEST is the hospital administrator's act,
+  // checked against the doctor's published availability. Patients only ever
+  // REQUEST; a doctor cannot confirm a request either (scheduling.service).
+  HospitalAppointmentManage: 'appointment:manage:hospital-scoped',
   HospitalManageOwn: 'hospital:manage:own',
   FeedbackReadHospitalScoped: 'feedback:read:hospital-scoped',
 } as const;
@@ -157,6 +181,12 @@ const PATIENT_PERMISSIONS: PermissionName[] = [
   Permission.EncounterReadOwn,
   Permission.AiInsightsUseOwn,
   Permission.FeedbackSubmitOwn,
+  Permission.AppointmentRescheduleOwn,
+  Permission.RxReadOwn,
+  Permission.ProblemReadOwn,
+  Permission.InstructionReadOwn,
+  Permission.VisitReadOwn,
+  Permission.HealthNoteWriteOwn,
 ];
 
 const DOCTOR_PERMISSIONS: PermissionName[] = [
@@ -192,6 +222,7 @@ const DOCTOR_PERMISSIONS: PermissionName[] = [
   Permission.RxSignOwn,
   Permission.RxOverrideHardStop,
   Permission.InstructionsWriteAssigned,
+  Permission.HealthNoteReadAssigned,
   Permission.TemplateManageOwn,
   Permission.BreakGlassRequest,
   // Deliberately NOT PatientReadAny: that would let any Doctor read any
@@ -297,6 +328,7 @@ const HOSPITAL_ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.HospitalDoctorManage,
   Permission.HospitalPatientRead,
   Permission.HospitalAppointmentRead,
+  Permission.HospitalAppointmentManage,
   Permission.HospitalManageOwn,
   Permission.FeedbackReadHospitalScoped,
   // Template governance (UI_ATLAS persona P-02, S-06-10). Promoting a

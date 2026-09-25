@@ -66,9 +66,29 @@ const envSchema = z
     ALLOWED_ORIGINS: z.string().min(1, 'ALLOWED_ORIGINS is required'),
 
     // Base URL of the frontend app — used to build links embedded in outbound
-    // communications (e.g. the password reset link). Not a security boundary;
-    // CORS/ALLOWED_ORIGINS remains the source of truth for allowed origins.
-    CLIENT_URL: z.string().url().default('http://localhost:5173'),
+    // communications (the password reset link, and the button in every
+    // notification email). Not a security boundary; CORS/ALLOWED_ORIGINS
+    // remains the source of truth for allowed origins.
+    //
+    // ⚠️ REQUIRED, WITH NO DEFAULT, AND THAT IS DELIBERATE.
+    //
+    // This used to default to `http://localhost:5173` and the default was
+    // wrong twice over. The port was wrong — this client runs on 3000, so the
+    // link was dead even on the developer's own machine. And `localhost` in an
+    // email means *the recipient's* device, so a clinician opening a
+    // password-reset link on their phone got connection-refused from their own
+    // handset. A default that is always wrong is worse than no default,
+    // because it lets the server boot and fail silently later, out of band,
+    // in a message nobody watching the logs will ever see.
+    //
+    // It cannot be derived from the request either: emails are sent
+    // asynchronously and there is no request to derive it from. So it is
+    // configuration, and it fails the boot when absent — exactly as
+    // ALLOWED_ORIGINS above already does.
+    CLIENT_URL: z
+      .string()
+      .url('CLIENT_URL must be a full URL, e.g. http://192.168.1.42:3000 or https://app.example.com')
+      .min(1, 'CLIENT_URL is required — it is the origin used in links inside outbound email'),
 
     // ── Transactional email (SMTP) ──────────────────────────────────────────
     // Required in production so password-reset emails can actually be sent.
@@ -89,6 +109,75 @@ const envSchema = z
     // Required in every environment — encrypted data must round-trip even in
     // dev. Each must decode (base64) to exactly 32 bytes.
     // Generate: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+    // ── Mobile OTP authentication ───────────────────────────────────────────
+    // ⚠️ Configured, never hardcoded at the call sites. Both of these are
+    // security parameters someone will want to tune under incident conditions
+    // without a code change.
+    //
+    // 300s (5 min) is the default because it is long enough to survive a slow
+    // SMS route and a user fetching their phone from another room, and short
+    // enough that a code glimpsed on a lock screen is not still live an hour
+    // later. 5 attempts against a 6-digit space leaves a 1-in-200,000 chance
+    // per challenge, and the challenge dies at the cap rather than throttling.
+    OTP_TTL_SECONDS: numericEnv('300', { min: 60, max: 900 }),
+    OTP_MAX_ATTEMPTS: numericEnv('5', { min: 3, max: 10 }),
+    /// Seconds before a resend is allowed. Enforced SERVER-side; the client
+    /// countdown is presentation only.
+    OTP_RESEND_COOLDOWN_SECONDS: numericEnv('30', { min: 15, max: 300 }),
+    /**
+     * ⚠️ DEVELOPMENT / DEMO ONLY. When set, every OTP the server issues is
+     * this code instead of a random one — for use while no SMS provider is
+     * contracted.
+     *
+     * It is NOT a bypass, and that distinction is the reason it lives in code
+     * generation rather than verification: the code is still hashed, stored,
+     * expired, attempt-capped and single-use exactly like a random one, so any
+     * other six digits fail, and an expired or used challenge fails even with
+     * this one. Only the value is predictable.
+     *
+     * The server refuses to boot with this set in production (see superRefine
+     * below). To go live: configure SMS_* and delete the line from .env — no
+     * code change.
+     */
+    OTP_DEV_FIXED_CODE: z
+      .string()
+      .regex(/^\d{6}$/, 'OTP_DEV_FIXED_CODE must be exactly six digits.')
+      .optional(),
+
+    // ── Speech-to-text for patient voice health notes ──────────────────────
+    // ⚠️ LOCAL ONLY, BY DECISION. A patient's recorded voice never leaves the
+    // server: `local` runs Whisper in-process on the pinned, SHA-verified
+    // model (npm run models:fetch:whisper). `off` is the default so a fresh
+    // deployment never half-enables voice — the portal then offers typed
+    // notes only, and says why.
+    STT_PROVIDER: z.enum(['local', 'off']).default('off'),
+    /// Longest clip accepted. Enforced on the server from the WAV header.
+    STT_MAX_SECONDS: numericEnv('120', { min: 10, max: 300 }),
+    /// Jobs allowed to WAIT behind the one running; beyond this, 503 "busy".
+    STT_QUEUE_MAX: numericEnv('4', { min: 0, max: 50 }),
+    /// A single transcription is abandoned after this long.
+    STT_TIMEOUT_MS: numericEnv('120000', { min: 5000, max: 600000 }),
+
+    // ── Encrypted file storage (voice-note audio) ──────────────────────────
+    // Outside any web root; created with mode 0700 at first use. Relative
+    // paths resolve from the server's working directory.
+    FILE_STORAGE_DIR: z.string().trim().min(1).default('./storage'),
+
+    // ── SMS delivery ────────────────────────────────────────────────────────
+    // Optional in development (see sms.service.ts for the dev outbox), and
+    // required in production via the superRefine below — the same shape the
+    // EMAIL_* keys already use.
+    SMS_PROVIDER: z.enum(['msg91', 'twilio']).optional(),
+    SMS_API_KEY: z.string().min(8).optional(),
+    SMS_SENDER_ID: z.string().min(3).max(11).optional(),
+    /**
+     * ⚠️ MSG91 / DLT template id. Indian carriers reject transactional SMS
+     * that does not quote a registered template, so without this the provider
+     * accepts the call and nothing arrives. Optional in the schema because
+     * other providers do not use one.
+     */
+    SMS_TEMPLATE_ID: z.string().min(3).optional(),
+
     ENCRYPTION_KEY: z
       .string()
       .refine(
@@ -191,6 +280,18 @@ const envSchema = z
     // send password-reset emails should fail to start, not fail silently later.
     if (val.NODE_ENV !== 'production') return;
 
+    // ⚠️ A predictable OTP in production is an open door to every patient
+    // account whose mobile number is known. Fail the boot, never the login.
+    if (val.OTP_DEV_FIXED_CODE !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['OTP_DEV_FIXED_CODE'],
+        message:
+          'OTP_DEV_FIXED_CODE must not be set when NODE_ENV=production. It makes every OTP '
+          + 'predictable. Remove it from the environment.',
+      });
+    }
+
     (['EMAIL_HOST', 'EMAIL_PORT', 'EMAIL_USER', 'EMAIL_PASSWORD', 'EMAIL_FROM'] as const).forEach(
       (key) => {
         if (val[key] === undefined) {
@@ -202,6 +303,34 @@ const envSchema = z
         }
       },
     );
+
+    // ⚠️ AT LEAST ONE OTP CHANNEL MUST BE FULLY CONFIGURED — not both.
+    //
+    // This used to demand all three SMS_* keys, justified as "a production
+    // server that cannot send an SMS cannot log anybody in". That stopped
+    // being true the moment email became a login channel: a deployment that
+    // delivers codes by email only is now perfectly coherent, and refusing to
+    // boot it would be the config check inventing a requirement the product
+    // does not have.
+    //
+    // What must NOT be allowed is a production server with NEITHER, because
+    // then nobody can sign in at all and every login request 200s with "a code
+    // has been sent" while nothing is ever sent. That failure is silent and
+    // indistinguishable from an unregistered account, which is exactly the
+    // kind of thing that should stop a deploy rather than page someone later.
+    const smsReady = Boolean(val.SMS_PROVIDER && val.SMS_API_KEY && val.SMS_SENDER_ID);
+    const emailReady = Boolean(
+      val.EMAIL_HOST && val.EMAIL_PORT && val.EMAIL_USER && val.EMAIL_PASSWORD && val.EMAIL_FROM,
+    );
+    if (!smsReady && !emailReady) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SMS_PROVIDER'],
+        message:
+          'At least one OTP delivery channel must be configured in production: either the '
+          + 'SMS_* keys or the EMAIL_* keys. Without one, no user can sign in.',
+      });
+    }
   });
 
 /**

@@ -11,7 +11,9 @@ import type {
   CreateAppointmentDto,
   CancelAppointmentDto,
   ListAppointmentsDto,
+  RescheduleAppointmentDto,
 } from './appointment.validator';
+import { canReschedule } from '../scheduling/scheduling';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Appointment Service
@@ -71,6 +73,10 @@ function toResponseShape(a: AppointmentWithDoctor) {
      * and so a client that gets it wrong still cannot cancel a past visit.
      */
     canCancel: isOpen && !isPast,
+    /** Same rule the reschedule endpoint enforces: open and in the future.
+     *  With a named doctor the new time must be one of their free slots;
+     *  without one it is a new preferred time for the hospital to arrange. */
+    canReschedule: isOpen && !isPast,
 
     /**
      * Video appointments have no joining link because no video provider is
@@ -199,11 +205,105 @@ export const appointmentService = {
       userId,
       type: NotificationType.Appointment,
       title: 'Appointment requested',
-      body: `We have received your request for ${formatWhen(created.scheduledAt)}. Your care team will confirm it shortly.`,
+      body: `We have received your request for ${formatWhen(created.scheduledAt)}. The hospital will confirm it once they have checked the doctor's availability.`,
       actionUrl: '/app/appointments',
     });
 
     return toResponseShape(created);
+  },
+
+  /**
+   * The patient moves their own appointment to another PUBLISHED, free slot.
+   *
+   * ⚠️ Only an appointment with a named clinician can move: without one there
+   * is no diary to validate against, and "any time you like" is not a slot.
+   * The new instant must be a slot the clinician published and nobody holds —
+   * `isPublishedSlot`, the same check booking uses — with the partial unique
+   * index as the backstop for a concurrent booking.
+   */
+  async reschedule(
+    userId: string,
+    id: string,
+    dto: RescheduleAppointmentDto,
+    meta: Meta,
+  ): Promise<AppointmentResponse> {
+    const patientId = await requireOwnPatientId(userId);
+    const existing = await appointmentRepository.findByIdForPatient(id, patientId);
+    if (existing === null) {
+      throw new AppError('Appointment not found.', 404);
+    }
+    if (!canReschedule(existing.status)) {
+      throw new AppError(`A ${existing.status.toLowerCase()} appointment cannot be moved.`, 409);
+    }
+    if (existing.scheduledAt.getTime() < Date.now()) {
+      throw new AppError('This appointment has already taken place and cannot be moved.', 409);
+    }
+    const scheduledAt = new Date(dto.scheduledAt);
+    if (scheduledAt.getTime() === existing.scheduledAt.getTime()) {
+      throw new AppError('That is already the time of this appointment.', 400);
+    }
+    // With a named doctor, only one of their published, free slots. Without
+    // one, the new time is a preference the hospital arranges on approval —
+    // the same rule as a "no preference" booking.
+    if (existing.doctorId !== null) {
+      const free = await schedulingService.isPublishedSlot(existing.doctorId, scheduledAt);
+      if (!free) {
+        throw new AppError('That time is not available. Please choose one of the offered slots.', 409);
+      }
+    }
+
+    let count: number;
+    try {
+      count = await appointmentRepository.rescheduleForPatient(id, patientId, scheduledAt);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new AppError('That time was just taken. Please choose another slot.', 409);
+      }
+      throw err;
+    }
+    if (count === 0) {
+      throw new AppError('This appointment can no longer be moved.', 409);
+    }
+
+    auditService.log({
+      action: AuditAction.AppointmentRescheduled,
+      userId,
+      severity: AuditSeverity.Info,
+      resource: 'appointment',
+      resourceId: id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      metadata: {
+        from: existing.scheduledAt.toISOString(),
+        to: scheduledAt.toISOString(),
+        rescheduledBy: 'patient',
+      },
+    });
+
+    notificationService.notify({
+      userId,
+      type: NotificationType.Appointment,
+      title: 'Appointment moved',
+      body: `Your appointment is now requested for ${formatWhen(scheduledAt)}. The hospital will confirm the new time once they have checked the doctor's availability.`,
+      actionUrl: '/app/appointments',
+    });
+
+    // ⚠️ No patient name in the clinician's notification: titles and bodies
+    // are stored in plaintext and may be emailed. The diary shows who.
+    const doctorUserId =
+      existing.doctorId === null ? null : await appointmentRepository.doctorUserId(existing.doctorId);
+    if (doctorUserId !== null) {
+      notificationService.notify({
+        userId: doctorUserId,
+        type: NotificationType.Appointment,
+        title: 'A patient moved their appointment',
+        body: `An appointment was moved from ${formatWhen(existing.scheduledAt)} to ${formatWhen(scheduledAt)} and needs confirming.`,
+        actionUrl: '/clinician',
+      });
+    }
+
+    const updated = await appointmentRepository.findByIdForPatient(id, patientId);
+    return toResponseShape(updated!);
   },
 
   async cancel(

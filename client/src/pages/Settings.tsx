@@ -37,6 +37,8 @@ import type { PatientProfile, PreferencesDto, User as DomainUser } from '../type
 import type { ApiError } from '../types/api'
 import type { AccessibilityKey } from '../app/accessibilityContextObject'
 import type { Theme } from '../app/themeContextObject'
+import IconTile from '../components/common/IconTile'
+import type { IconTone } from '../components/common/iconTones'
 
 /* ── Page animation ── */
 const pageVariants = {
@@ -55,14 +57,14 @@ type SectionId =
    'devices' (Connected Devices / wearables) was removed — there is no real
    integration target for it, and a fake "connected" list is exactly the
    kind of thing this cleanup pass exists to remove. */
-const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
-  { id: 'profile',       label: 'Profile',           icon: User },
-  { id: 'security',      label: 'Security',          icon: Lock },
-  { id: 'notifications', label: 'Notifications',     icon: Bell },
-  { id: 'privacy',       label: 'Privacy',           icon: Shield },
-  { id: 'accessibility', label: 'Accessibility',     icon: Eye },
-  { id: 'language',      label: 'Language & Region', icon: Globe },
-  { id: 'appearance',    label: 'Appearance',        icon: Moon },
+const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon; hue: IconTone }> = [
+  { id: 'profile',       label: 'Profile',           icon: User,   hue: 'blue' },
+  { id: 'security',      label: 'Security',          icon: Lock,   hue: 'green' },
+  { id: 'notifications', label: 'Notifications',     icon: Bell,   hue: 'red' },
+  { id: 'privacy',       label: 'Privacy',           icon: Shield, hue: 'indigo' },
+  { id: 'accessibility', label: 'Accessibility',     icon: Eye,    hue: 'teal' },
+  { id: 'language',      label: 'Language & Region', icon: Globe,  hue: 'orange' },
+  { id: 'appearance',    label: 'Appearance',        icon: Moon,   hue: 'violet' },
 ]
 
 type PreferenceCategory = keyof PreferencesDto
@@ -189,13 +191,13 @@ export default function Settings() {
    SIDEBAR NAV ITEM
 ───────────────────────────────────────────── */
 interface SideNavItemProps {
-  section: { id: SectionId; label: string; icon: LucideIcon }
+  section: { id: SectionId; label: string; icon: LucideIcon; hue: IconTone }
   isActive: boolean
   onClick: () => void
 }
 
 function SideNavItem({ section, isActive, onClick }: SideNavItemProps) {
-  const { label, icon: Icon } = section
+  const { label, icon, hue } = section
   return (
     <button
       type="button"
@@ -211,20 +213,7 @@ function SideNavItem({ section, isActive, onClick }: SideNavItemProps) {
         }
       `}
     >
-      <div
-        className={`
-          w-8 h-8 rounded-lg flex items-center justify-center transition-colors
-          ${isActive
-            ? 'bg-primary-100'
-            : 'bg-surface-2 group-hover:bg-surface-3'
-          }
-        `}
-      >
-        <Icon
-          size={15}
-          className={isActive ? 'text-primary-700' : 'text-ink-subtle'}
-        />
-      </div>
+      <IconTile icon={icon} tone={hue} size="sm" />
       <span className="text-sm font-medium">{label}</span>
       {isActive && (
         <ChevronRight size={13} className="ml-auto text-primary-700" />
@@ -680,7 +669,7 @@ function PrivacySection({ profile, onSave }: PreferenceSectionProps) {
 
       <Card variant="default" padding="lg">
         <p className="text-sm font-bold text-ink mb-1">Data Sharing</p>
-        <SettingsRow icon={Shield} label="Share with Care Team" sub="Allow your physicians to access your data"
+        <SettingsRow icon={Shield} label="Share with my doctors" sub="Allow your physicians to access your data"
           tone="primary"
           control={<ToggleSwitch enabled={settings.dataSharing} onToggle={() => toggle('dataSharing')} />} />
         <SettingsRow icon={Globe} label="Anonymized Research" sub="Contribute anonymized data to stroke care research"

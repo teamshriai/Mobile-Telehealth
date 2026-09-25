@@ -101,6 +101,51 @@ export async function register(formData: RegisterFormData): Promise<{ user: User
   return { user }
 }
 
+/**
+ * Mobile OTP login — stage 1.
+ *
+ * ⚠️ The response is deliberately identical whether or not the number is
+ * registered, and the client must not try to be cleverer than that. Any
+ * branch here on "did it actually send" would rebuild the account-enumeration
+ * oracle the server works to avoid.
+ */
+/** Which way the code was delivered. Chosen by the user, echoed by the server. */
+export type OtpChannel = 'Sms' | 'Email'
+
+export interface OtpChallenge {
+  challengeId: string
+  /** ⚠️ Server-authoritative. The countdown reads this, not a local timer. */
+  expiresAt: string
+  resendAvailableAt: string
+  channel: OtpChannel
+  /**
+   * `••••• •3210` or `a••••@g••••.com` — for display only. The full identifier
+   * is never echoed back, so a shoulder-surfer learns nothing from the screen.
+   */
+  maskedIdentifier: string
+}
+
+export async function requestOtp(args: {
+  channel: OtpChannel
+  identifier: string
+}): Promise<OtpChallenge> {
+  return apiClient.post<OtpChallenge>('/auth/otp/request', args)
+}
+
+/**
+ * Mobile OTP login — stage 2. On success this IS a login: the server sets the
+ * same refresh cookie and returns the same body as password login, so the
+ * caller finishes exactly as `login()` does.
+ */
+export async function verifyOtp(args: {
+  challengeId: string
+  code: string
+}): Promise<{ token: string; user: User }> {
+  const data = await apiClient.post<{ token: string; user: User }>('/auth/otp/verify', args)
+  setAccessToken(data.token)
+  return data
+}
+
 export interface LoginCredentials {
   email: string
   password: string

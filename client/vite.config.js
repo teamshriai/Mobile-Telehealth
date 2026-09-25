@@ -17,6 +17,28 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        /*
+         * ⚠️ CACHING, NOT SIZE. Libraries that change rarely get their own
+         * long-lived chunks, so an ordinary deploy — which changes app code —
+         * does not make every returning patient re-download React, the router
+         * and the animation library. Routes are already split per page by the
+         * `lazy()` imports in App.tsx; this only separates the shared vendor
+         * code underneath them.
+         */
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run)\//.test(id)) return 'vendor-react'
+          if (id.includes('node_modules/framer-motion') || id.includes('node_modules/motion-')) return 'vendor-motion'
+          if (id.includes('node_modules/lucide-react')) return 'vendor-icons'
+          if (id.includes('node_modules/axios')) return 'vendor-http'
+          return undefined
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@':          resolve(__dirname, './src'),
@@ -30,6 +52,27 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    /**
+     * ⚠️ DNS-REBINDING PROTECTION, NOT A CONVENIENCE TOGGLE.
+     *
+     * Vite 5.4.21 refuses any request whose `Host` header it does not
+     * recognise, returning `403 Blocked request` BEFORE application code runs.
+     * Out of the box it accepts IPv4 literals, bracketed IPv6 and
+     * `localhost` — so `http://192.168.1.42:3000` already works and needs
+     * nothing here.
+     *
+     * What it does NOT accept is an mDNS name like `http://ward-tablet.local`,
+     * and the rest of this stack promises that it will: `cors.config.ts`
+     * deliberately allows `*.local`, `cors.config.test.ts` asserts on it, and
+     * `apiClient.ts` names it as a supported case. Three of the four layers
+     * agreed; this was the one that did not.
+     *
+     * ⚠️ `['.local']` is a leading-dot SUFFIX match — never a literal IP, and
+     * never `true`. `allowedHosts: true` disables the check entirely, which is
+     * what the protection exists to prevent: any website you visit could then
+     * point a hostname at this machine and read your dev server's responses.
+     */
+    allowedHosts: ['.local'],
     /**
      * ⚠️ NO `host` HERE, DELIBERATELY. LAN hosting is opt-in per command:
      *

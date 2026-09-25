@@ -129,7 +129,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const apiErr = err as Error & { fieldErrors?: Record<string, string[]> | string[] | null }
         const fieldErrors = apiErr.fieldErrors ?? null
         setError({ message: apiErr.message, fieldErrors })
-        return { success: false, fieldErrors }
+        return { success: false, fieldErrors, message: apiErr.message }
+      } finally {
+        setLoading(false)
+      }
+    },
+    [applySession],
+  )
+
+  /**
+   * Finish an OTP login.
+   *
+   * ⚠️ ENDS IN EXACTLY THE SAME THREE LINES AS `login()` ABOVE, and that is
+   * the whole contract: verify → `getMe()` → `applySession`. Every consumer of
+   * auth state — `can()`, the guards, `homeForRole`, the onboarding hop — is
+   * downstream of `applySession`, so a second code path that populated state
+   * "nearly the same way" would be a slow-burning source of "works when you
+   * log in with a password, not with an OTP" bugs.
+   *
+   * ⚠️ The ROLE COMES FROM THE SERVER, via `getMe()`. The browser never says
+   * who it is; it proves control of a handset and is told what that account is.
+   */
+  const loginWithOtp = useCallback(
+    async (args: { challengeId: string; code: string }): Promise<AuthResult> => {
+      setError(null)
+      setLoading(true)
+      try {
+        await authService.verifyOtp(args)
+        const me = await authService.getMe()
+        applySession(me.user, me.permissions, me.profile)
+        return {
+          success: true,
+          role: me.user?.role,
+          needsOnboarding: !me.profile?.onboardingCompletedAt,
+        }
+      } catch (err) {
+        const apiErr = err as Error & { fieldErrors?: Record<string, string[]> | string[] | null }
+        const fieldErrors = apiErr.fieldErrors ?? null
+        setError({ message: apiErr.message, fieldErrors })
+        return { success: false, fieldErrors, message: apiErr.message }
       } finally {
         setLoading(false)
       }
@@ -154,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const apiErr = err as Error & { fieldErrors?: Record<string, string[]> | string[] | null }
         const fieldErrors = apiErr.fieldErrors ?? null
         setError({ message: apiErr.message, fieldErrors })
-        return { success: false, fieldErrors }
+        return { success: false, fieldErrors, message: apiErr.message }
       } finally {
         setLoading(false)
       }
@@ -204,6 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /** UI gating only — the server re-checks every request. */
       can: (permission: string) => permissions.includes(permission),
       login,
+      loginWithOtp,
       register,
       logout,
       /**
@@ -216,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       reloadUser,
       clearError: () => setError(null),
     }),
-    [user, permissions, profile, status, error, loading, login, register, logout, clearSession, reloadUser],
+    [user, permissions, profile, status, error, loading, login, loginWithOtp, register, logout, clearSession, reloadUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

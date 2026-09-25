@@ -18,6 +18,7 @@ import AppShell from './components/layout/AppShell'
 
 /* ── Public ── */
 const Login          = lazy(() => import('./components/auth/Login'))
+const EntryPage      = lazy(() => import('./components/auth/EntryPage'))
 const Register       = lazy(() => import('./components/auth/Register'))
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword'))
 const ResetPassword  = lazy(() => import('./components/auth/ResetPassword'))
@@ -31,6 +32,11 @@ const AppointmentsPage = lazy(() => import('./pages/patient/AppointmentsPage'))
 const MyHealthPage    = lazy(() => import('./pages/patient/MyHealthPage'))
 const AiInsightsPage  = lazy(() => import('./pages/patient/AiInsightsPage'))
 const CareTeamPage    = lazy(() => import('./pages/patient/CareTeamPage'))
+const MedicinesPage   = lazy(() => import('./pages/patient/MedicinesPage'))
+const VisitDetail     = lazy(() => import('./pages/patient/VisitDetail'))
+const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage'))
+const HealthNotesPage = lazy(() => import('./pages/patient/HealthNotesPage'))
+const ReportsPage     = lazy(() => import('./pages/patient/ReportsPage'))
 const Profile         = lazy(() => import('./pages/Profile'))
 const Settings        = lazy(() => import('./pages/Settings'))
 
@@ -126,15 +132,15 @@ function SessionExpiryBridge() {
 }
 
 /**
- * Resolves "/" by session. With the marketing page gone the root is not a page
- * of its own: a visitor belongs on sign-in, and someone already signed in
- * belongs in their portal rather than being bounced through /login's guard.
+ * Resolves "/" by session. A signed-out visitor meets the entry page — "Who
+ * are you?" — and someone already signed in goes straight to their portal
+ * rather than being bounced through /login's guard.
  */
 function RootRedirect() {
   const { isChecking, isAuthenticated, role, needsOnboarding } = useAuth()
 
-  if (isChecking) return <FullPageLoader label="Loading Stroke AI…" />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (isChecking) return <FullPageLoader label="Loading Indostates Health…" />
+  if (!isAuthenticated) return <EntryPage />
   return <Navigate to={needsOnboarding ? '/onboarding' : homeForRole(role)} replace />
 }
 
@@ -186,10 +192,9 @@ export default function App() {
               <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
                 <Routes>
                   {/* ── Public ──
-                      There is no marketing page in this app, so "/" is not a
-                      destination — it resolves to wherever the visitor
-                      actually belongs. /landing is kept as a redirect only so
-                      existing bookmarks and emailed links do not 404. */}
+                      "/" is the entry page for signed-out visitors and the
+                      portal for everyone else. /landing is kept as a redirect
+                      only so existing bookmarks and emailed links do not 404. */}
                   <Route path="/" element={<RootRedirect />} />
                   <Route path="/landing" element={<Navigate to="/" replace />} />
 
@@ -226,10 +231,16 @@ export default function App() {
                   >
                     <Route index                element={<PatientHome />} />
                     <Route path="appointments"  element={<AppointmentsPage />} />
-                    <Route path="medicines"     element={<MedicinesRoute />} />
+                    <Route path="medicines"     element={<MedicinesPage />} />
                     <Route path="health"        element={<MyHealthPage />} />
+                    <Route path="visits/:visitId" element={<VisitDetail />} />
+                    <Route path="health-notes"  element={<HealthNotesPage />} />
+                    <Route path="reports"       element={<ReportsPage />} />
+                    <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="ai-insights"   element={<AiInsightsPage />} />
-                    <Route path="care-team"     element={<CareTeamPage />} />
+                    <Route path="my-doctors"    element={<CareTeamPage />} />
+                    {/* Renamed from "My Care Team"; old links and notifications still land. */}
+                    <Route path="care-team"     element={<Navigate to="/app/my-doctors" replace />} />
                     <Route path="emergency"     element={<EmergencyPage />} />
                     <Route path="profile"       element={<Profile />} />
                     <Route path="settings"      element={<Settings />} />
@@ -364,11 +375,4 @@ export default function App() {
   )
 }
 
-/* Named wrappers so each lazy module chunk stays separate and the route table
-   above reads as a list of destinations rather than of imports. */
-const Modules = {
-  // Medicines has no backing Medication model — stays an honest placeholder.
-  Medicines: lazy(() => import('./pages/patient/modules').then((m) => ({ default: m.MedicinesPage }))),
-}
 
-function MedicinesRoute() { return <Modules.Medicines /> }

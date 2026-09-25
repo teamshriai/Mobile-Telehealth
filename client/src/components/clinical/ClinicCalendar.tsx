@@ -132,7 +132,7 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
             type="button"
             aria-label="Previous month"
             onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
-            className="focus-ring rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+            className="focus-ring tap-reach rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
           >
             <ChevronLeft size={14} aria-hidden="true" />
           </button>
@@ -140,7 +140,7 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
             type="button"
             aria-label="Next month"
             onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}
-            className="focus-ring rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+            className="focus-ring tap-reach rounded p-1 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
           >
             <ChevronRight size={14} aria-hidden="true" />
           </button>
@@ -192,7 +192,7 @@ export default function ClinicCalendar({ load, selected, onSelect }: ClinicCalen
               // well hid today's disc underneath it on the commonest case of
               // all — today selected — which is the one cell that must stay
               // identifiable.
-              className={`focus-ring flex aspect-square flex-col items-center justify-center gap-1 rounded-md transition-colors hover:bg-surface-2 ${
+              className={`focus-ring tap-reach flex aspect-square flex-col items-center justify-center gap-1 rounded-md transition-colors hover:bg-surface-2 ${
                 isSelected ? 'ring-1 ring-clinic-accent/50' : ''
               }`}
             >

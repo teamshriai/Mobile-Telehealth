@@ -1,16 +1,31 @@
 import type { Page, ConsoleMessage } from '@playwright/test'
 import { expect } from '@playwright/test'
+import { API_ORIGIN } from './apiOrigin'
 
 export const DOCTOR = 'demo.doctor.iyer@stroke-ai.invalid'
 export const SECOND_CONSULTANT = 'demo.doctor.desai@stroke-ai.invalid'
 export const RESIDENT = 'demo.resident.rao@stroke-ai.invalid'
+/** SD-P-01 Meera Krishnan — the patient portal's demo account (§8.2). */
+export const PATIENT = 'demo.patient.krishnan@stroke-ai.invalid'
+/** SD-P-01's Shri ID in the seeded demo database. */
+export const PATIENT_SHRI_ID = 'SHRI-XMVY30-2'
 
 /** Read from the environment so no credential is committed. */
 export const PASSWORD = process.env.DEMO_CLINIC_PASSWORD ?? ''
 
-/** §5.1's breakpoints, including md 1024 — "the breakpoint that matters most". */
+/**
+ * §5.1's breakpoints, including md 1024 — "the breakpoint that matters most".
+ *
+ * ⚠️ The three phone widths are the real handsets people hold, not round
+ * numbers: 375×812 is an iPhone SE/13 mini, 390×844 an iPhone 14/15, and
+ * 412×915 a Pixel. 390 and 412 are where a layout tuned only at 375 starts to
+ * leave awkward gaps, and where a two-column grid is most tempted to appear
+ * one column too early.
+ */
 export const BREAKPOINTS = [
   { name: 'xs-375', width: 375, height: 812 },
+  { name: 'xs-390', width: 390, height: 844 },
+  { name: 'xs-412', width: 412, height: 915 },
   { name: 'sm-768', width: 768, height: 1024 },
   { name: 'md-1024', width: 1024, height: 768 },
   { name: 'xl-1440', width: 1440, height: 900 },
@@ -87,19 +102,37 @@ export async function openAuthed(
 }
 
 /**
- * Sign in through the form.
+ * Give this page its own disposable session.
  *
- * ⚠️ Kept for the two specs that are ABOUT authentication — the logout test
- * needs a session it is allowed to destroy, and destroying a `storageState`
- * session would poison the file for every later test. Everything else uses
- * `openAuthed`.
+ * ⚠️ NO LONGER DRIVES THE LOGIN FORM, because there is no longer a password
+ * form to drive — the sign-in screen is mobile + OTP. It posts to
+ * `/auth/login` through the PAGE'S OWN request context, which shares the
+ * browser's cookie jar, so the refresh cookie lands exactly where a form
+ * login would have put it and the subsequent `goto` boots an authenticated
+ * session.
+ *
+ * ⚠️ Password, because these callers sign in as a DOCTOR and staff sign in
+ * by email + password only — the server never issues a staff account an OTP.
+ * They are about session TRANSPORT (logout revoking server-side, a LAN cookie
+ * surviving a reload), not about how the session was minted;
+ * `e2e/auth-entry.spec.ts` covers the sign-in screens themselves.
+ *
+ * ⚠️ Still its own session, for the original reason: the logout test destroys
+ * what it is given, and destroying a `storageState` session would poison the
+ * file for every later test.
  */
 export async function login(page: Page, email: string, watcher?: ConsoleWatcher): Promise<void> {
-  await page.goto('/login')
-  await page.getByLabel(/email/i).first().fill(email)
-  await page.getByLabel(/password/i).first().fill(PASSWORD)
-  await page.getByRole('button', { name: /sign in|log ?in/i }).first().click()
-  await page.waitForURL(/\/(clinician|app|hospital-admin|admin)/, { timeout: 30_000 })
+  const res = await page.request.post(`${API_ORIGIN}/api/v1/auth/login`, {
+    data: { email, password: PASSWORD },
+  })
+  expect(
+    res.status(),
+    `API login failed for ${email} — check DEMO_CLINIC_PASSWORD and the login rate limit`,
+  ).toBe(200)
+
+  await page.goto('/clinician')
+  await page.getByRole('heading', { level: 1 }).first().waitFor({ state: 'visible', timeout: 30_000 })
+  expect(page.url(), 'API login did not produce a usable browser session').not.toMatch(/\/login/)
   // Everything from here on is asserted on. See watchConsole.
   watcher?.reset()
 }
@@ -160,4 +193,39 @@ export async function navigateTo(
   // the evidence screenshots showing the SCREEN rather than a closing drawer
   // on top of it.
   if (needsDrawer) await page.waitForTimeout(400)
+}
+
+/**
+ * Press the confirm button inside the signing dialog.
+ *
+ * ⚠️ THIS EXISTS BECAUSE `.last()` LOSES A RACE, and the way it loses is
+ * invisible in the failure message.
+ *
+ * Both sign specs used to do:
+ *
+ *     await page.getByRole('button', { name: /^sign|^submit/i }).last().click()
+ *
+ * `ConsultationNote.openSign` is **async** — it re-runs the banned-abbreviation
+ * check against the server and only then sets `confirmSign`, so the dialog
+ * mounts a round-trip after the Sign button is pressed. Playwright resolves the
+ * locator as soon as one element matches, and at that instant the only match is
+ * the page's OWN "Sign note" button in the Z7a action bar. `.last()` therefore
+ * latched onto the button underneath, not the confirmation's.
+ *
+ * Playwright then waited for that element to become clickable — and it never
+ * did, because the dialog opened over it and `Modal`'s backdrop sat between the
+ * cursor and the target. The test failed sixty seconds later with
+ * "<div class='bg-scrim'> intercepts pointer events", which reads like a
+ * z-index bug in the modal and is not one: the panel is correctly above its
+ * own scrim, and the click was simply aimed at the wrong button.
+ *
+ * Scoping to `role=dialog` fixes both halves at once. It waits for the dialog
+ * to exist before resolving anything, and it can only ever match a button
+ * inside it. "Cancel" and "Close dialog" do not match the pattern, so the
+ * confirm button is unambiguous.
+ */
+export async function confirmSign(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible({ timeout: 20_000 })
+  await dialog.getByRole('button', { name: /^sign|^submit/i }).click()
 }

@@ -69,6 +69,14 @@ export default function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
+  /**
+   * ⚠️ `setup=1` marks a staff INVITATION: the same single-use token and the
+   * same endpoint as a reset, issued when an administrator creates the
+   * account. Only the words change — "reset" is alarming to someone who never
+   * had a password. The server does not read this flag and grants nothing
+   * on it.
+   */
+  const isSetup = searchParams.get('setup') === '1'
 
   const [tokenStatus, setTokenStatus] = useState<TokenStatus>('checking')
   const [form, setForm] = useState<ResetForm>({ password: '', confirmPassword: '' })
@@ -143,7 +151,11 @@ export default function ResetPassword() {
       setTimeout(() => {
         navigate('/login', {
           replace: true,
-          state: { message: 'Password reset successfully. Please sign in with your new password.' },
+          state: {
+            message: isSetup
+              ? 'Password set. Choose your account type and sign in with your email and new password.'
+              : 'Password reset successfully. Please sign in with your new password.',
+          },
         })
       }, 2000)
     } catch (err) {
@@ -215,8 +227,11 @@ export default function ResetPassword() {
                     Link expired or invalid
                   </h2>
                   <p className="text-sm text-ink-subtle leading-relaxed max-w-sm mx-auto">
-                    This password reset link is no longer valid. Reset links expire after 15 minutes
-                    and can only be used once. Please request a new one.
+                    {isSetup
+                      ? 'This set-password link is no longer valid. Invitation links expire after 72 hours '
+                        + 'and can only be used once. Request a new link with your work email.'
+                      : 'This password reset link is no longer valid. Reset links expire after 15 minutes '
+                        + 'and can only be used once. Please request a new one.'}
                   </p>
                 </div>
                 <Link
@@ -257,7 +272,7 @@ export default function ResetPassword() {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
-                    Password reset
+                    {isSetup ? 'Password set' : 'Password reset'}
                   </h2>
                   <p className="text-sm text-ink-subtle">
                     Redirecting you to sign in…
@@ -270,10 +285,12 @@ export default function ResetPassword() {
               <motion.div key="form" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                 <div className="mb-6">
                   <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
-                    Set a new password
+                    {isSetup ? 'Set your password' : 'Set a new password'}
                   </h2>
                   <p className="mt-1.5 text-sm text-ink-subtle">
-                    Choose a strong password you haven't used before.
+                    {isSetup
+                      ? 'Your account has been created. Choose a strong password to finish setting it up.'
+                      : "Choose a strong password you haven't used before."}
                   </p>
                 </div>
 
@@ -288,7 +305,7 @@ export default function ResetPassword() {
 
                 <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                   <motion.div custom={0} variants={fadeIn} initial="initial" animate="animate">
-                    <label className="block text-sm font-medium text-ink-muted mb-1.5">New password</label>
+                    <label htmlFor="reset-password" className="block text-sm font-medium text-ink-muted mb-1.5">New password</label>
                     <div className="relative group">
                       <Lock
                         size={16}
@@ -296,6 +313,7 @@ export default function ResetPassword() {
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle transition-colors group-focus-within:text-primary-600 pointer-events-none"
                       />
                       <input
+                        id="reset-password"
                         type={showPassword ? 'text' : 'password'}
                         name="password"
                         value={form.password}
@@ -335,7 +353,7 @@ export default function ResetPassword() {
                   </motion.div>
 
                   <motion.div custom={1} variants={fadeIn} initial="initial" animate="animate">
-                    <label className="block text-sm font-medium text-ink-muted mb-1.5">Confirm new password</label>
+                    <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-ink-muted mb-1.5">Confirm new password</label>
                     <div className="relative group">
                       <Lock
                         size={16}
@@ -343,6 +361,7 @@ export default function ResetPassword() {
                         className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-subtle transition-colors group-focus-within:text-primary-600 pointer-events-none"
                       />
                       <input
+                        id="reset-confirm-password"
                         type={showConfirmPassword ? 'text' : 'password'}
                         name="confirmPassword"
                         value={form.confirmPassword}
@@ -383,7 +402,7 @@ export default function ResetPassword() {
                       <Spinner />
                     ) : (
                       <>
-                        Reset password
+                        {isSetup ? 'Set password' : 'Reset password'}
                         <ArrowRight size={16} strokeWidth={2.5} className="transition-transform group-hover:translate-x-0.5" />
                       </>
                     )}

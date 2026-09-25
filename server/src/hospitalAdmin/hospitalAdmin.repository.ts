@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { hospitalScopeWhere } from './appointmentScope';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hospital Admin Repository — every query here is scoped to one hospital.
@@ -205,12 +206,17 @@ export const hospitalAdminRepository = {
 
   async listAppointmentsByHospital(hospitalId: string, take = 200) {
     return prisma.appointment.findMany({
-      where: { doctor: { hospitalId } },
+      // ⚠️ Includes unassigned requests from this hospital's patients — see
+      // appointmentApproval.ts; without them "no preference" requests would
+      // be visible to no administrator anywhere.
+      where: hospitalScopeWhere(hospitalId),
       select: {
         id: true,
         scheduledAt: true,
+        durationMins: true,
         status: true,
         mode: true,
+        doctorId: true,
         doctor: { select: { firstName: true, lastName: true } },
         patient: { select: { firstName: true, lastName: true } },
       },

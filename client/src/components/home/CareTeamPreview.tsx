@@ -19,11 +19,11 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
     <section aria-labelledby="careteam-heading" className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
         <h2 id="careteam-heading" className="text-sm font-semibold text-ink">
-          Your care team
+          My doctors
         </h2>
         {careTeam.length > 0 && (
           <Link
-            to="/app/care-team"
+            to="/app/my-doctors"
             className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-primary-700 hover:underline"
           >
             View all <ArrowRight size={14} aria-hidden="true" />
@@ -41,7 +41,7 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
               <UserPlus size={18} className="text-ink-subtle" />
             </span>
             <p className="text-sm leading-relaxed text-ink-subtle">
-              No clinicians assigned yet. Your hospital will add them to your care team.
+              No doctors assigned yet. Your hospital will add them here.
             </p>
           </div>
         ) : (

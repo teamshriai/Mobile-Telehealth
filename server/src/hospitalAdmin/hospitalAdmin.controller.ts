@@ -1,9 +1,12 @@
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { hospitalAdminService } from './hospitalAdmin.service';
+import { appointmentApproval, approveSchema, declineSchema } from './appointmentApproval';
 import {
   updateHospitalSchema,
   setDoctorActiveSchema,
   assignCareTeamSchema,
+  provisionStaffSchema,
 } from './staffProfile.validator';
 import { ApiResponseBuilder } from '../utils/apiResponse';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -27,6 +30,33 @@ export const listHospitalDoctors = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const doctors = await hospitalAdminService.listDoctors(req.user!.id);
     res.status(200).json(ApiResponseBuilder.success('Doctors retrieved.', { doctors }));
+  },
+);
+
+/**
+ * POST /api/v1/hospital-admin/doctors
+ *
+ * ⚠️ The response never echoes the mobile number back in full, and never
+ * contains a credential — there isn't one. The provisioned doctor signs in by
+ * setting a password through the emailed invitation link.
+ */
+export const provisionHospitalStaff = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const dto = provisionStaffSchema.parse(req.body);
+    const created = await hospitalAdminService.provisionStaff(
+      req.user!.id,
+      dto,
+      getRequestMeta(req),
+    );
+    res.status(201).json(
+      ApiResponseBuilder.success(
+        created.inviteSent
+          ? `${dto.role} added. A link to set their password has been emailed to them.`
+          : `${dto.role} added. The set-password email could not be sent — they can use `
+            + '"Forgot password" on the sign-in page with the email you registered.',
+        created,
+      ),
+    );
   },
 );
 
@@ -68,6 +98,24 @@ export const listHospitalAppointments = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const appointments = await hospitalAdminService.listAppointments(req.user!.id);
     res.status(200).json(ApiResponseBuilder.success('Appointments retrieved.', { appointments }));
+  },
+);
+
+export const approveHospitalAppointment = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const id = z.string().uuid('Invalid appointment reference.').parse(req.params.id);
+    const dto = approveSchema.parse(req.body ?? {});
+    const appointment = await appointmentApproval.approve(req.user!.id, id, dto, getRequestMeta(req));
+    res.status(200).json(ApiResponseBuilder.success('Appointment approved.', { appointment }));
+  },
+);
+
+export const declineHospitalAppointment = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const id = z.string().uuid('Invalid appointment reference.').parse(req.params.id);
+    const dto = declineSchema.parse(req.body ?? {});
+    const appointment = await appointmentApproval.decline(req.user!.id, id, dto, getRequestMeta(req));
+    res.status(200).json(ApiResponseBuilder.success('Appointment request declined.', { appointment }));
   },
 );
 

@@ -11,7 +11,13 @@ export interface AuthError {
 
 export type AuthResult =
   | { success: true; role: string | undefined; needsOnboarding: boolean }
-  | { success: false; fieldErrors: Record<string, string[]> | string[] | null }
+  | {
+      success: false
+      fieldErrors: Record<string, string[]> | string[] | null
+      /** The server's own message, returned directly — reading `error` off
+       *  context right after the await reads the PREVIOUS render's value. */
+      message?: string
+    }
 
 export interface RegisterFormInput {
   firstName: string
@@ -42,6 +48,8 @@ export interface AuthContextValue {
   needsOnboarding: boolean
   can: (permission: string) => boolean
   login: (credentials: LoginCredentialsInput) => Promise<AuthResult>
+  /** Mobile OTP login, stage 2. Produces identical state to `login`. */
+  loginWithOtp: (args: { challengeId: string; code: string }) => Promise<AuthResult>
   register: (formData: RegisterFormInput) => Promise<AuthResult>
   logout: () => Promise<void>
   endSession: () => void

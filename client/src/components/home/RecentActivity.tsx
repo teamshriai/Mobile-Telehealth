@@ -48,7 +48,7 @@ export default function RecentActivity({ notifications = [] }: { notifications?:
       <div className="mt-3.5 flex-1 rounded-xl bg-tile-blue p-4 shadow-card">
         {items.length === 0 ? (
           <p className="py-6 text-center text-sm leading-relaxed text-white/75">
-            Nothing yet. Updates about your appointments and care team will show here.
+            Nothing yet. Updates about your appointments and doctors will show here.
           </p>
         ) : (
           <ul>

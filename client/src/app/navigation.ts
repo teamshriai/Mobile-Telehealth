@@ -4,10 +4,11 @@ import {
   CalendarClock, LayoutDashboard, Stethoscope, Building2,
   CalendarRange, MessageSquareHeart,
   FileCheck2,
-  Home, Calendar, Pill, FolderHeart, Users, Siren, User, Settings, Sparkles,
+  Home, Calendar, Pill, FolderHeart, Users, Siren, User, Settings, Sparkles, NotebookPen, FileScan,
   LayoutTemplate, ShieldAlert,
 } from 'lucide-react'
 import type { RoleName } from '../types/domain'
+import type { IconTone } from '../components/common/iconTones'
 
 /**
  * Navigation for every portal, in one file.
@@ -44,12 +45,15 @@ export interface NavItem {
    *  still is not the only carrier: the label says "Emergency" and the icon
    *  is a siren. */
   tone?: 'emergency'
+  /** The destination's colour (icon tile in lists, tinted glyph in the bar). */
+  hue?: IconTone
 }
 
 export interface AccountNavItem {
   label: string
   path: string
   icon: IconType
+  hue?: IconTone
 }
 
 export interface PortalDescriptor {
@@ -60,13 +64,18 @@ export interface PortalDescriptor {
 }
 
 export const PATIENT_NAV: NavItem[] = [
-  { label: 'Home', path: '/app', icon: Home, end: true, description: 'Your day at a glance' },
-  { label: 'Appointments', path: '/app/appointments', icon: Calendar, description: 'Visits and video consultations' },
-  { label: 'Medicines', path: '/app/medicines', icon: Pill, description: 'What to take, and when' },
-  { label: 'My Health', path: '/app/health', icon: FolderHeart, description: 'Records, reports and your recovery' },
-  { label: 'AI Insights', path: '/app/ai-insights', icon: Sparkles, description: 'Ask about your medicines and visits' },
-  { label: 'My Care Team', path: '/app/care-team', icon: Users, description: 'The people looking after you' },
-  { label: 'Emergency', path: '/app/emergency', icon: Siren, description: 'Get help fast', tone: 'emergency' },
+  { label: 'Home', path: '/app', icon: Home, end: true, description: 'Your day at a glance', hue: 'blue' },
+  { label: 'Appointments', path: '/app/appointments', icon: Calendar, description: 'Visits and video consultations', hue: 'orange' },
+  { label: 'Medicines', path: '/app/medicines', icon: Pill, description: 'What your doctors have prescribed', hue: 'teal' },
+  { label: 'My Health', path: '/app/health', icon: FolderHeart, description: 'Conditions, visits and instructions', hue: 'pink' },
+  // ⚠️ Patient-GENERATED. Its own destination, not a tab inside My Health,
+  // so a note the patient wrote is never shelved beside the record their
+  // clinicians wrote as if it were the same kind of thing.
+  { label: 'Health Notes', path: '/app/health-notes', icon: NotebookPen, description: 'Notes you write or speak', hue: 'amber' },
+  { label: 'Reports', path: '/app/reports', icon: FileScan, description: 'X-rays, scans and test reports', hue: 'indigo' },
+  { label: 'AI Insights', path: '/app/ai-insights', icon: Sparkles, description: 'Ask about your medicines and visits', hue: 'violet' },
+  { label: 'My doctors', path: '/app/my-doctors', icon: Users, description: 'The doctors looking after you', hue: 'green' },
+  { label: 'Emergency', path: '/app/emergency', icon: Siren, description: 'Get help fast', tone: 'emergency', hue: 'red' },
 ]
 
 /**
@@ -113,8 +122,8 @@ const PORTALS: Partial<Record<RoleName, PortalDescriptor>> = {
     home: '/app',
     items: PATIENT_NAV,
     account: [
-      { label: 'Profile', path: '/app/profile', icon: User },
-      { label: 'Settings', path: '/app/settings', icon: Settings },
+      { label: 'Profile', path: '/app/profile', icon: User, hue: 'blue' },
+      { label: 'Settings', path: '/app/settings', icon: Settings, hue: 'gray' },
     ],
   },
   Doctor: {
@@ -194,8 +203,12 @@ export const ROUTE_TITLES: Record<string, string> = {
   '/app/appointments': 'Appointments',
   '/app/medicines': 'Medicines',
   '/app/health': 'My Health',
+  '/app/health-notes': 'Health Notes',
+  '/app/reports': 'Reports',
+  '/app/notifications': 'Notifications',
+  '/app/visits': 'Visit summary',
   '/app/ai-insights': 'AI Insights',
-  '/app/care-team': 'My Care Team',
+  '/app/my-doctors': 'My doctors',
   '/app/emergency': 'Emergency',
   '/app/profile': 'Profile',
   '/app/settings': 'Settings',

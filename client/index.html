@@ -18,7 +18,10 @@
 <html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ⚠️ `viewport-fit=cover` is what makes `env(safe-area-inset-*)` resolve to
+         anything other than 0. Without it the CSS below is inert and fixed
+         bottom bars sit under the iPhone home indicator. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Stroke AI — Emergency Stroke Response Platform" />
     <meta name="theme-color" content="#E8EDF4" />
     <title>Stroke AI — Emergency Stroke Response Platform</title>

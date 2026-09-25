@@ -165,6 +165,16 @@ enum AuditAction {
   TokenRefreshed
   TokenReuseDetected
   SessionRevoked
+
+  // ── Mobile OTP authentication ─────────────────────────────────────────────
+  // First-class actions rather than a UserLoginFailed + metadata.reason
+  // discriminator. The older forgot-password flow took the metadata route and
+  // the comment on AppointmentCreated calls that a mistake: a security
+  // question like "how many OTP attempts failed for this account last night"
+  // should be an indexed equality filter, not a JSON scan.
+  OtpRequested
+  OtpVerified
+  OtpFailed
   // ── Patient identity & encounters (Phase 6) ─────────────────────────────
   PatientRegistered
   PatientSearched
@@ -224,6 +234,12 @@ enum AuditAction {
   BreakGlassRequested
   BreakGlassGranted
   BreakGlassReviewed
+  // ── Patient portal: health notes (patient-generated) ────────────────────
+  HealthNoteCreated
+  HealthNoteUpdated
+  HealthNoteDeleted
+  HealthNoteAudioAccessed
+  TranscriptionRequested
 
   @@map("audit_action")
 }
@@ -321,9 +337,42 @@ model RolePermission {
 // =============================================================================
 
 model User {
-  id           String @id @default(uuid()) @db.Uuid
-  email        String @unique
-  passwordHash String @map("password_hash")
+  id    String @id @default(uuid()) @db.Uuid
+  email String @unique
+
+  /// ⚠️ NULLABLE as of the OTP migration. An account provisioned by a hospital
+  /// admin has no password at all and authenticates only by mobile + OTP, so
+  /// "no password" had to become representable rather than being faked with an
+  /// unusable sentinel hash — a sentinel is indistinguishable from a real hash
+  /// at every call site, which is exactly how a "passwordless" account quietly
+  /// becomes guessable.
+  ///
+  /// ⚠️ Every read of this MUST null-guard. Password login remains available
+  /// alongside OTP, and one consumer is not a login at all:
+  /// prescription.service.ts authenticates the SECOND CONSULTANT by email +
+  /// password for the G4 hard-stop override. A null here means that clinician
+  /// cannot counter-authorize, which must be said in words rather than
+  /// crashing or silently passing.
+  passwordHash String? @map("password_hash")
+
+  // ── Mobile identity (OTP login) ───────────────────────────────────────────
+  /// The registered mobile, ENCRYPTED at rest (AES-256-GCM, random IV) exactly
+  /// like PatientProfile.phoneNumber. Never queryable directly — that is what
+  /// mobileHash below is for.
+  mobile String? @map("mobile")
+
+  /// Deterministic HMAC-SHA256 blind index of the NORMALIZED mobile
+  /// (utils/phone.ts normalizeMobile + encryption.ts hmacBlindIndex). This is
+  /// the login lookup key.
+  ///
+  /// ⚠️ @unique HERE, and deliberately NOT on PatientProfile.phoneNumberHash.
+  /// The two are answering different questions. That one indexes every patient
+  /// record including the nine field-registered ones with no login, where a
+  /// family genuinely shares one handset. THIS one indexes accounts that can
+  /// sign in, where a shared number would mean an OTP could not resolve to a
+  /// single identity — so uniqueness is the property that makes OTP login
+  /// sound. Verified against live data before enforcing: zero collisions.
+  mobileHash String? @unique @map("mobile_hash")
 
   // ── Role FK ──────────────────────────────────────────────────────────────
   roleId String @map("role_id") @db.Uuid
@@ -366,9 +415,11 @@ model User {
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
   refreshTokens       RefreshToken[]
+  otpChallenges       OtpChallenge[]
   notifications       Notification[]
   aiConversations     AiConversation[]
   aiMemoryChunks      AiMemoryChunk[]
+  healthNotesAuthored PatientHealthNote[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // email: @unique creates the lookup index implicitly — not duplicated here.
@@ -546,6 +597,8 @@ model PatientProfile {
   prescriptions    Prescription[]
   instructions     PatientInstruction[]
   breakGlassGrants BreakGlassGrant[]
+  healthNotes      PatientHealthNote[]
+  storedFiles      StoredFile[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
@@ -704,6 +757,80 @@ model PasswordResetToken {
 //  - deviceLabel/ipAddress/userAgent let a patient see and revoke their own
 //    sessions later without another schema change.
 // =============================================================================
+/// Which channel an OTP was delivered over.
+///
+/// ⚠️ The channel is part of the challenge, not of the account. A person may
+/// hold both a registered mobile and a registered email; which one they used
+/// this time is a property of this login attempt.
+enum OtpChannel {
+  Sms
+  Email
+
+  @@map("otp_channel")
+}
+
+/// A single OTP login challenge, over either channel.
+///
+/// ⚠️ THE CODE IS NEVER STORED IN PLAINTEXT. `codeHash` is a SHA-256 of the
+/// six digits, the same treatment `RefreshToken.tokenHash` gives its secret.
+/// A database reader — a backup, a support query, a leaked dump — must not be
+/// able to complete someone's login.
+///
+/// ⚠️ NO PLAINTEXT IDENTIFIER HERE EITHER, only the blind index — for a mobile
+/// number AND for an email address. An OTP table is high-churn and
+/// short-lived; it is the last place that should quietly accumulate a
+/// directory of everyone's contact details. Note the asymmetry this papers
+/// over on purpose: `User.email` is stored plaintext and unique, so the email
+/// LOOKUP is a direct query and needs no hash — but that is no reason to let
+/// this table collect addresses too. `userId` is
+/// nullable precisely so a request for an UNREGISTERED number can still be
+/// recorded and rate-limited without inventing an account for it — which is
+/// what keeps the anti-enumeration response honest rather than cosmetic.
+model OtpChallenge {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Null when no account matched. See the note above.
+  userId String? @map("user_id") @db.Uuid
+
+  channel OtpChannel
+
+  /// HMAC blind index of the normalized identifier: `normalizeMobile` for
+  /// `Sms`, a lowercased/trimmed address for `Email`. Both go through
+  /// `hmacBlindIndex`, so one column serves both channels.
+  identifierHash String @map("identifier_hash")
+
+  /// SHA-256 of the 6-digit code. Never the code itself.
+  codeHash String @map("code_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  /// Set the instant a correct code is accepted. A consumed challenge is dead
+  /// — single use is what stops a code being replayed from a shoulder-surf,
+  /// an SMS backup or a screenshot.
+  consumedAt DateTime? @map("consumed_at")
+
+  attemptCount Int @default(0) @map("attempt_count")
+  maxAttempts  Int @map("max_attempts")
+
+  /// Who asked. Same fields RefreshToken records, for the same reason.
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // [channel, identifierHash, createdAt]: find the live challenge for an
+  //   identifier, newest first — the hot path on both request (invalidate the
+  //   previous) and verify. The channel leads because the same string could
+  //   never be both, but the composite keeps the index selective.
+  //   [expiresAt]: lets the cleanup sweep avoid a full scan.
+  //   [userId]: "show me this account's recent attempts" during an incident.
+  @@index([channel, identifierHash, createdAt])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("otp_challenges")
+}
+
 model RefreshToken {
   id     String @id @default(uuid()) @db.Uuid
   userId String @map("user_id") @db.Uuid
@@ -1220,6 +1347,12 @@ enum AiChunkSource {
   StrokeAssessment
   CareTeam
   ChatSummary
+  // Patient portal round 1 — appended, never reordered.
+  Prescription
+  Problem
+  Instruction
+  /// The PATIENT'S OWN words. Rendered to the model labelled patient-reported.
+  HealthNote
 
   @@map("ai_chunk_source")
 }
@@ -2079,4 +2212,114 @@ model BreakGlassGrant {
   @@index([patientId, grantedAt])
   @@index([reviewedAt, grantedAt])
   @@map("break_glass_grants")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Patient portal — patient-generated information
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// What a stored file is for. Appended to, never reordered: documents and
+/// insurance cards (later phases) reuse this table.
+enum StoredFileKind {
+  HealthNoteAudio
+
+  @@map("stored_file_kind")
+}
+
+/// A file held for a patient, encrypted at rest on local disk.
+///
+/// ⚠️ The bytes never live in the database and are never served statically.
+/// `storageKey` is an opaque random name inside FILE_STORAGE_DIR; the only
+/// way out is an authenticated, owner-scoped route that decrypts on the fly
+/// (see src/storage/fileStore.ts). `sha256` is of the PLAINTEXT, so a
+/// corrupted or swapped file is detected on read.
+model StoredFile {
+  id         String         @id @default(uuid()) @db.Uuid
+  patientId  String         @map("patient_id") @db.Uuid
+  kind       StoredFileKind
+  storageKey String         @unique @map("storage_key")
+  mimeType   String         @map("mime_type")
+  bytes      Int
+  sha256     String
+  encrypted  Boolean        @default(true)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  deletedAt  DateTime?      @map("deleted_at")
+
+  patient     PatientProfile      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  healthNotes PatientHealthNote[]
+
+  @@index([patientId, kind])
+  @@map("stored_files")
+}
+
+enum HealthNoteSource {
+  Voice
+  Typed
+
+  @@map("health_note_source")
+}
+
+/// A voice note is a Draft from transcription until the patient confirms the
+/// text. Unconfirmed drafts (audio included) are purged after 24 hours.
+enum HealthNoteStatus {
+  Draft
+  Confirmed
+
+  @@map("health_note_status")
+}
+
+/// Who besides the patient may read the note. `Private` is the default and is
+/// never readable by any clinician; `CareTeam` is readable only by clinicians
+/// with a care relationship, and only once Confirmed.
+enum HealthNoteVisibility {
+  Private
+  CareTeam
+
+  @@map("health_note_visibility")
+}
+
+/// A note the PATIENT wrote or spoke — never a clinical finding.
+///
+/// ⚠️ PATIENT-GENERATED, AND EVERY SURFACE MUST SAY SO. Nothing here is
+/// reviewed, signed or monitored by a clinician. It must never render as, or
+/// be summarised into, anything that looks like a diagnosis.
+///
+/// ⚠️ `patientId` IS RESOLVED ON THE SERVER from the authenticated user; no
+/// endpoint accepts it from a client. `authorUserId` is separate so a future
+/// proxy (a caregiver writing on the patient's behalf) needs no migration.
+///
+/// `machineTranscript` keeps the raw speech-to-text output beside the
+/// patient's corrected `body`, so "edited after transcription" is provable
+/// rather than inferred. Both are encrypted.
+model PatientHealthNote {
+  id                String               @id @default(uuid()) @db.Uuid
+  patientId         String               @map("patient_id") @db.Uuid
+  authorUserId      String               @map("author_user_id") @db.Uuid
+  source            HealthNoteSource
+  status            HealthNoteStatus
+  visibility        HealthNoteVisibility @default(Private)
+  /// Encrypted. The text the patient confirmed.
+  body              String?
+  /// Encrypted. What speech-to-text produced, before any correction.
+  machineTranscript String?              @map("machine_transcript")
+  /// en | kn | hi | ta | ml — the language the patient chose.
+  language          String
+  recordedAt        DateTime             @map("recorded_at")
+  confirmedAt       DateTime?            @map("confirmed_at")
+  editedAt          DateTime?            @map("edited_at")
+  audioFileId       String?              @map("audio_file_id") @db.Uuid
+  audioDurationMs   Int?                 @map("audio_duration_ms")
+  sttModel          String?              @map("stt_model")
+  sttLatencyMs      Int?                 @map("stt_latency_ms")
+  deletedAt         DateTime?            @map("deleted_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  audioFile StoredFile?    @relation(fields: [audioFileId], references: [id], onDelete: SetNull)
+
+  @@index([patientId, status, recordedAt])
+  @@index([status, createdAt])
+  @@map("patient_health_notes")
 }

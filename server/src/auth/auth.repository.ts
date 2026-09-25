@@ -1,6 +1,6 @@
 import { type Gender, type Prisma, RoleName } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { encryptFieldOptional } from '../utils/encryption';
+import { encryptField, encryptFieldOptional, hmacBlindIndex } from '../utils/encryption';
 import {
   withGeneratedShriPatientId,
   computePhoneNumberHash,
@@ -53,6 +53,16 @@ export const authRepository = {
    * Find a non-deleted user by email with their role.
    * Used in: login, duplicate-email check during registration.
    */
+  /**
+   * ⚠️ Deliberately NOT filtered on `deletedAt`: `User.mobileHash` is unique
+   * across every row, soft-deleted included, so a deleted account's number
+   * still collides at insert time. Checking only live rows would turn that
+   * into a 500 instead of a sentence.
+   */
+  async findByMobileHash(mobileHash: string): Promise<{ id: string } | null> {
+    return prisma.user.findUnique({ where: { mobileHash }, select: { id: true } });
+  },
+
   async findByEmail(email: string): Promise<UserWithRole | null> {
     return prisma.user.findFirst({
       where: { email, deletedAt: null },
@@ -98,6 +108,9 @@ export const authRepository = {
     email: string;
     passwordHash: string;
     roleId: string;
+    /** Login identity: canonical 10-digit mobile, encrypted + blind-indexed
+     *  here so the account can sign in by SMS OTP. Null when absent. */
+    mobile: string | null;
     termsAcceptedAt: Date | null;
     termsVersion: string | null;
     profile: {
@@ -115,6 +128,11 @@ export const authRepository = {
             email: data.email,
             passwordHash: data.passwordHash,
             roleId: data.roleId,
+            // ⚠️ Without these two the patient could register with a mobile
+            // number and then never sign in by it: OTP looks accounts up by
+            // `User.mobileHash`, not by the profile's `phoneNumberHash`.
+            mobile: data.mobile === null ? null : encryptField(data.mobile),
+            mobileHash: data.mobile === null ? null : hmacBlindIndex(data.mobile),
             passwordChangedAt: new Date(),
             termsAcceptedAt: data.termsAcceptedAt,
             termsVersion: data.termsVersion,

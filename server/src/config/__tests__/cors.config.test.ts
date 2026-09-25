@@ -41,6 +41,24 @@ describe('isPrivateNetworkOrigin — accepted', () => {
     'http://172.20.10.3:3000', // iPhone hotspot range
     'https://192.168.1.42:3000', // https on a LAN is unusual but not wrong
     'http://macbook-pro.local:3000', // mDNS, which is how Macs advertise
+    'http://ward-tablet.local:3000',
+
+    // The brief's explicit allow-list.
+    'http://192.168.29.230:4100',
+    'http://192.168.1.10:4100',
+    'http://10.0.0.20:4100',
+    'http://172.16.0.20:4100',
+    'http://172.31.255.254:4100',
+
+    // ⚠️ IPv6 on a dual-stack Wi-Fi. Without these the LAN works over IPv4 and
+    // fails inexplicably over IPv6 on the very same network.
+    'http://[fd00::1]:3000',                      // unique local (fc00::/7)
+    'http://[fc00::1234]:3000',                   // unique local
+    'http://[fe80::1ff:fe23:4567:890a]:3000',     // link-local
+    'http://[feb0::1]:3000',                      // link-local, top of range
+
+    // APIPA — what a device self-assigns when DHCP is unavailable.
+    'http://169.254.10.5:3000',
   ];
 
   for (const origin of accepted) {
@@ -83,6 +101,29 @@ describe('isPrivateNetworkOrigin — refused', () => {
     ['not-a-url', 'unparseable'],
     ['', 'empty'],
     ['null', 'the literal string browsers send for opaque origins'],
+
+    // The brief's explicit reject-list.
+    ['http://172.15.1.1:4100', '172.15 is below the private block'],
+    ['http://172.32.1.1:4100', '172.32 is above the private block'],
+    ['http://8.8.8.8:4100', 'a public DNS resolver is not a LAN host'],
+    ['http://evil.com:4100', 'a public origin with a LAN-looking port'],
+
+    // ⚠️ IPv6 addresses that are PUBLIC. `fe00::` is not link-local (that is
+    // fe80::/10), and `2001:` is global unicast — the ranges are adjacent
+    // enough in text that a sloppy prefix match would let them through.
+    ['http://[2001:db8::1]:3000', 'global unicast documentation range'],
+    ['http://[fe00::1]:3000', 'fe00 is not in fe80::/10'],
+    ['http://[fec0::1]:3000', 'fec0 is deprecated site-local, not link-local'],
+    ['http://[2404:6800:4007::1]:3000', 'a real public IPv6 address'],
+
+    // 169.253/169.255 neighbour APIPA without being it.
+    ['http://169.253.1.1:3000', '169.253 is not APIPA'],
+    ['http://169.255.1.1:3000', '169.255 is not APIPA'],
+
+    // ⚠️ The substring attack, IPv6 flavour and .local flavour.
+    ['http://fd00-1.evil.com', 'ULA-looking label on a public domain'],
+    ['http://local.evil.com', 'the word local as a subdomain, not a .local TLD'],
+    ['http://evil.com.local.attacker.io', '.local in the middle, not the suffix'],
   ];
 
   for (const [origin, why] of refused) {

@@ -32,6 +32,10 @@ const CLINICAL_SOURCE_TYPES = new Set<AiChunkSource>([
   AiChunkSource.Encounter,
   AiChunkSource.StrokeAssessment,
   AiChunkSource.CareTeam,
+  AiChunkSource.Prescription,
+  AiChunkSource.Problem,
+  AiChunkSource.Instruction,
+  AiChunkSource.HealthNote,
 ]);
 
 export type RetrievalResult = {

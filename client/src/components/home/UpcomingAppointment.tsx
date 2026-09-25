@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { Video, MapPin, CalendarPlus, ArrowRight } from 'lucide-react'
 import type { Appointment } from '../../types/domain'
+import MiniCalendar from '../appointments/MiniCalendar'
+import { dayKey } from '../appointments/calendarDays'
 
 /**
  * The next appointment, given real prominence.
@@ -34,7 +36,14 @@ function relativeLabel(days: number): string | null {
   return null
 }
 
-export default function UpcomingAppointment({ appointment }: { appointment: Appointment | null | undefined }) {
+export default function UpcomingAppointment({
+  appointment,
+  appointments = [],
+}: {
+  appointment: Appointment | null | undefined
+  /** Every upcoming visit, for the calendar's markings. */
+  appointments?: Appointment[]
+}) {
   if (!appointment) {
     // Deliberately compact. The generic EmptyState is built for a full page
     // column; used here it gave the "nothing to see" case more vertical room
@@ -62,8 +71,11 @@ export default function UpcomingAppointment({ appointment }: { appointment: Appo
               to="/app/appointments"
               className="focus-ring inline-flex min-h-11 flex-shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-700"
             >
-              Book an appointment
+              Request an appointment
             </Link>
+          </div>
+          <div className="mt-4 border-t border-border-soft pt-4 sm:max-w-xs">
+            <MiniCalendar compact label="Your upcoming appointments" marks={[]} />
           </div>
         </div>
       </section>
@@ -93,8 +105,8 @@ export default function UpcomingAppointment({ appointment }: { appointment: Appo
         </Link>
       </div>
 
-      <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="mt-3.5 flex flex-1 flex-col gap-5 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-center">
           {/* Calendar block — a date is read as a date faster than as prose. */}
           <div
             aria-hidden="true"
@@ -140,6 +152,19 @@ export default function UpcomingAppointment({ appointment }: { appointment: Appo
               <p className="mt-2 text-sm leading-relaxed text-ink-subtle">{appointment.reason}</p>
             )}
           </div>
+        </div>
+
+        {/* The month at a glance, every upcoming visit marked. Opens on the
+            month of the next appointment. */}
+        <div className="border-t border-border-soft pt-4 lg:w-64 lg:flex-shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <MiniCalendar
+            compact
+            label="Your upcoming appointments"
+            initialMonth={dayKey(appointment.scheduledAt)}
+            marks={appointments
+              .filter((a) => a.status !== 'Cancelled')
+              .map((a) => ({ at: a.scheduledAt, confirmed: a.status === 'Confirmed' }))}
+          />
         </div>
       </div>
     </section>

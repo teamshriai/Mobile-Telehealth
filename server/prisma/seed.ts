@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { hash, Algorithm } from '@node-rs/argon2';
 import { encryptField, hmacBlindIndex } from '../src/utils/encryption';
+import { normalizeMobile } from '../src/utils/phone';
 import {
   withGeneratedShriPatientId,
   computePhoneNumberHash,
@@ -59,9 +60,16 @@ const ROLE_DESCRIPTIONS: Record<RoleName, string> = {
  * acute neurology, rehabilitation, physiotherapy, speech therapy, and
  * coordination — which is what a recovering patient actually deals with.
  */
+// ⚠️ Each carries a distinct mobile. OTP login resolves an account by a blind
+// index over the mobile, so a demo doctor without one simply cannot sign in —
+// the backfill reports them, but reporting a lockout is not the same as not
+// causing one. Numbers are from the Atlas §8 Bengaluru range and are unique
+// per account, because `User.mobileHash` is UNIQUE and a shared demo number
+// would make the seed itself fail.
 const DEMO_DOCTORS = [
   {
     email: 'demo.doctor.nair@stroke-ai.invalid',
+    phoneNumber: '+91 9845020401',
     firstName: 'Priya',
     lastName: 'Nair',
     gender: Gender.Female,
@@ -71,6 +79,7 @@ const DEMO_DOCTORS = [
   },
   {
     email: 'demo.doctor.raja@stroke-ai.invalid',
+    phoneNumber: '+91 9845020402',
     firstName: 'Karthik',
     lastName: 'Raja',
     gender: Gender.Male,
@@ -80,6 +89,7 @@ const DEMO_DOCTORS = [
   },
   {
     email: 'demo.doctor.selvam@stroke-ai.invalid',
+    phoneNumber: '+91 9845020403',
     firstName: 'Anitha',
     lastName: 'Selvam',
     gender: Gender.Female,
@@ -89,6 +99,7 @@ const DEMO_DOCTORS = [
   },
   {
     email: 'demo.doctor.kumar@stroke-ai.invalid',
+    phoneNumber: '+91 9845020404',
     firstName: 'Senthil',
     lastName: 'Kumar',
     gender: Gender.Male,
@@ -132,15 +143,26 @@ async function seedDemoDoctors(doctorRoleId: string): Promise<void> {
   });
 
   for (const doc of DEMO_DOCTORS) {
+    // ⚠️ THE MOBILE IDENTITY IS WRITTEN HERE, not left to a backfill script.
+    // OTP login resolves an account by `mobileHash`; a seeded doctor without
+    // one simply cannot sign in, so a fresh `db:seed` would produce a demo
+    // cast that the new login screen rejects. `update` fills it in for rows
+    // seeded before the column existed.
+    const normalized = normalizeMobile(doc.phoneNumber);
+    const mobileFields = normalized === null
+      ? {}
+      : { mobile: encryptField(normalized), mobileHash: hmacBlindIndex(normalized) };
+
     const user = await prisma.user.upsert({
       where: { email: doc.email },
-      update: {},
+      update: mobileFields,
       create: {
         email: doc.email,
         passwordHash,
         roleId: doctorRoleId,
         isVerified: true,
         isActive: true,
+        ...mobileFields,
       },
     });
 
@@ -151,12 +173,14 @@ async function seedDemoDoctors(doctorRoleId: string): Promise<void> {
         qualifications: doc.qualifications,
         hospitalName: DEMO_HOSPITAL,
         yearsExperience: doc.yearsExperience,
+        phoneNumber: doc.phoneNumber,
       },
       create: {
         userId: user.id,
         firstName: doc.firstName,
         lastName: doc.lastName,
         gender: doc.gender,
+        phoneNumber: doc.phoneNumber,
         specialty: doc.specialty,
         qualifications: doc.qualifications,
         hospitalName: DEMO_HOSPITAL,
@@ -413,7 +437,7 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
           type: NotificationType.CareTeam,
           title: 'Care team updated',
           body: 'Dr. Anitha Selvam (Physiotherapy) has been added to your care team.',
-          actionUrl: '/app/care-team',
+          actionUrl: '/app/my-doctors',
           readAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
         },
         {

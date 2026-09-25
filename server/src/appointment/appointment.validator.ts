@@ -65,6 +65,17 @@ export const cancelAppointmentSchema = z.object({
 export type CancelAppointmentDto = z.infer<typeof cancelAppointmentSchema>;
 
 /**
+ * Moving one's own appointment. Same instant rules as booking — the shared
+ * `scheduledAt` refinements below — because a reschedule IS a booking of a
+ * new slot; only the slot's ownership check differs.
+ */
+export const rescheduleAppointmentSchema = z.object({
+  scheduledAt: createAppointmentSchema.shape.scheduledAt,
+});
+
+export type RescheduleAppointmentDto = z.infer<typeof rescheduleAppointmentSchema>;
+
+/**
  * Query for the list endpoint. `scope` splits upcoming vs past because those
  * are genuinely different views for a patient, not a filter they toggle.
  */

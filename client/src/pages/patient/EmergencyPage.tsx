@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Siren, Phone, AlertTriangle, Check } from 'lucide-react'
 import { Banner } from '../../components/feedback/States'
+import EmergencyInfoCard from './EmergencyInfoCard'
 
 /**
  * Emergency — symptom check and how to get help.
@@ -77,6 +78,8 @@ export default function EmergencyPage() {
         </div>
       </section>
 
+      <EmergencyInfoCard />
+
       {/* ── BE-FAST ── */}
       <section aria-labelledby="befast-heading" className="rounded-xl border border-border-soft bg-surface-1 p-5">
         <h2 id="befast-heading" className="text-base font-semibold text-ink">
@@ -135,7 +138,7 @@ export default function EmergencyPage() {
             <Banner tone="error" title="Call 108 now">
               You have marked {positive.length === 1 ? 'a stroke warning sign' : `${positive.length} stroke warning signs`}.
               Even one sign is enough — call an ambulance immediately and note the time
-              the symptoms started. Your care team needs that time.
+              the symptoms started. Your doctors need that time.
             </Banner>
           )}
         </div>

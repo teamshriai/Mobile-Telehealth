@@ -34,11 +34,28 @@ const ROUTES = [
 ]
 
 test.describe('clinician portal sweep', () => {
-  for (const bp of BREAKPOINTS) {
-    test(`all routes render clean at ${bp.name}`, async ({ page }) => {
-      const watcher = watchConsole(page)
+  /**
+   * ⚠️ ONE PAGE LOAD FOR ALL SEVEN BREAKPOINTS, not one per breakpoint.
+   *
+   * This used to be a `test()` per width, and each one paid an `openAuthed`,
+   * i.e. a full reload, i.e. one of the 60 `/auth/refresh` calls the limiter
+   * allows per 15 minutes per IP. Seven widths would have been seven of that
+   * budget for a screen-size check, and the suite was already close enough to
+   * the ceiling that its tail bounced to /login — which reads as a
+   * catastrophically broken application and is nothing of the kind.
+   *
+   * Resizing a live page is also closer to what it claims to test. A layout
+   * bug that only appears when a viewport CHANGES — a `matchMedia` listener
+   * that never re-subscribes, a drawer that stays open across a breakpoint —
+   * is invisible when every width gets a fresh document.
+   */
+  test('every route renders clean at every breakpoint', async ({ page }) => {
+    const watcher = watchConsole(page)
+    await page.setViewportSize({ width: BREAKPOINTS[0].width, height: BREAKPOINTS[0].height })
+    await openAuthed(page, undefined, watcher)
+
+    for (const bp of BREAKPOINTS) {
       await page.setViewportSize({ width: bp.width, height: bp.height })
-      await openAuthed(page, undefined, watcher)
 
       for (const route of ROUTES) {
         // Below lg the rail collapses into a drawer; navigateTo opens it when
@@ -49,15 +66,15 @@ test.describe('clinician portal sweep', () => {
           page.getByRole('heading', { name: route.heading }).first(),
           `${route.path} heading at ${bp.name}`,
         ).toBeVisible({ timeout: 20_000 })
-        await page.waitForTimeout(400)
+        await page.waitForTimeout(250)
         await expectNoHorizontalOverflow(page)
         await page.screenshot({
           path: `e2e/screenshots/${bp.name}/${route.name}.png`,
           fullPage: true,
         })
       }
+    }
 
-      expect(watcher.errors, `console errors at ${bp.name}:\n${watcher.errors.join('\n')}`).toEqual([])
-    })
-  }
+    expect(watcher.errors, `console errors:\n${watcher.errors.join('\n')}`).toEqual([])
+  })
 })

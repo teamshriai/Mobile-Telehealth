@@ -113,11 +113,11 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
           hint={upcoming > 0 ? 'Coming up' : 'Nothing scheduled'}
         />
         <Tile
-          to="/app/care-team"
+          to="/app/my-doctors"
           icon={Users}
           tone="violet"
           value={careTeam.length}
-          label={careTeam.length === 1 ? 'clinician' : 'clinicians'}
+          label={careTeam.length === 1 ? 'doctor' : 'doctors'}
           hint={careTeam.length > 0 ? 'Looking after you' : 'No one assigned yet'}
         />
         <Tile

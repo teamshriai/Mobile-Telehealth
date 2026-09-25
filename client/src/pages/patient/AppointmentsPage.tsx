@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react'
-import { Calendar, Video, Phone, MapPin, Clock, X, Plus, Stethoscope } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Calendar, Video, Phone, MapPin, Clock, X, Plus, Stethoscope, CalendarClock, Camera } from 'lucide-react'
+import Modal from '../../components/common/Modal'
+import ConfirmDialog from '../../components/common/ConfirmDialog'
+import SlotPicker from '../../components/appointments/SlotPicker'
+import DeviceCheck from '../../components/appointments/DeviceCheck'
+import MiniCalendar from '../../components/appointments/MiniCalendar'
+import { dayKey } from '../../components/appointments/calendarDays'
 import * as appointmentService from '../../services/appointment.service'
 import type { AppointmentScope, RequestAppointmentPayload } from '../../services/appointment.service'
 import * as doctorService from '../../services/doctor.service'
@@ -37,10 +44,12 @@ const STATUS_TONE: Record<AppointmentStatus, string> = {
 interface AppointmentCardProps {
   appointment: Appointment
   onCancel: (appointment: Appointment) => void
+  onReschedule: (appointment: Appointment) => void
+  onCheckDevices: () => void
   cancelling: boolean
 }
 
-function AppointmentCard({ appointment, onCancel, cancelling }: AppointmentCardProps) {
+function AppointmentCard({ appointment, onCancel, onReschedule, onCheckDevices, cancelling }: AppointmentCardProps) {
   const Icon = MODE_ICON[appointment.mode] ?? MapPin
   const when = new Date(appointment.scheduledAt).toLocaleString('en-IN', {
     dateStyle: 'medium',
@@ -87,37 +96,96 @@ function AppointmentCard({ appointment, onCancel, cancelling }: AppointmentCardP
             </p>
           )}
 
+          {appointment.locationName && !appointment.isVideo && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
+              <MapPin size={14} aria-hidden="true" />
+              {appointment.locationName}
+            </p>
+          )}
+
           {appointment.cancelReason && (
             <p className="mt-2 text-xs text-ink-subtle">Reason for cancellation: {appointment.cancelReason}</p>
           )}
         </div>
 
-        {appointment.canCancel && (
-          <button
-            type="button"
-            onClick={() => onCancel(appointment)}
-            disabled={cancelling}
-            className="focus-ring tap-target inline-flex flex-shrink-0 items-center gap-1.5 self-start rounded-lg border border-border-soft px-3 text-sm font-medium text-ink-muted transition-colors hover:border-critical-fg/30 hover:bg-critical-bg hover:text-critical-fg disabled:opacity-50 sm:self-auto"
-          >
-            <X size={14} aria-hidden="true" />
-            {cancelling ? 'Cancelling…' : 'Cancel'}
-          </button>
-        )}
+        <div className="flex flex-shrink-0 flex-col gap-2 sm:items-end">
+          {/* Reschedule sits beside Cancel — the two decisions about this
+              visit — sharing one row even on a phone. */}
+          {(appointment.canReschedule || appointment.canCancel) && (
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              {appointment.canReschedule && (
+                <button
+                  type="button"
+                  onClick={() => onReschedule(appointment)}
+                  className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 rounded-lg border border-primary-600/30 px-3 text-sm font-medium text-primary-700 hover:bg-primary-50/50"
+                >
+                  <CalendarClock size={14} aria-hidden="true" /> Reschedule
+                </button>
+              )}
+              {appointment.canCancel && (
+                <button
+                  type="button"
+                  onClick={() => onCancel(appointment)}
+                  disabled={cancelling}
+                  className="focus-ring tap-target inline-flex items-center justify-center gap-1.5 rounded-lg border border-border-soft px-3 text-sm font-medium text-ink-muted transition-colors hover:border-critical-fg/30 hover:bg-critical-bg hover:text-critical-fg disabled:opacity-50"
+                >
+                  <X size={14} aria-hidden="true" />
+                  {cancelling ? 'Cancelling…' : 'Cancel'}
+                </button>
+              )}
+            </div>
+          )}
+          {appointment.isVideo && appointment.canCancel && (
+            <button
+              type="button"
+              onClick={onCheckDevices}
+              className="focus-ring inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-1 text-sm font-medium text-ink-muted hover:text-ink sm:self-end"
+            >
+              <Camera size={14} aria-hidden="true" /> Check camera &amp; mic
+            </button>
+          )}
+        </div>
       </div>
     </li>
   )
 }
 
+/** A free date + time, for requests that have no doctor (and so no diary) yet. */
+function PreferredTime({ onChange }: { onChange: (iso: string | null) => void }) {
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  useEffect(() => {
+    onChange(date && time ? new Date(`${date}T${time}`).toISOString() : null)
+  }, [date, time, onChange])
+  const todayStr = new Date().toISOString().slice(0, 10)
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label htmlFor="move-date" className="mb-1.5 block text-sm font-medium text-ink">Preferred date</label>
+        <input id="move-date" type="date" min={todayStr} value={date} onChange={(e) => setDate(e.target.value)}
+          className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink" />
+      </div>
+      <div>
+        <label htmlFor="move-time" className="mb-1.5 block text-sm font-medium text-ink">Preferred time</label>
+        <input id="move-time" type="time" value={time} onChange={(e) => setTime(e.target.value)}
+          className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink" />
+      </div>
+    </div>
+  )
+}
+
 interface BookingFormProps {
   doctors: BookableDoctor[]
+  initialDoctorId: string
   onSubmit: (payload: RequestAppointmentPayload) => void
   onClose: () => void
   submitting: boolean
   error: string | null
 }
 
-function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingFormProps) {
-  const [doctorId, setDoctorId] = useState('')
+function BookingForm({ doctors, initialDoctorId, onSubmit, onClose, submitting, error }: BookingFormProps) {
+  const [doctorId, setDoctorId] = useState(initialDoctorId)
+  const [slot, setSlot] = useState<string | null>(null)
   const [mode, setMode] = useState<AppointmentMode>('InPerson')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -125,7 +193,15 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!date || !time || !reason.trim()) return
+    if (!reason.trim()) return
+    // ⚠️ With a named clinician the patient picks a REAL slot from their
+    // published diary; only "no preference" is a free-text time request.
+    if (doctorId !== '') {
+      if (slot === null) return
+      onSubmit({ scheduledAt: slot, doctorId, mode, reason: reason.trim() })
+      return
+    }
+    if (!date || !time) return
     // Combine the patient's local date+time into an absolute instant. Using
     // Date's local-time constructor (not a manual ISO concat) means DST and
     // the browser's own timezone are handled by the platform, not by us.
@@ -139,7 +215,9 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
     <form onSubmit={handleSubmit} className="rounded-xl border border-border-soft bg-surface-1 p-5">
       <h2 className="text-base font-semibold text-ink">Request an appointment</h2>
       <p className="mt-1 text-sm text-ink-muted">
-        Your care team will confirm the exact time. This is a request, not a booking.
+        {doctorId !== ''
+          ? 'Choose one of this doctor’s free times. This sends a request — the hospital confirms it after checking the doctor’s availability.'
+          : 'This sends a request with your preferred time. The hospital will assign a doctor and confirm a time.'}
       </p>
 
       {error && (
@@ -154,10 +232,10 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
           <select
             id="appt-doctor"
             value={doctorId}
-            onChange={(e) => setDoctorId(e.target.value)}
+            onChange={(e) => { setDoctorId(e.target.value); setSlot(null) }}
             className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           >
-            <option value="">No preference — care team will assign</option>
+            <option value="">No preference — the hospital will assign a doctor</option>
             {doctors.map((d) => (
               <option key={d.id} value={d.id}>{d.name} — {d.specialty}</option>
             ))}
@@ -180,6 +258,12 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
           </select>
         </div>
 
+        {doctorId !== '' ? (
+          <div className="sm:col-span-2">
+            <p className="mb-1.5 text-sm font-medium text-ink">Choose a time</p>
+            <SlotPicker doctorId={doctorId} value={slot} onChange={setSlot} />
+          </div>
+        ) : (<>
         <div>
           <label htmlFor="appt-date" className="mb-1.5 block text-sm font-medium text-ink">
             Preferred date
@@ -208,6 +292,7 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
             className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
           />
         </div>
+        </>)}
 
         <div className="sm:col-span-2">
           <label htmlFor="appt-reason" className="mb-1.5 block text-sm font-medium text-ink">
@@ -236,7 +321,7 @@ function BookingForm({ doctors, onSubmit, onClose, submitting, error }: BookingF
         </button>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || (doctorId !== '' && slot === null)}
           className="focus-ring tap-target rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary hover:bg-primary-700 disabled:opacity-60"
         >
           {submitting ? 'Sending request…' : 'Send request'}
@@ -252,12 +337,24 @@ const TABS: Array<{ key: 'upcoming' | 'past'; label: string }> = [
 ]
 
 export default function AppointmentsPage() {
+  const [params, setParams] = useSearchParams()
+  // `?doctor=<id>` arrives from "Book with" on My Care Team.
+  const preselectedDoctor = params.get('doctor') ?? ''
   const [scope, setScope] = useState<'upcoming' | 'past'>('upcoming')
+  const [toCancel, setToCancel] = useState<Appointment | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [toMove, setToMove] = useState<Appointment | null>(null)
+  const [newSlot, setNewSlot] = useState<string | null>(null)
+  const [moveError, setMoveError] = useState<string | null>(null)
+  const [moving, setMoving] = useState(false)
+  const [deviceCheck, setDeviceCheck] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [day, setDay] = useState<string | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<BookableDoctor[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<ApiError | null>(null)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(preselectedDoctor !== '')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -273,7 +370,7 @@ export default function AppointmentsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load(scope) }, [scope, load])
+  useEffect(() => { load(scope); setDay(null) }, [scope, load])
 
   useEffect(() => {
     let cancelled = false
@@ -297,10 +394,17 @@ export default function AppointmentsPage() {
     }
   }
 
-  const handleCancel = async (appointment: Appointment) => {
+  // ⚠️ Cancelling is confirmed first: it releases a slot someone else may
+  // take at once, so a mis-tap is not cheap to undo.
+  const handleCancel = async () => {
+    const appointment = toCancel
+    if (appointment === null) return
     setCancellingId(appointment.id)
     try {
-      await appointmentService.cancelAppointment(appointment.id, null)
+      await appointmentService.cancelAppointment(appointment.id, cancelReason.trim() || null)
+      setToCancel(null)
+      setCancelReason('')
+      setNotice('Appointment cancelled.')
       await load(scope)
     } catch (err) {
       setLoadError(err as ApiError)
@@ -309,10 +413,29 @@ export default function AppointmentsPage() {
     }
   }
 
+  const handleMove = async () => {
+    if (toMove === null || newSlot === null) return
+    setMoving(true)
+    setMoveError(null)
+    try {
+      await appointmentService.rescheduleAppointment(toMove.id, newSlot)
+      setToMove(null)
+      setNewSlot(null)
+      setNotice('Reschedule requested. The hospital will confirm the new time after checking the doctor’s availability.')
+      await load(scope)
+    } catch (err) {
+      setMoveError((err as ApiError).message)
+    } finally {
+      setMoving(false)
+    }
+  }
+
+  const shown = day === null ? appointments : appointments.filter((a) => dayKey(a.scheduledAt) === day)
+
   const emptyCopy = useMemo(() => ({
     upcoming: {
       title: 'No upcoming appointments',
-      description: 'When you request a visit, it will appear here until your care team confirms it.',
+      description: 'When you request a visit, it appears here as “Awaiting confirmation” until the hospital approves it.',
     },
     past: {
       title: 'No past appointments yet',
@@ -337,11 +460,14 @@ export default function AppointmentsPage() {
         </button>
       </div>
 
+      {notice !== null && <Banner tone="success">{notice}</Banner>}
+
       {showForm && (
         <BookingForm
           doctors={doctors}
+          initialDoctorId={preselectedDoctor}
           onSubmit={handleBook}
-          onClose={() => setShowForm(false)}
+          onClose={() => { setShowForm(false); if (preselectedDoctor !== '') setParams({}, { replace: true }) }}
           submitting={submitting}
           error={formError}
         />
@@ -365,6 +491,27 @@ export default function AppointmentsPage() {
         ))}
       </div>
 
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[18rem_1fr]">
+        {/* The calendar reflects the tab you are on; tap a day to show only
+            that day's visits, tap it again to show them all. */}
+        <div className="rounded-xl border border-border-soft bg-surface-1 p-4 lg:sticky lg:top-36">
+          <MiniCalendar
+            label={scope === 'upcoming' ? 'Upcoming appointments' : 'Past appointments'}
+            marks={appointments
+              .filter((a) => a.status !== 'Cancelled')
+              .map((a) => ({ at: a.scheduledAt, confirmed: a.status === 'Confirmed' || a.status === 'Completed' }))}
+            initialMonth={appointments[0] !== undefined ? dayKey(appointments[0].scheduledAt) : undefined}
+            selected={day}
+            onSelect={setDay}
+          />
+          {day !== null && (
+            <button type="button" onClick={() => setDay(null)} className="focus-ring mt-3 rounded text-xs font-medium text-primary-700 hover:underline">
+              Show all days
+            </button>
+          )}
+        </div>
+
+        <div className="min-w-0">
       {loading ? (
         <LoadingState label="Loading your appointments…" />
       ) : loadError ? (
@@ -387,17 +534,85 @@ export default function AppointmentsPage() {
           }
         />
       ) : (
+        shown.length === 0 ? (
+          <p className="rounded-xl border border-border-soft bg-surface-1 p-4 text-sm text-ink-muted">
+            No appointments on this day.
+          </p>
+        ) : (
         <ul className="space-y-3">
-          {appointments.map((a) => (
+          {shown.map((a) => (
             <AppointmentCard
               key={a.id}
               appointment={a}
-              onCancel={handleCancel}
+              onCancel={(appt) => { setToCancel(appt); setCancelReason('') }}
+              onReschedule={(appt) => { setToMove(appt); setNewSlot(null); setMoveError(null) }}
+              onCheckDevices={() => setDeviceCheck(true)}
               cancelling={cancellingId === a.id}
             />
           ))}
         </ul>
+        )
       )}
+
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={toCancel !== null}
+        title="Cancel this appointment?"
+        consequence="The time will be released and may be booked by someone else. You can request a new appointment at any time."
+        confirmLabel="Cancel appointment"
+        cancelLabel="Keep it"
+        destructive
+        onConfirm={handleCancel}
+        onCancel={() => setToCancel(null)}
+      >
+        <label htmlFor="cancel-reason" className="block text-sm font-medium text-ink">
+          Reason <span className="font-normal text-ink-subtle">(optional — helps the clinic offer the slot to someone else)</span>
+        </label>
+        <textarea
+          id="cancel-reason"
+          rows={2}
+          maxLength={300}
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          className="focus-ring mt-1.5 w-full rounded-lg border border-border bg-surface-1 px-3 py-2 text-sm text-ink"
+        />
+      </ConfirmDialog>
+
+      <Modal
+        isOpen={toMove !== null}
+        onClose={moving ? undefined : () => setToMove(null)}
+        title="Reschedule appointment"
+        size="lg"
+      >
+        {toMove !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-muted">
+              {toMove.doctor !== null
+                ? `Choose a new time with ${toMove.doctor.name}.`
+                : 'Choose a new preferred time.'}{' '}
+              This sends a reschedule request; the hospital confirms it after checking the doctor’s availability.
+            </p>
+            {toMove.doctor !== null ? (
+              <SlotPicker doctorId={toMove.doctor.id} value={newSlot} onChange={setNewSlot} excludeInstant={toMove.scheduledAt} />
+            ) : (
+              <PreferredTime onChange={setNewSlot} />
+            )}
+            {moveError !== null && <Banner tone="error">{moveError}</Banner>}
+            <div className="flex justify-end gap-2 border-t border-border-soft pt-4">
+              <button type="button" onClick={() => setToMove(null)} disabled={moving} className="focus-ring tap-target rounded-lg px-4 text-sm font-medium text-ink-muted hover:bg-surface-2">
+                Keep current time
+              </button>
+              <button type="button" onClick={() => void handleMove()} disabled={moving || newSlot === null} className="focus-ring tap-target rounded-lg bg-primary-600 px-5 text-sm font-semibold text-on-primary hover:bg-primary-700 disabled:opacity-60">
+                {moving ? 'Sending…' : 'Request new time'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <DeviceCheck open={deviceCheck} onClose={() => setDeviceCheck(false)} />
     </div>
   )
 }

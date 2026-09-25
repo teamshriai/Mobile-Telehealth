@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, Pill, FolderHeart, Users, Siren, ArrowRight, Phone } from 'lucide-react'
+import { Calendar, Pill, FolderHeart, Users, Siren, ArrowRight, Phone, NotebookPen, Mic } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import * as profileService from '../../services/profile.service'
 import * as appointmentService from '../../services/appointment.service'
 import * as careTeamService from '../../services/careteam.service'
 import * as notificationService from '../../services/notification.service'
+import * as portalService from '../../services/portal.service'
 import { Banner, SkeletonText, Skeleton } from '../../components/feedback/States'
 import HealthSnapshot from '../../components/home/HealthSnapshot'
 import UpcomingAppointment from '../../components/home/UpcomingAppointment'
@@ -52,7 +53,8 @@ const MODULES: ModuleLink[] = [
   { to: '/app/appointments', icon: Calendar,    label: 'Appointments', bg: 'bg-accent-sky',  fg: 'text-accent-sky-fg',  hoverBorder: 'hover:border-accent-sky-fg/40' },
   { to: '/app/medicines',    icon: Pill,        label: 'Medicines',    bg: 'bg-accent-teal', fg: 'text-accent-teal-fg', hoverBorder: 'hover:border-accent-teal-fg/40' },
   { to: '/app/health',       icon: FolderHeart, label: 'My Health',    bg: 'bg-accent-clay', fg: 'text-accent-clay-fg', hoverBorder: 'hover:border-accent-clay-fg/40' },
-  { to: '/app/care-team',    icon: Users,       label: 'My Care Team', bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', hoverBorder: 'hover:border-accent-sage-fg/40' },
+  { to: '/app/my-doctors',   icon: Users,       label: 'My doctors', bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', hoverBorder: 'hover:border-accent-sage-fg/40' },
+  { to: '/app/health-notes', icon: NotebookPen, label: 'Health Notes', bg: 'bg-accent-sand', fg: 'text-accent-sand-fg', hoverBorder: 'hover:border-accent-sand-fg/40' },
 ]
 
 /**
@@ -122,6 +124,7 @@ export default function PatientHome() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [careTeam, setCareTeam] = useState<CareTeamMember[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [prescribed, setPrescribed] = useState<string[] | null>(null)
   const [loading, setLoading] = useState(true)
   // Per-source, not one page-level flag: each cell degrades on its own.
   const [failed, setFailed] = useState<Partial<Record<FailedKey, boolean>>>({})
@@ -177,14 +180,26 @@ export default function PatientHome() {
     [mark],
   )
 
+  // Signed prescriptions for the medicines cell. Best-effort: if this fails
+  // the cell falls back to what the patient told us, labelled as such.
+  const loadPrescribed = useCallback(
+    () =>
+      portalService
+        .getMedications()
+        .then((r) => setPrescribed(r.current.map((m) => `${m.name} ${m.dose} ${m.doseUnit}`)))
+        .catch(() => setPrescribed(null)),
+    [],
+  )
+
   useEffect(() => {
     let cancelled = false
+    void loadPrescribed()
     // allSettled, not all: a care-team outage must not take the whole
     // dashboard down with it.
     Promise.allSettled([loadProfile(), loadAppointments(), loadCareTeam(), loadNotifications()])
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [loadProfile, loadAppointments, loadCareTeam, loadNotifications])
+  }, [loadProfile, loadAppointments, loadCareTeam, loadNotifications, loadPrescribed])
 
   const firstName = profile?.firstName ?? user?.name?.split(' ')[0] ?? null
   const upcoming = nextAppointment(appointments)
@@ -214,9 +229,18 @@ export default function PatientHome() {
         <h1 id="home-heading" className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {greeting(new Date().getHours())}{firstName ? `, ${firstName}` : ''}
         </h1>
-        <p className="mt-1.5 text-sm text-ink-muted">
-          Here is your care, your records and what is coming up.
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-muted">
+            Here is your care, your records and what is coming up.
+          </p>
+          {/* Symptoms are easiest to describe while they are happening. */}
+          <Link
+            to="/app/health-notes?new=voice"
+            className="focus-ring tap-target inline-flex items-center gap-1.5 rounded-lg border border-border-soft bg-surface-1 px-3 text-sm font-medium text-ink hover:bg-surface-2"
+          >
+            <Mic size={15} aria-hidden="true" /> Add a health note
+          </Link>
+        </div>
       </section>
 
       {allFailed && (
@@ -229,7 +253,7 @@ export default function PatientHome() {
         <div className={spanFor('appointment')}>
           {failed.appointments
             ? <CellError label="Next appointment" onRetry={loadAppointments} />
-            : <UpcomingAppointment appointment={upcoming} />}
+            : <UpcomingAppointment appointment={upcoming} appointments={appointments} />}
         </div>
 
         <div className={spanFor('snapshot')}>
@@ -246,21 +270,21 @@ export default function PatientHome() {
 
         <div className={spanFor('careteam')}>
           {failed.careTeam
-            ? <CellError label="Your care team" onRetry={loadCareTeam} />
+            ? <CellError label="My doctors" onRetry={loadCareTeam} />
             : <CareTeamPreview careTeam={careTeam} />}
         </div>
 
         <div className={spanFor('meds')}>
           {failed.profile
             ? <CellError label="Medicines and allergies" onRetry={loadProfile} />
-            : <MedsAndAllergies profile={profile} />}
+            : <MedsAndAllergies profile={profile} prescribed={prescribed} />}
         </div>
 
         {/* Plain navigation, styled as such — it sits low in the grid because
             real content carries the hierarchy now. */}
         <section aria-labelledby="modules-heading" className={`flex h-full flex-col ${spanFor('links')}`}>
           <h2 id="modules-heading" className="text-sm font-semibold text-ink">Go to</h2>
-          <ul className="mt-3.5 grid flex-1 grid-cols-2 gap-3 md:grid-cols-4">
+          <ul className="mt-3.5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
             {MODULES.map(({ to, icon: Icon, label, bg, fg, hoverBorder }) => (
               <li key={to} className="aspect-square">
                 <Link

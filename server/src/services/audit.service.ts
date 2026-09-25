@@ -31,6 +31,14 @@ export enum AuditAction {
   // ── Session lifecycle (refresh-token rotation) ──────────────────────────
   TokenRefreshed = 'TokenRefreshed',
   TokenReuseDetected = 'TokenReuseDetected',
+
+  // ── Mobile OTP authentication ─────────────────────────────────────────────
+  // First-class actions, not a UserLoginFailed + metadata.reason discriminator.
+  // "How many OTP attempts failed for this account last night" should be an
+  // indexed equality filter, not a JSON scan — see the AppointmentCreated note.
+  OtpRequested = 'OtpRequested',
+  OtpVerified = 'OtpVerified',
+  OtpFailed = 'OtpFailed',
   SessionRevoked = 'SessionRevoked',
   // ── Patient identity & encounters (Phase 6) ─────────────────────────────
   PatientRegistered = 'PatientRegistered',
@@ -96,6 +104,13 @@ export enum AuditAction {
   BreakGlassRequested = 'BreakGlassRequested',
   BreakGlassGranted = 'BreakGlassGranted',
   BreakGlassReviewed = 'BreakGlassReviewed',
+  // Patient portal: patient-generated health notes. Metadata never carries
+  // the note text — it is PHI in the patient's own words.
+  HealthNoteCreated = 'HealthNoteCreated',
+  HealthNoteUpdated = 'HealthNoteUpdated',
+  HealthNoteDeleted = 'HealthNoteDeleted',
+  HealthNoteAudioAccessed = 'HealthNoteAudioAccessed',
+  TranscriptionRequested = 'TranscriptionRequested',
 }
 
 export enum AuditSeverity {

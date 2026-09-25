@@ -38,7 +38,7 @@ export default function IdleWarning({ secondsLeft, onStayActive }: IdleWarningPr
       aria-live="assertive"
       aria-labelledby="idle-warning-title"
       aria-describedby="idle-warning-body"
-      className="fixed inset-x-0 bottom-0 z-50 px-4 pb-4 sm:left-auto sm:right-6 sm:bottom-6 sm:px-0 sm:pb-0"
+      className="safe-bottom fixed inset-x-0 bottom-0 z-50 px-4 sm:left-auto sm:right-6 sm:bottom-6 sm:px-0"
     >
       <div className="mx-auto w-full max-w-sm rounded-xl border border-border-soft bg-surface-1 p-4 shadow-lg sm:mx-0">
         <div className="flex items-start gap-3">

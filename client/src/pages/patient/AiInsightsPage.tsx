@@ -151,6 +151,15 @@ export default function AiInsightsPage() {
   const [renameDraft, setRenameDraft] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  /** Which reply's copy just failed, so the message sits beside that button. */
+  const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
+  /**
+   * ⚠️ Probed once, not assumed. `navigator.clipboard` is absent on any page
+   * that is not a secure context — every LAN address over plain http — so the
+   * button must know before it is pressed whether it can do anything.
+   */
+  const canCopy =
+    typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function'
   const [atBottom, setAtBottom] = useState(true)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -284,14 +293,47 @@ export default function AiInsightsPage() {
     }
   }
 
+  /**
+   * ⚠️ `navigator.clipboard` DOES NOT EXIST OUTSIDE A SECURE CONTEXT, and a
+   * LAN address over plain http is not one — only `localhost` gets the
+   * exemption. This used to reach straight for `.writeText`, throw a TypeError
+   * on the missing property, and land in a catch that set the page-level error
+   * banner. That banner renders above the page header, OUTSIDE the scrolling
+   * thread, so a patient scrolled to the bottom of a long conversation saw
+   * precisely nothing happen. Pressing it again did nothing again.
+   *
+   * Two changes: the affordance is only offered when it can work, and when it
+   * cannot, the fallback selects the text so the reader can copy it with the
+   * gesture they already know. Feedback appears next to the button they
+   * pressed, not at the top of a page they cannot see.
+   */
   const copyMessage = async (m: ThreadMessage) => {
+    if (!canCopy) {
+      selectMessageText(m.id)
+      setCopyFailedId(m.id)
+      window.setTimeout(() => setCopyFailedId((cur) => (cur === m.id ? null : cur)), 4000)
+      return
+    }
     try {
       await navigator.clipboard.writeText(m.content)
       setCopiedId(m.id)
       window.setTimeout(() => setCopiedId((cur) => (cur === m.id ? null : cur)), 1600)
     } catch {
-      setError('Could not copy that message.')
+      selectMessageText(m.id)
+      setCopyFailedId(m.id)
+      window.setTimeout(() => setCopyFailedId((cur) => (cur === m.id ? null : cur)), 4000)
     }
+  }
+
+  /** Puts the reply in the user's selection so a manual copy is one gesture. */
+  const selectMessageText = (id: string) => {
+    const el = document.getElementById(`msg-body-${id}`)
+    if (el === null) return
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -633,6 +675,7 @@ export default function AiInsightsPage() {
 
                     <div className={`group/msg min-w-0 max-w-[85%] ${isUser ? 'items-end' : ''}`}>
                       <p
+                        id={`msg-body-${m.id}`}
                         role={special?.role}
                         className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
                           isUser
@@ -659,16 +702,27 @@ export default function AiInsightsPage() {
                           {m.createdAt ? timeOfDay(m.createdAt) : 'Sending…'}
                         </span>
                         {!isUser && (
-                          <button
-                            type="button"
-                            onClick={() => void copyMessage(m)}
-                            aria-label="Copy this reply"
-                            className="focus-ring rounded p-0.5 text-ink-subtle transition-colors hover:text-ink"
-                          >
-                            {copiedId === m.id
-                              ? <Check size={12} aria-hidden="true" className="text-success-fg" />
-                              : <Copy size={12} aria-hidden="true" />}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void copyMessage(m)}
+                              aria-label={canCopy ? 'Copy this reply' : 'Select this reply to copy it'}
+                              className="focus-ring rounded p-0.5 text-ink-subtle transition-colors hover:text-ink"
+                            >
+                              {copiedId === m.id
+                                ? <Check size={12} aria-hidden="true" className="text-success-fg" />
+                                : <Copy size={12} aria-hidden="true" />}
+                            </button>
+                            {/* ⚠️ Beside the button that was pressed. The page-level
+                                error banner lives above the header, outside this
+                                scroll container, so from the bottom of a long thread
+                                it is invisible — which made this a silent no-op. */}
+                            {copyFailedId === m.id && (
+                              <span role="status" className="text-2xs text-ink-muted">
+                                Selected — copy it with your usual shortcut.
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -733,7 +787,7 @@ export default function AiInsightsPage() {
                   </p>
                   <p className="text-critical-fg">
                     It will never diagnose you, judge whether a symptom is serious, or change a
-                    medicine. For anything urgent, contact your care team or call 108.
+                    medicine. For anything urgent, contact your doctor or call 108.
                   </p>
                 </div>
               </details>

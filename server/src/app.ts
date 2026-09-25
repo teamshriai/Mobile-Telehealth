@@ -29,7 +29,12 @@ import { patientRouter } from './patient/patient.routes';
 import { encounterRouter } from './encounter/encounter.routes';
 import { hospitalRouter } from './hospital/hospital.routes';
 import { hospitalAdminRouter } from './hospitalAdmin/hospitalAdmin.routes';
+import { adminRouter } from './admin/admin.routes';
 import { feedbackRouter } from './feedback/feedback.routes';
+import { portalRouter } from './portal/portal.routes';
+import { healthNoteRouter } from './healthNote/healthNote.routes';
+
+const HEALTH_NOTES_PATH = '/api/v1/me/health-notes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Factory
@@ -79,8 +84,21 @@ export function createApp(): Application {
   app.use(compression());
 
   // ── Body Parsing ──────────────────────────────────────────────────────────
-  // 10kb limit prevents large-payload DoS attacks
-  app.use(express.json({ limit: '10kb' }));
+  // 10kb limit prevents large-payload DoS attacks.
+  //
+  // ⚠️ ONE EXCEPTION, AND ONLY ONE: a patient's health note. Its text cap is
+  // 5,000 characters, and Indic scripts are ~3 bytes per character in UTF-8,
+  // so a full-length Kannada note is ~15 kB before JSON overhead — the 10kb
+  // limit would refuse notes the validator allows. The exception is by path
+  // prefix, so no other route's limit moves. Audio is multipart and never
+  // passes through this parser (see healthNote.routes.ts).
+  const jsonDefault = express.json({ limit: '10kb' });
+  const jsonHealthNotes = express.json({ limit: '64kb' });
+  app.use((req, res, next) =>
+    req.path.startsWith(HEALTH_NOTES_PATH)
+      ? jsonHealthNotes(req, res, next)
+      : jsonDefault(req, res, next),
+  );
   app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
   // ── Cookie Parser ─────────────────────────────────────────────────────────
@@ -134,7 +152,11 @@ export function createApp(): Application {
   app.use('/api/v1/encounters', encounterRouter);
   app.use('/api/v1/hospitals', hospitalRouter);
   app.use('/api/v1/hospital-admin', hospitalAdminRouter);
+  app.use('/api/v1/admin', adminRouter);
   app.use('/api/v1/feedback', feedbackRouter);
+  // The patient's own record. Health notes first: its path is more specific.
+  app.use(HEALTH_NOTES_PATH, healthNoteRouter);
+  app.use('/api/v1/me', portalRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────
   app.use(notFoundHandler);

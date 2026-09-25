@@ -4,6 +4,7 @@ import {
   createAppointmentSchema,
   cancelAppointmentSchema,
   listAppointmentsSchema,
+  rescheduleAppointmentSchema,
 } from './appointment.validator';
 import { appointmentService } from './appointment.service';
 import { ApiResponseBuilder } from '../utils/apiResponse';
@@ -44,6 +45,14 @@ export const createAppointment = asyncHandler(async (req: Request, res: Response
   res
     .status(201)
     .json(ApiResponseBuilder.success('Appointment requested successfully.', { appointment }));
+});
+
+export const rescheduleAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { id } = idParamSchema.parse(req.params);
+  const dto = rescheduleAppointmentSchema.parse(req.body ?? {});
+  const appointment = await appointmentService.reschedule(req.user!.id, id, dto, getRequestMeta(req));
+
+  res.status(200).json(ApiResponseBuilder.success('Appointment moved.', { appointment }));
 });
 
 export const cancelAppointment = asyncHandler(async (req: Request, res: Response): Promise<void> => {

@@ -63,19 +63,22 @@ export default function OnboardingShell({
         {subtitle && <p className="mt-1.5 text-sm text-ink-muted">{subtitle}</p>}
 
         <nav aria-label="Onboarding progress" className="mt-6">
-          <ol className="flex items-center gap-2">
+          {/* ⚠️ `min-w-0` on every level: flex items default to min-width:auto,
+              so three pills could not shrink below their labels and pushed a
+              390px phone 20px sideways. */}
+          <ol className="flex items-center gap-1.5 sm:gap-2">
             {TIERS.map((tier, index) => {
               const isUnlocked = unlockedTiers.includes(tier.key)
               const isActive = activeTier === tier.key
               const isComplete = unlockedTiers.includes(tier.key) && activeTier !== tier.key && index < TIERS.findIndex((t) => t.key === activeTier)
               return (
-                <li key={tier.key} className="flex flex-1 items-center gap-2">
+                <li key={tier.key} className="flex min-w-0 flex-1 items-center gap-2">
                   <button
                     type="button"
                     disabled={!isUnlocked}
                     onClick={() => onSelectTier(tier.key)}
                     aria-current={isActive ? 'step' : undefined}
-                    className={`focus-ring flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors
+                    className={`focus-ring flex w-full min-w-0 items-center gap-1.5 rounded-lg border px-2 py-2 text-left text-xs font-semibold transition-colors sm:gap-2 sm:px-3
                       ${isActive
                         ? 'border-primary-600 bg-primary-50 text-primary-700'
                         : isUnlocked
@@ -88,7 +91,7 @@ export default function OnboardingShell({
                     >
                       {isComplete ? <Check size={12} strokeWidth={3} /> : index + 1}
                     </span>
-                    {tier.label}
+                    <span className="truncate">{tier.label}</span>
                   </button>
                 </li>
               )

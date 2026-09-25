@@ -1,6 +1,12 @@
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
-import { openAuthed, watchConsole, navigateTo, expectNoHorizontalOverflow } from './helpers'
+import {
+  openAuthed,
+  watchConsole,
+  navigateTo,
+  expectNoHorizontalOverflow,
+  confirmSign,
+} from './helpers'
 
 /**
  * `S-06-03` — the signing gate, and the promise the screen makes about it.
@@ -243,7 +249,7 @@ test('a complete, clean note can be signed and is then locked with addendum as t
   await signButton(page).click()
 
   // The confirm dialog, then the signature.
-  await page.getByRole('button', { name: /^sign|^submit/i }).last().click()
+  await confirmSign(page)
 
   // ⚠️ LOCKED, and the addendum is the only route (CMP-NABH-10). This is the
   // model the fix must not have disturbed.

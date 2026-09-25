@@ -36,7 +36,19 @@ import { seedM06Visits } from './m06Visits';
  * a penicillin-allergic adult are added and FLAGGED in the database
  * (`isAtlasVocabulary = false`) so they can be folded into §8.5 properly.
  */
-const ATLAS_EXTENSIONS = new Set(['Azithromycin', 'Doxycycline', 'Levofloxacin']);
+const ATLAS_EXTENSIONS = new Set(['Azithromycin', 'Doxycycline', 'Levofloxacin', 'Levothyroxine']);
+
+/*
+ * ⚠️ SECOND DOCUMENTED DEVIATION: Levothyroxine 50mcg.
+ *
+ * §8.2 makes SD-P-01 "OPD follow-up, hypothyroid", and the portal screens'
+ * own sample data (S-26-01, S-26-07) are "2 medication reminders today" and
+ * "thyroid medication daily". §8.5 has no thyroid drug, so the patient portal
+ * could not show SD-P-01 the one medicine her scenario is about. Her seeded
+ * profile already records "Levothyroxine 50mcg once daily" and her first visit
+ * plan says "Start levothyroxine"; this adds the matching formulary row,
+ * FLAGGED (`isAtlasVocabulary = false`), to be folded into §8.5 properly.
+ */
 
 interface DrugSpec {
   genericName: string;
@@ -76,6 +88,8 @@ const DRUGS: DrugSpec[] = [
     dose: { min: 100, max: 200, unit: 'mg', maxPerDay: 200 } },
   { genericName: 'Levofloxacin', form: 'Tablet', strength: '500mg', route: 'Oral', allergenClass: 'Fluoroquinolone', therapeuticClass: 'Antibiotic', isNlem: true,
     dose: { min: 250, max: 750, unit: 'mg', maxPerDay: 750 } },
+  { genericName: 'Levothyroxine', form: 'Tablet', strength: '50mcg', route: 'Oral', allergenClass: null, therapeuticClass: 'Thyroid hormone', isNlem: true,
+    dose: { min: 12.5, max: 200, unit: 'mcg', maxPerDay: 200 } },
 ];
 
 /**

@@ -196,7 +196,7 @@ export default function PatientOnboarding() {
       {tier === 'recommended' && (
         <div className="space-y-4">
           <p className="text-sm text-ink-muted">
-            This helps your care team reach you and respond faster in an emergency.
+            This helps your doctors reach you and respond faster in an emergency.
           </p>
           <FormField as="select" label="Blood group" name="bloodGroup" value={form.bloodGroup || ''} onChange={set('bloodGroup')}>
             <option value="">Not specified</option>

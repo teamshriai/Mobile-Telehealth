@@ -5,6 +5,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog'
 import AiMark from '../../ai/components/AiMark'
 import ConfidenceBandChip from '../../ai/components/ConfidenceBand'
 import { useAiMode } from '../../ai/useAi'
+import { classifyMicError, micPreflight, type MicStatus } from '../../lib/micSupport'
 import {
   TRANSCRIPT,
   DRAFTS,
@@ -58,6 +59,39 @@ interface AmbientScribeProps {
   onAccept: (drafts: ReadonlyArray<ScribeDraft>) => void
 }
 
+/**
+ * What to tell the clinician when real capture is unavailable.
+ *
+ * ⚠️ Each of these is a DIFFERENT fact with a different remedy, and the
+ * insecure-origin case is the one that used to be reported as a missing
+ * microphone. It is by far the most likely of the four in practice, because it
+ * is what every device on the LAN sees: browsers only treat `localhost` as a
+ * secure origin, so the moment the app is opened from `http://192.168.x.x` the
+ * whole `mediaDevices` API disappears. Naming the origin, and naming the two
+ * ways to get real capture back, is the difference between a clinician
+ * understanding the product and a clinician filing a hardware ticket.
+ */
+const MIC_STATUS: Record<MicStatus, { headline: string; detail: string }> = {
+  'insecure-origin': {
+    headline: 'Dictation is unavailable on this address.',
+    detail:
+      'This page was opened over plain HTTP, and browsers only allow microphone access on '
+      + 'HTTPS or on localhost. Your microphone is fine.',
+  },
+  denied: {
+    headline: 'Microphone access was declined.',
+    detail: 'You can allow it from the address bar and start again.',
+  },
+  'no-device': {
+    headline: 'No microphone was found on this device.',
+    detail: 'Connect one, or dictate from a device that has one.',
+  },
+  unsupported: {
+    headline: 'This browser will not give the page a microphone.',
+    detail: 'Typing the note works exactly as it always does.',
+  },
+}
+
 export default function AmbientScribe({
   open,
   onClose,
@@ -68,7 +102,18 @@ export default function AmbientScribe({
   const [phase, setPhase] = useState<Phase>('consent')
   const [consent, setConsent] = useState(false)
   const [elapsed, setElapsed] = useState(0)
-  const [micDenied, setMicDenied] = useState(false)
+  /**
+   * Why real capture is unavailable, or `null` when it is available.
+   *
+   * ⚠️ Four values, not a boolean. This was `micDenied: boolean`, and the
+   * screen printed "No microphone is available" for every one of these causes
+   * — including an insecure origin, where the microphone is in perfect working
+   * order and the browser is the thing refusing. On a ward tablet reached over
+   * LAN that sentence sends a clinician hunting a hardware fault. The file's
+   * own header has promised since it was written that the session "says which
+   * one happened"; a single boolean could not keep that promise.
+   */
+  const [micStatus, setMicStatus] = useState<MicStatus | null>(null)
   const [gaps, setGaps] = useState<number[]>([])
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const logRef = useRef<HTMLDivElement>(null)
@@ -95,7 +140,7 @@ export default function AmbientScribe({
     setPhase('consent')
     setConsent(false)
     setElapsed(0)
-    setMicDenied(false)
+    setMicStatus(null)
     setGaps([])
   }, [open])
 
@@ -123,13 +168,28 @@ export default function AmbientScribe({
    */
   const start = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      // Released immediately: holding an open microphone we never read would be
-      // indefensible, and the recording indicator in the browser chrome would
-      // be telling the patient something untrue.
-      stream.getTracks().forEach((t) => t.stop())
-    } catch {
-      setMicDenied(true)
+      // ⚠️ CHECKED, NOT ASSUMED. Outside a secure context — which is any page
+      // served over plain http from something that is not localhost, i.e.
+      // every LAN address — browsers do not expose `navigator.mediaDevices`
+      // AT ALL. Reaching straight for `.getUserMedia` throws a TypeError on a
+      // missing property, which a bare catch then misreports as a refusal.
+      const blocked = micPreflight()
+      if (blocked !== null) {
+        setMicStatus(blocked)
+      } else {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        // Released immediately: holding an open microphone we never read would
+        // be indefensible, and the recording indicator in the browser chrome
+        // would be telling the patient something untrue.
+        stream.getTracks().forEach((t) => t.stop())
+      }
+    } catch (err) {
+      // ⚠️ The cause is NAMED. `NotAllowedError` (the clinician pressed Block)
+      // and `NotFoundError` (there is no capture device) are different facts
+      // with different remedies, and telling someone their microphone is
+      // missing when they simply declined sends them to look for a hardware
+      // fault that does not exist.
+      setMicStatus(classifyMicError(err))
     }
     setPhase('recording')
   }, [])
@@ -212,11 +272,14 @@ export default function AmbientScribe({
             />
           ) : (
             <div ref={logRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 sm:px-6">
-              {micDenied && (
+              {micStatus !== null && (
                 <p className="flex items-start gap-1.5 rounded-lg bg-warning-bg p-2.5 text-2xs text-warning-fg">
                   <MicOff size={13} aria-hidden="true" className="mt-0.5 shrink-0" />
-                  No microphone is available, so this session is playing back a recorded example.
-                  Nothing is being listened to.
+                  <span>
+                    <span className="font-semibold">{MIC_STATUS[micStatus].headline}</span>{' '}
+                    {MIC_STATUS[micStatus].detail} This session is playing back a recorded
+                    example; nothing is being listened to.
+                  </span>
                 </p>
               )}
               {timeline.length === 0 && (

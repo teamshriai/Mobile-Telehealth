@@ -2,7 +2,17 @@ import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { decryptFieldOptional } from '../utils/encryption';
 import { hospitalAdminRepository } from './hospitalAdmin.repository';
-import type { UpdateHospitalDto, AssignCareTeamDto } from './staffProfile.validator';
+import type {
+  UpdateHospitalDto,
+  AssignCareTeamDto,
+  ProvisionStaffDto,
+} from './staffProfile.validator';
+import { prisma } from '../lib/prisma';
+import { appointmentApproval } from './appointmentApproval';
+import { sendPasswordSetupInvite } from '../auth/passwordToken';
+import { RoleName } from '@prisma/client';
+import { normalizeMobile } from '../utils/phone';
+import { encryptField, hmacBlindIndex } from '../utils/encryption';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hospital Admin Service — the "manager dashboard" backend.
@@ -58,6 +68,153 @@ export const hospitalAdminService = {
     const hospitalId = await requireHospitalScope(userId);
     const doctors = await hospitalAdminRepository.listDoctorsByHospital(hospitalId);
     return doctors.map(toDoctorSummary);
+  },
+
+  /**
+   * Provision a doctor account.
+   *
+   * ⚠️ THIS IS THE ONLY WAY A DOCTOR ACCOUNT COMES INTO EXISTENCE. Public
+   * self-registration as a clinician was removed, and the reason is clinical
+   * rather than administrative: an OTP proves somebody controls a handset, and
+   * nothing more. It says nothing about whether they hold a medical
+   * registration. Binding the mobile to an account a hospital administrator
+   * created, against a named registration number, is what makes "logged in as
+   * a doctor" mean something. A mobile number must never be able to become a
+   * prescriber by itself.
+   *
+   * ⚠️ NO PASSWORD IS SET. `passwordHash` stays NULL, so the account simply
+   * has no password to guess, phish or leak — and `auth.service.login()`
+   * refuses it exactly as it refuses a wrong password, disclosing nothing.
+   */
+  async provisionStaff(
+    adminUserId: string,
+    dto: ProvisionStaffDto,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<{ profileId: string; userId: string; role: string; inviteSent: boolean }> {
+    const hospitalId = await requireHospitalScope(adminUserId);
+
+    const normalized = normalizeMobile(dto.mobile);
+    if (normalized === null) {
+      // The validator rejects this first; defence in depth.
+      throw new AppError('Enter a valid Indian mobile number.', 400);
+    }
+    const mobileHash = hmacBlindIndex(normalized);
+
+    // ⚠️ Checked explicitly so the admin gets a sentence instead of a unique
+    // -constraint error, and so the two collision causes are told apart —
+    // they need different actions from the person reading the message.
+    const emailTaken = await prisma.user.findUnique({ where: { email: dto.email } });
+    if (emailTaken !== null) {
+      throw new AppError('An account already exists with that email address.', 409);
+    }
+    const mobileTaken = await prisma.user.findFirst({ where: { mobileHash } });
+    if (mobileTaken !== null) {
+      throw new AppError(
+        'An account already uses that mobile number. Each login needs its own number.',
+        409,
+      );
+    }
+
+    const role = await prisma.role.findUnique({
+      where: { name: RoleName[dto.role] },
+      select: { id: true },
+    });
+    if (role === null) throw new AppError(`${dto.role} role is not configured.`, 500);
+
+    // ⚠️ Doctor and Resident share DoctorProfile — a resident IS a clinician
+    // and appears on care teams; the ONLY difference is which capabilities
+    // their role carries (see RESIDENT_WITHHELD). Nurses and lab technicians
+    // use StaffProfile. Nothing else is special-cased.
+    const isClinician = dto.role === 'Doctor' || dto.role === 'Resident';
+
+
+    // One transaction: a User without its DoctorProfile is an account that can
+    // log in and then crash every clinician screen.
+    const created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: dto.email,
+          passwordHash: null,
+          mobile: encryptField(normalized),
+          mobileHash,
+          roleId: role.id,
+          isVerified: true,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      const profile = isClinician
+        ? await tx.doctorProfile.create({
+            data: {
+              userId: user.id,
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              specialty: dto.specialty,
+              qualifications: dto.qualifications,
+              registrationNumber: dto.registrationNumber,
+              yearsExperience: dto.yearsExperience,
+              phoneNumber: normalized,
+              hospitalId,
+              // ⚠️ `hospitalName` DELIBERATELY UNSET when hospitalId is known.
+              // The first version wrote both, and `updateOwnProfile` nulls the
+              // string the moment an id is present — so the value was
+              // dead-on-arrival and would vanish on the doctor's first edit.
+              // A stale denormalised name can only ever disagree with the row.
+              isVerified: false,
+              // ⚠️ Onboarding is COMPLETE on provisioning. Everything
+              // `completeOnboarding` requires — specialty, hospital,
+              // yearsExperience — was just collected by the administrator, so
+              // sending the clinician through a form to retype it would be
+              // ceremony. The first version omitted yearsExperience and
+              // therefore trapped every provisioned doctor on that screen.
+              onboardingCompletedAt: new Date(),
+            },
+            select: { id: true },
+          })
+        : await tx.staffProfile.create({
+            data: {
+              userId: user.id,
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              // Non-clinical staff have a job title where a clinician has a
+              // specialty; the form collects one field either way.
+              jobTitle: dto.specialty,
+              phoneNumber: normalized,
+              hospitalId,
+              isVerified: false,
+              onboardingCompletedAt: new Date(),
+            },
+            select: { id: true },
+          });
+
+      return { userId: user.id, profileId: profile.id };
+    });
+
+    auditService.log({
+      action: AuditAction.UserRegistered,
+      userId: adminUserId,
+      severity: AuditSeverity.Info,
+      resource: isClinician ? 'doctor_profile' : 'staff_profile',
+      resourceId: created.profileId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      // ⚠️ The provisioned user, the hospital and the acting admin — never the
+      // mobile number itself.
+      metadata: {
+        action: 'provisioned_by_hospital_admin',
+        provisionedUserId: created.userId,
+        provisionedRole: dto.role,
+        hospitalId,
+      },
+    });
+
+    // ⚠️ After the commit, never inside it: a token for a rolled-back user
+    // would point at nothing. Staff sign in with email + password, and this
+    // is how they get one — the administrator never sets or sees it.
+    const invite = await sendPasswordSetupInvite(created.userId, dto.email);
+
+    return { ...created, role: dto.role, inviteSent: invite.sent };
   },
 
   async verifyDoctor(
@@ -232,13 +389,19 @@ export const hospitalAdminService = {
   async listAppointments(userId: string) {
     const hospitalId = await requireHospitalScope(userId);
     const rows = await hospitalAdminRepository.listAppointmentsByHospital(hospitalId);
+    // Whether each pending request fits the doctor's diary, so Approve can
+    // say so before it is pressed. The server re-checks on approve.
+    const availability = await appointmentApproval.availabilityFor(rows);
     return rows.map((r) => ({
       id: r.id,
       scheduledAt: r.scheduledAt,
+      durationMins: r.durationMins,
       status: r.status,
       mode: r.mode,
+      doctorId: r.doctorId,
       doctorName: r.doctor ? `Dr. ${r.doctor.firstName} ${r.doctor.lastName}`.trim() : 'Unassigned',
       patientName: `${r.patient.firstName} ${r.patient.lastName}`.trim(),
+      availability: availability.get(r.id) ?? null,
     }));
   },
 

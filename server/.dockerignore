@@ -41,3 +41,9 @@ __tests__/
 # ─── TypeScript sources (use compiled dist/) ──────────────────────────────────
 src/
 tsconfig*.json
+
+# ─── Patient data and dev artefacts (NEVER in an image) ───────────────────────
+# Encrypted voice-note audio lives on a mounted volume (FILE_STORAGE_DIR), and
+# the dev OTP outbox holds live codes and reset links.
+storage/
+.otp-outbox.json

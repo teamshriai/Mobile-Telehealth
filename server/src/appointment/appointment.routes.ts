@@ -4,6 +4,7 @@ import {
   getAppointment,
   createAppointment,
   cancelAppointment,
+  rescheduleAppointment,
 } from './appointment.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/authorize';
@@ -32,6 +33,12 @@ router.patch(
   authenticate,
   requirePermission(Permission.AppointmentCancelOwn),
   cancelAppointment,
+);
+router.patch(
+  '/:id/reschedule',
+  authenticate,
+  requirePermission(Permission.AppointmentRescheduleOwn),
+  rescheduleAppointment,
 );
 
 export { router as appointmentRouter };

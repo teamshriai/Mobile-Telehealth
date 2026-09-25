@@ -11,6 +11,7 @@ import ChartAiPanel from '../../ai/components/ChartAiPanel'
 import Tabs from '../../components/common/Tabs'
 import BottomSheet from '../../components/common/BottomSheet'
 import Card from '../../components/common/Card'
+import PatientReportedNotes from '../../components/clinical/PatientReportedNotes'
 import Button from '../../components/common/Button'
 import DataTable, { type Column } from '../../components/common/DataTable'
 import { EmptyState, ErrorState, Skeleton } from '../../components/feedback/States'
@@ -488,6 +489,8 @@ function SummaryTab() {
           issued here are on the Medications tab.
         </p>
       </Card>
+
+      <PatientReportedNotes shriPatientId={patient.shriPatientId} />
 
       <Card padding="md">
         <PanelHeading icon={ClipboardList} title="Social and lifestyle" />

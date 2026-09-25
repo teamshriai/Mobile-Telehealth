@@ -72,3 +72,46 @@ export function decryptFieldOptional(payload?: string | null): string | null | u
 export function hmacBlindIndex(plaintext: string): string {
   return crypto.createHmac('sha256', blindIndexKey).update(plaintext, 'utf8').digest('hex');
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File encryption (binary) — for StoredFile bytes on disk.
+//
+// ⚠️ A SEPARATE KEY, DERIVED, NOT A NEW SECRET. HKDF-SHA256 over ENCRYPTION_KEY
+// with a purpose label, so file ciphertext and field ciphertext never share a
+// key (a key used for two jobs is a key whose misuse in one leaks the other),
+// and no deployment has a second secret to lose or rotate out of step.
+//
+// ⚠️ THE STORAGE KEY IS BOUND AS ASSOCIATED DATA. Decryption supplies the
+// name the file is stored under; a ciphertext copied onto another record's
+// path fails authentication instead of decrypting as the wrong patient's
+// audio.
+//
+// Layout: "IHF1" (4) | iv (12) | authTag (16) | ciphertext.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FILE_MAGIC = Buffer.from('IHF1', 'ascii');
+const FILE_KEY = Buffer.from(
+  crypto.hkdfSync('sha256', encryptionKey, Buffer.alloc(0), 'indostates/stored-files/v1', 32),
+);
+
+export function encryptBuffer(plaintext: Buffer, associatedData: string): Buffer {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, FILE_KEY, iv);
+  cipher.setAAD(Buffer.from(associatedData, 'utf8'));
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  return Buffer.concat([FILE_MAGIC, iv, cipher.getAuthTag(), ciphertext]);
+}
+
+/** Throws on a wrong format, a wrong associated-data value, or any tampering. */
+export function decryptBuffer(payload: Buffer, associatedData: string): Buffer {
+  const headerLength = FILE_MAGIC.length + IV_LENGTH + 16;
+  if (payload.length < headerLength || !payload.subarray(0, FILE_MAGIC.length).equals(FILE_MAGIC)) {
+    throw new Error('Invalid encrypted file payload format.');
+  }
+  const iv = payload.subarray(FILE_MAGIC.length, FILE_MAGIC.length + IV_LENGTH);
+  const authTag = payload.subarray(FILE_MAGIC.length + IV_LENGTH, headerLength);
+  const decipher = crypto.createDecipheriv(ALGORITHM, FILE_KEY, iv);
+  decipher.setAAD(Buffer.from(associatedData, 'utf8'));
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(payload.subarray(headerLength)), decipher.final()]);
+}

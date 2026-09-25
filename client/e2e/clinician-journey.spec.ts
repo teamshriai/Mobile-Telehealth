@@ -1,5 +1,11 @@
 import { test, expect } from './fixtures'
-import { openAuthed, watchConsole, expectNoHorizontalOverflow, navigateTo } from './helpers'
+import {
+  openAuthed,
+  watchConsole,
+  expectNoHorizontalOverflow,
+  navigateTo,
+  confirmSign,
+} from './helpers'
 
 /**
  * ⚠️ THE WHOLE CLINICIAN JOURNEY, IN ONE RUN.
@@ -166,7 +172,7 @@ test('the full clinician journey, My Day to signed and locked', async ({ page })
   const sign = page.getByRole('button', { name: /sign note|submit for co-signature/i })
   await expect(sign).toBeEnabled({ timeout: 20_000 })
   await sign.click()
-  await page.getByRole('button', { name: /^sign|^submit/i }).last().click()
+  await confirmSign(page)
 
   // ── 10. LOCKED, addendum the only way forward (CMP-NABH-10) ──────────────
   await expect(page.getByText(/signed by/i)).toBeVisible({ timeout: 20_000 })
@@ -174,9 +180,12 @@ test('the full clinician journey, My Day to signed and locked', async ({ page })
   await expect(sign).toHaveCount(0)
   await expect(page.getByRole('button', { name: /addendum/i })).toBeVisible()
 
-  // ⚠️ The signed text is not editable. A read-only render is not enough — the
-  // field must not accept input at all.
-  await expect(page.getByLabel(/^assessment$/i)).toHaveCount(0)
+  // ⚠️ The signed text is not editable. `CMP-NABH-10` is about the record being
+  // unchangeable, not about the text disappearing — a clinician must still be
+  // able to READ what was signed, so `NoteSection` keeps the field and sets
+  // `readOnly`. Asserting the field is gone was asserting the wrong guarantee.
+  await expect(page.getByLabel(/^assessment$/i)).not.toBeEditable()
+  await expect(page.getByLabel(/^assessment$/i)).toHaveValue(/hypothyroidism/i)
 
   await expectNoHorizontalOverflow(page)
   expect(watcher.errors, 'console errors').toEqual([])

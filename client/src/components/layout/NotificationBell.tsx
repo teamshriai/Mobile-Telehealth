@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Bell, Calendar, Info } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Bell, Info } from 'lucide-react'
+import { NOTIFICATION_ICON, timeAgo } from './notificationFormat'
+import { useAuth } from '../../app/useAuth'
 import * as notificationService from '../../services/notification.service'
 import { EmptyState, ErrorState, LoadingState } from '../feedback/States'
 import type { ApiError } from '../../types/api'
-import type { Notification, NotificationType } from '../../types/domain'
+import type { Notification } from '../../types/domain'
 
 /**
  * Notification bell — real data from the Phase 3 notification API.
@@ -22,24 +24,7 @@ import type { Notification, NotificationType } from '../../types/domain'
 
 const POLL_MS = 60_000
 
-const TYPE_ICON: Record<NotificationType, typeof Calendar> = {
-  Appointment: Calendar,
-  General: Info,
-  Report: Info,
-  Medication: Info,
-  CareTeam: Info,
-}
-
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const mins = Math.round(diffMs / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
-}
+const TYPE_ICON = NOTIFICATION_ICON
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
@@ -48,6 +33,7 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const navigate = useNavigate()
+  const { role } = useAuth()
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -210,6 +196,16 @@ export default function NotificationBell() {
               </ul>
             )}
           </div>
+          {/* Only the patient portal has a full notifications page. */}
+          {role === 'Patient' && (
+            <Link
+              to="/app/notifications"
+              onClick={() => setOpen(false)}
+              className="focus-ring block border-t border-border-soft px-3.5 py-2.5 text-center text-sm font-medium text-primary-700 hover:bg-surface-2"
+            >
+              View all notifications
+            </Link>
+          )}
         </div>
       )}
     </div>

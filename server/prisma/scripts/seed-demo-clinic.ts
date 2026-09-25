@@ -43,7 +43,8 @@ import {
   IdentityStatus,
 } from '@prisma/client';
 import { hash, Algorithm } from '@node-rs/argon2';
-import { encryptField, decryptFieldOptional } from '../../src/utils/encryption';
+import { encryptField, decryptFieldOptional, hmacBlindIndex } from '../../src/utils/encryption';
+import { normalizeMobile } from '../../src/utils/phone';
 import {
   withGeneratedShriPatientId,
   withGeneratedVisitId,
@@ -203,6 +204,13 @@ type PatientSpec = {
 /** §8.2. Ages are as at the atlas's fixed reference moment, 21-Sep-2026.
  *  SD-P-08 (unidentified MLC male) is deliberately absent: an identity-pending
  *  record belongs to the registration flow, not to a consultant's care team. */
+/** SD-P-01 is the portal's demo patient (see section 3b). */
+const PORTAL_PATIENT = {
+  ref: 'SD-P-01',
+  email: 'demo.patient.krishnan@stroke-ai.invalid',
+  phone: '+91 9845100101',
+} as const;
+
 const PATIENTS: PatientSpec[] = [
   {
     ref: 'SD-P-01',
@@ -485,8 +493,19 @@ async function main(): Promise<void> {
   const patientIdByRef = new Map<string, string>();
 
   for (const spec of PATIENTS) {
+    // ⚠️ Matched as the seeded, synthetic, staff-registered record — NOT by
+    // `userId: null`. SD-P-01 now has a portal login (section 3b), so the old
+    // `userId: null` filter would stop finding her and create a duplicate
+    // Meera Krishnan on every re-run.
     const existing = await prisma.patientProfile.findFirst({
-      where: { firstName: spec.firstName, lastName: spec.lastName, userId: null },
+      where: {
+        firstName: spec.firstName,
+        lastName: spec.lastName,
+        isSyntheticData: true,
+        registrationSource: RegistrationSource.StaffRegistered,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
 
@@ -537,6 +556,38 @@ async function main(): Promise<void> {
     patientIdByRef.set(spec.ref, created.id);
   }
   console.log(`✓ patients: ${patientIdByRef.size} on record`);
+
+  // ── 3b. SD-P-01's patient-portal login ────────────────────────────────────
+  // UI_ATLAS uses SD-P-01 as the sample patient on nearly every portal
+  // screen (M-26), so she is the portal's demo account. Same password
+  // variable as the demo clinicians; her registered mobile doubles as her
+  // OTP identity. Idempotent: the user is upserted and the profile is only
+  // linked when it is not linked already.
+  const portalPatientId = patientIdByRef.get(PORTAL_PATIENT.ref);
+  const patientRole = await prisma.role.findUnique({ where: { name: RoleName.Patient } });
+  if (portalPatientId !== undefined && patientRole !== null) {
+    const mobile = normalizeMobile(PORTAL_PATIENT.phone);
+    if (mobile === null) throw new Error(`SD-P-01's seeded phone is not a valid mobile.`);
+    const portalUser = await prisma.user.upsert({
+      where: { email: PORTAL_PATIENT.email },
+      update: { passwordHash, isActive: true, isVerified: true },
+      create: {
+        email: PORTAL_PATIENT.email,
+        passwordHash,
+        roleId: patientRole.id,
+        isVerified: true,
+        isActive: true,
+        mobile: encryptField(mobile),
+        mobileHash: hmacBlindIndex(mobile),
+      },
+      select: { id: true },
+    });
+    await prisma.patientProfile.updateMany({
+      where: { id: portalPatientId, userId: null },
+      data: { userId: portalUser.id },
+    });
+    console.log(`✓ portal login: SD-P-01 Meera Krishnan (${PORTAL_PATIENT.email})`);
+  }
 
   // ── 4. Care team ──────────────────────────────────────────────────────────
   for (const link of CARE_TEAM) {

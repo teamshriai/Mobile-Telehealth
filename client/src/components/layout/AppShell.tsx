@@ -17,6 +17,9 @@ import { roleLabel } from '../clinical/clinicalLabels'
 import { useAuth } from '../../app/useAuth'
 import { useIdleTimeout } from '../../app/useIdleTimeout'
 import { useDismissable } from '../../app/useDismissable'
+import PatientBottomNav from './PatientBottomNav'
+import IconTile from '../common/IconTile'
+import { TONE_HEX } from '../common/iconTones'
 
 /**
  * The one authenticated shell, for every portal.
@@ -155,12 +158,16 @@ function NavDrawer({ open, onClose, portal, role }: NavDrawerProps) {
                     >
                       {({ isActive }) => (
                         <>
-                          <item.icon
-                            size={19}
-                            aria-hidden="true"
-                            className="mt-0.5 flex-shrink-0"
-                            strokeWidth={isActive ? 2.2 : 1.8}
-                          />
+                          {item.hue !== undefined ? (
+                            <IconTile icon={item.icon} tone={item.hue} size="sm" />
+                          ) : (
+                            <item.icon
+                              size={19}
+                              aria-hidden="true"
+                              className="mt-0.5 flex-shrink-0"
+                              strokeWidth={isActive ? 2.2 : 1.8}
+                            />
+                          )}
                           <span className="min-w-0">
                             <span className="block truncate">{item.label}</span>
                             {item.description && (
@@ -190,7 +197,9 @@ function NavDrawer({ open, onClose, portal, role }: NavDrawerProps) {
                           onClick={onClose}
                           className={({ isActive }) => `${navItemClass(isActive)} w-full py-2.5`}
                         >
-                          <item.icon size={19} aria-hidden="true" className="flex-shrink-0" />
+                          {item.hue !== undefined
+                            ? <IconTile icon={item.icon} tone={item.hue} size="sm" />
+                            : <item.icon size={19} aria-hidden="true" className="flex-shrink-0" />}
                           {item.label}
                         </NavLink>
                       </li>
@@ -277,7 +286,9 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
               onClick={() => { close(); navigate(item.path) }}
               className="focus-ring flex min-h-11 w-full items-center gap-2.5 px-3.5 text-sm text-ink-muted transition-colors hover:bg-surface-2"
             >
-              <item.icon size={16} aria-hidden="true" /> {item.label}
+              {item.hue !== undefined
+                ? <IconTile icon={item.icon} tone={item.hue} size="sm" />
+                : <item.icon size={16} aria-hidden="true" />} {item.label}
             </button>
           ))}
 
@@ -407,6 +418,9 @@ export default function AppShell(): ReactNode {
                           size={17}
                           aria-hidden="true"
                           strokeWidth={isActive ? 2.2 : 1.8}
+                          // A tinted glyph, not a tile: tiles would widen a
+                          // bar that already scrolls at 1024px.
+                          style={item.hue !== undefined && item.tone !== 'emergency' ? { color: TONE_HEX[item.hue] } : undefined}
                         />
                         {item.label}
                         {isActive && <span className="sr-only">(current page)</span>}
@@ -436,7 +450,12 @@ export default function AppShell(): ReactNode {
       <NavDrawer open={drawerOpen} onClose={closeDrawer} portal={portal} role={role} />
 
       <main id="main-content" tabIndex={-1} className="overflow-x-hidden">
-        <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6">
+        {/* Bottom padding clears the patient phone bar, which is fixed. */}
+        <div
+          className={`mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 ${
+            role === 'Patient' ? 'pb-28 md:pb-6' : ''
+          }`}
+        >
           {/* Keyed to the path so a thrown error on one page does not leave the
               boundary latched when the user navigates away. */}
           <ErrorBoundary key={location.pathname} label={`${role}:${location.pathname}`}>
@@ -451,6 +470,8 @@ export default function AppShell(): ReactNode {
           rather than occupying layout width, so no screen has to make room
           for it. It hides itself entirely when assistance is off. */}
       <AssistantBubble />
+
+      {role === 'Patient' && <PatientBottomNav onOpenMenu={() => setDrawerOpen(true)} />}
 
       {warning && <IdleWarning secondsLeft={secondsLeft} onStayActive={stayActive} />}
     </div>

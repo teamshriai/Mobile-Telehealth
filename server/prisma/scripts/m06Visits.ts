@@ -313,6 +313,12 @@ const VISITS: VisitSpec[] = [
       plan:
         'Start levothyroxine. Oral iron with vitamin C. Explained the importance of taking replacement on an empty stomach, separated from iron. Repeat thyroid function and haemoglobin in eight weeks.',
     }],
+    // The course the plan above starts: eight weeks, to the repeat test.
+    prescriptions: [{
+      status: PrescriptionStatus.Signed,
+      items: [{ drug: 'Levothyroxine', dose: 50, unit: 'mcg', freq: 'OD', days: 56, indication: 'E03.9',
+        instructions: 'Take every morning on an empty stomach, at least 30 minutes before food or tea. Keep four hours apart from iron tablets.' }],
+    }],
   },
   {
     patient: 'SD-P-01',
@@ -331,6 +337,12 @@ const VISITS: VisitSpec[] = [
         'Well. Pulse 72 regular, blood pressure 118 over 74. No goitre. TSH 2.1, free T4 within range.',
       assessment: 'Hypothyroidism, biochemically euthyroid on current replacement.',
       plan: 'Continue current dose. Repeat thyroid function in six months. Reinforced timing advice.',
+    }],
+    // "Continue current dose" to the six-month review — so it is current today.
+    prescriptions: [{
+      status: PrescriptionStatus.Signed,
+      items: [{ drug: 'Levothyroxine', dose: 50, unit: 'mcg', freq: 'OD', days: 180, indication: 'E03.9',
+        instructions: 'Take every morning on an empty stomach, at least 30 minutes before food or tea. Keep four hours apart from iron or calcium tablets.' }],
     }],
     instructions: [{
       title: 'How to take your thyroid medicine',
@@ -752,7 +764,17 @@ export async function seedM06Visits(
   const drugs = await prisma.drug.findMany({ select: { id: true, genericName: true, route: true } });
   const drugByName = new Map(drugs.map((d) => [d.genericName, d]));
 
-  let rxSeq = await prisma.prescription.count();
+  // ⚠️ From the HIGHEST number issued, not from count(). The app allocates by
+  // max-issued too, and numbers are not contiguous once the running app has
+  // issued some (or a row was removed), so count() hands out a number that is
+  // already taken and the seed dies on the unique index. The suffix is
+  // zero-padded to six digits, so lexical order is numeric order.
+  const lastRx = await prisma.prescription.findFirst({
+    where: { rxNumber: { startsWith: 'RX/26-27/' } },
+    orderBy: { rxNumber: 'desc' },
+    select: { rxNumber: true },
+  });
+  let rxSeq = lastRx === null ? 0 : Number(lastRx.rxNumber.split('/').pop() ?? '0');
   const made = { visits: 0, notes: 0, problems: 0, rx: 0, instructions: 0, instructionsBackfilled: 0 };
 
   for (const visit of VISITS) {

@@ -49,7 +49,17 @@ test('a visit opens onto the work that was done at it', async ({ page }) => {
    *
    * Matching the signer's name is unambiguous: only a signed note has one.
    */
-  const noteRow = page.getByRole('row').filter({ hasText: /Dr\.\s/ }).first()
+  // ⚠️ AND it must not be a draft. `/Dr\.\s/` matches the AUTHOR column too, so
+  // a blank draft another spec left behind — every spec that opens a
+  // consultation creates one — satisfies it and this test then fails claiming
+  // the record is incoherent when it is merely reading the wrong row. The
+  // signer column renders the literal "Not signed" for a draft, so excluding
+  // that phrase targets what this test always meant: a signed note.
+  const noteRow = page
+    .getByRole('row')
+    .filter({ hasText: /Dr\.\s/ })
+    .filter({ hasNotText: /not signed/i })
+    .first()
   await expect(noteRow).toBeVisible({ timeout: 20_000 })
   await noteRow.click()
 

@@ -131,6 +131,8 @@ export interface Appointment {
   locationName: string | null
   doctor: AppointmentDoctorSummary | null
   canCancel: boolean
+  /** Server-derived: open, in the future, and with a named clinician. */
+  canReschedule: boolean
   joinUrl: string | null
   isVideo: boolean
   cancelledAt: string | null
@@ -329,10 +331,15 @@ export interface HospitalAdminPatientRow {
 export interface HospitalAdminAppointmentRow {
   id: string
   scheduledAt: string
+  durationMins: number
   status: AppointmentStatus
   mode: AppointmentMode
+  doctorId: string | null
   doctorName: string
   patientName: string
+  /** For a pending, future request with a doctor: does it fit their diary?
+   *  The server re-checks on approve. Null when not applicable. */
+  availability: { ok: boolean; reason?: string } | null
 }
 
 /** GET /hospital-admin/analytics's shape — see hospitalAdminService.getAnalytics. */

@@ -170,6 +170,36 @@ export const appointmentRepository = {
     return count;
   },
 
+  /**
+   * Moves the patient's own appointment and returns it to `Requested`.
+   *
+   * ⚠️ Scoped by (id, patientId) and by status, in the same statement, so a
+   * row that was cancelled or completed between the service's check and this
+   * write is not moved. A Confirmed visit goes back to Requested because the
+   * clinic confirmed a DIFFERENT time; it must confirm the new one too — the
+   * same rule a fresh patient booking follows.
+   */
+  async rescheduleForPatient(id: string, patientId: string, scheduledAt: Date): Promise<number> {
+    const { count } = await prisma.appointment.updateMany({
+      where: {
+        id,
+        patientId,
+        status: { in: [AppointmentStatus.Requested, AppointmentStatus.Confirmed] },
+      },
+      data: { scheduledAt, status: AppointmentStatus.Requested },
+    });
+    return count;
+  },
+
+  /** The clinician's login, so they can be told a patient moved their visit. */
+  async doctorUserId(doctorId: string): Promise<string | null> {
+    const row = await prisma.doctorProfile.findUnique({
+      where: { id: doctorId },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
+  },
+
   /** Confirms a doctor exists and is not soft-deleted, before referencing them. */
   async doctorExists(doctorId: string): Promise<boolean> {
     const found = await prisma.doctorProfile.findFirst({

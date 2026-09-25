@@ -67,8 +67,17 @@ function ChipRow({ items, tone, emptyLabel }: ChipRowProps) {
   )
 }
 
-export default function MedsAndAllergies({ profile }: { profile: PatientProfile | null | undefined }) {
-  const medicines = splitList(profile?.currentMedications, /[;\n]/)
+export default function MedsAndAllergies({
+  profile,
+  prescribed,
+}: {
+  profile: PatientProfile | null | undefined
+  /** Current SIGNED prescriptions, when they loaded. Preferred over the
+   *  patient's own free text, and labelled so the source is never ambiguous. */
+  prescribed?: string[] | null
+}) {
+  const fromPrescriptions = prescribed !== undefined && prescribed !== null && prescribed.length > 0
+  const medicines = fromPrescriptions ? prescribed : splitList(profile?.currentMedications, /[;\n]/)
   const allergiesRaw = profile?.knownAllergies
   const allergies = isNone(allergiesRaw) ? [] : splitList(allergiesRaw, /[;,\n]/)
   const allergiesRecorded = Boolean((allergiesRaw ?? '').trim())
@@ -80,10 +89,10 @@ export default function MedsAndAllergies({ profile }: { profile: PatientProfile 
           Medicines &amp; allergies
         </h2>
         <Link
-          to="/app/health"
+          to="/app/medicines"
           className="focus-ring group inline-flex items-center gap-1 rounded text-xs font-semibold text-primary-700"
         >
-          Manage
+          View all
           <ArrowRight
             size={12}
             aria-hidden="true"
@@ -97,6 +106,9 @@ export default function MedsAndAllergies({ profile }: { profile: PatientProfile 
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
             <Pill size={13} aria-hidden="true" className="text-accent-teal-fg" />
             Medicines
+            <span className="font-normal text-ink-subtle">
+              · {fromPrescriptions ? 'prescribed by your doctors' : 'as you told us'}
+            </span>
           </p>
           <ChipRow
             items={medicines}
@@ -109,6 +121,7 @@ export default function MedsAndAllergies({ profile }: { profile: PatientProfile 
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
             <ShieldAlert size={13} aria-hidden="true" className="text-warning-fg" />
             Allergies
+            <span className="font-normal text-ink-subtle">· as you told us</span>
           </p>
           <ChipRow
             items={allergies}

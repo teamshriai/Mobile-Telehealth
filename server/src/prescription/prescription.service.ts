@@ -413,7 +413,24 @@ export const prescriptionService = {
     const REFUSED = 'Second consultant could not be authenticated.';
     if (second === null || second.doctorProfile === null) throw new AppError(REFUSED, 403);
 
-    const passwordOk = await verify(second.passwordHash, dto.secondConsultantPassword);
+    // ⚠️ A NULL passwordHash takes the SAME refusal path, and that is a
+    // deliberate safety choice, not an oversight.
+    //
+    // This is the G4 gate: a clinician is about to prescribe past a documented
+    // allergy, and the whole control rests on a SECOND named human proving who
+    // they are. An account provisioned for mobile + OTP has no password, so
+    // there is nothing here to prove it with — and the two wrong answers are
+    // both worse than refusing. Waving it through would let anyone who knows a
+    // passwordless consultant's email countersign an anaphylaxis override.
+    // Naming the cause would tell an attacker which colleague to target.
+    //
+    // ⚠️ So this FAILS CLOSED and says nothing extra. The operational fix is
+    // to give consultants who hold `rx:override:hard-stop` a password, or to
+    // build OTP counter-signature — either is a deliberate piece of work, not
+    // something to improvise inside an override handler.
+    const passwordOk =
+      second.passwordHash !== null
+      && (await verify(second.passwordHash, dto.secondConsultantPassword));
     if (!passwordOk) throw new AppError(REFUSED, 403);
 
     if (second.id === actor.id) {

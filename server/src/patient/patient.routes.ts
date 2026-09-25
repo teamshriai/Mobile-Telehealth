@@ -11,6 +11,7 @@ import { authenticate } from '../middleware/authenticate';
 import { requirePermission, requireAnyPermission } from '../middleware/authorize';
 import { patientSearchLimiter } from '../middleware/rateLimiter';
 import { Permission } from '../config/permissions';
+import { listSharedForClinician } from '../healthNote/healthNote.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Patient Router
@@ -83,6 +84,15 @@ router.get(
   authenticate,
   requireAnyPermission(Permission.EncounterReadAssigned, Permission.EncounterReadOwn),
   listEncounters,
+);
+
+// ⚠️ Patient-REPORTED notes the patient chose to share with their care team.
+// Confirmed only, never private ones, and row-gated by the care relationship.
+router.get(
+  '/:shriPatientId/health-notes',
+  authenticate,
+  requirePermission(Permission.HealthNoteReadAssigned),
+  listSharedForClinician,
 );
 
 export { router as patientRouter };

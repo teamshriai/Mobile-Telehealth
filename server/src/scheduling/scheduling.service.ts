@@ -116,6 +116,61 @@ export const schedulingService = {
     }
   },
 
+  /**
+   * Can this doctor take this appointment? Used when a hospital administrator
+   * APPROVES a patient's request.
+   *
+   * Two questions, answered separately so the administrator is told which:
+   *  1. Is the time inside the doctor's published working hours and not on
+   *     leave? (A free-text "no preference" request need not sit on a slot
+   *     boundary, so this checks the whole interval fits a working window.)
+   *  2. Does it overlap a CONFIRMED appointment? Other pending requests do not
+   *     block — whichever is approved first takes the time.
+   */
+  async checkAvailability(
+    doctorId: string,
+    scheduledAt: Date,
+    durationMins: number,
+    excludeAppointmentId: string,
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const { isoDate } = instantToClinicLocal(scheduledAt);
+    const dayStart = new Date(scheduledAt);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCDate(dayEnd.getUTCDate() + 2);
+    const [availability, leaves] = await Promise.all([
+      schedulingRepository.listAvailability(doctorId),
+      schedulingRepository.listLeaves(doctorId, dayStart, dayEnd),
+    ]);
+    // Slots as if the diary were empty: what the doctor's hours ALLOW.
+    const workingSlots = generateSlotsForDate({ isoDate, availability, leaves, booked: [] });
+    const start = scheduledAt.getTime();
+    const end = start + durationMins * 60_000;
+    const inHours = workingSlots.some((s, i) => {
+      if (start < s.startsAt.getTime()) return false;
+      // Walk forward over contiguous slots until the interval is covered.
+      let coveredUntil = s.startsAt.getTime() + s.durationMins * 60_000;
+      for (let j = i + 1; coveredUntil < end && j < workingSlots.length; j++) {
+        if (workingSlots[j].startsAt.getTime() !== coveredUntil) break;
+        coveredUntil += workingSlots[j].durationMins * 60_000;
+      }
+      return start < s.startsAt.getTime() + s.durationMins * 60_000 && coveredUntil >= end;
+    });
+    if (!inHours) {
+      return { ok: false, reason: 'The doctor is not working at that time (outside their hours or on leave).' };
+    }
+    const nearby = await schedulingRepository.listConfirmedAround(
+      doctorId, scheduledAt, OVERLAP_SEARCH_PADDING_MINUTES, excludeAppointmentId,
+    );
+    const clash = nearby.find((b) =>
+      intervalsOverlap(start, durationMins, b.scheduledAt.getTime(), b.durationMins),
+    );
+    if (clash !== undefined) {
+      return { ok: false, reason: 'The doctor already has a confirmed appointment at that time.' };
+    }
+    return { ok: true };
+  },
+
   /** True when the instant is the start of a published, still-free slot. */
   async isPublishedSlot(doctorId: string, scheduledAt: Date): Promise<boolean> {
     const { isoDate } = instantToClinicLocal(scheduledAt);
@@ -252,6 +307,17 @@ export const schedulingService = {
     const existing = await schedulingRepository.findAppointment(appointmentId);
     if (existing === null || existing.doctorId !== doctorId) {
       throw new AppError('Appointment not found.', 404);
+    }
+
+    // ⚠️ A patient's REQUEST is approved by the hospital administrator, after
+    // checking this doctor's availability — not by the doctor, and never by
+    // the patient. The doctor still records what happened (completed, no-show)
+    // and may cancel.
+    if (existing.status === AppointmentStatus.Requested && to === AppointmentStatus.Confirmed) {
+      throw new AppError(
+        'Appointment requests are approved by your hospital administrator.',
+        403,
+      );
     }
 
     if (!canTransition(existing.status, to)) {

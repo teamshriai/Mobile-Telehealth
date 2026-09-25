@@ -40,10 +40,18 @@ import type { ApiError } from '../types/api'
  * Precedence, and it matters:
  *  1. `VITE_API_BASE_URL` wins outright — an explicit setting is never
  *     second-guessed, which is what staging and production builds rely on.
- *  2. Loaded from localhost → `http://localhost:5000`, byte-identical to the
- *     previous behaviour. Nothing about the normal dev loop changes.
- *  3. Anything else (a LAN IP, a `.local` name) → same host and scheme as the
- *     page, on the API port.
+ *  2. Anything else — `localhost`, `127.0.0.1`, a LAN IP, a `.local` name —
+ *     keeps the page's own host and scheme and swaps the port.
+ *
+ * ⚠️ THE API ORIGIN MUST STAY SAME-SITE WITH THE PAGE, and that is the whole
+ * reason this is one rule rather than a localhost special case. This function
+ * used to fold `127.0.0.1` into a hard-coded `http://localhost:5000`, which
+ * looks harmless and is not: `127.0.0.1` and `localhost` are **different
+ * sites**, and the refresh cookie is `sameSite: 'lax'`, which browsers do not
+ * send on a cross-site XHR at all. A developer who typed `127.0.0.1` therefore
+ * got a silent refresh that 401'd, `onSessionExpired()`, and a bounce to
+ * `/login` roughly every fifteen minutes — with nothing in the console naming
+ * the cause. Port never affects same-site; host does. Keep the host.
  *
  * ⚠️ The scheme is inherited, not assumed. Hard-coding `http:` here would make
  * an https-served page issue mixed-content requests that the browser blocks.
@@ -57,10 +65,10 @@ function resolveApiBaseUrl(): string {
   // SSR/test contexts have no `window`; fall back to the historical default.
   if (typeof window === 'undefined') return `http://localhost:${API_PORT}`
 
+  // One rule, no host special-cases — see the same-site note above.
+  // `location.hostname` keeps IPv6 brackets (`[::1]`, `[2001:db8::1]`), which
+  // is exactly what a URL authority needs, so this is correct for IPv6 too.
   const { hostname, protocol } = window.location
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
-    return `http://localhost:${API_PORT}`
-  }
   return `${protocol}//${hostname}:${API_PORT}`
 }
 
@@ -136,10 +144,69 @@ function refreshAccessToken(): Promise<string | null> {
 }
 
 /** Endpoints where a 401 is a legitimate answer, not an expired session. */
-const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'] as const
+const NO_RETRY_PATHS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout',
+  // ⚠️ A wrong OTP legitimately returns 401. Without these, the interceptor
+  // would read that as an expired access token, fire a silent refresh and
+  // replay the guess — burning a second attempt against a 5-attempt cap for
+  // every one the user actually made.
+  '/auth/otp/request',
+  '/auth/otp/verify'] as const
 
 axiosInstance.interceptors.response.use(
-  (response) => response.data?.data,
+  (response) => {
+    /**
+     * ⚠️ THE ENVELOPE IS CHECKED, NOT ASSUMED.
+     *
+     * Every endpoint answers `{ success, message, data }` and this unwraps to
+     * `data`. When something upstream answers with anything else — a proxy
+     * error page, a captive portal's HTML, a truncated body, a misconfigured
+     * gateway — `response.data?.data` is `undefined`, and the caller's
+     * `const { patients } = await apiClient.get(...)` then throws
+     * "Cannot destructure property 'patients' of '(intermediate value)' as it
+     * is undefined".
+     *
+     * That string was reaching the screen. A clinician was shown a JavaScript
+     * internal as if it were an explanation, and it leaks implementation
+     * detail while telling them nothing they can act on. Catching the shape
+     * here fixes it once for all ~60 call sites instead of at each one.
+     *
+     * ⚠️ `data` IS OPTIONAL IN THE CONTRACT, not merely nullable.
+     * `ApiResponseBuilder.success(message)` with no payload sets
+     * `data: undefined`, which `JSON.stringify` DROPS — so "Password changed",
+     * "Draft discarded", "Doctor verified", the G4 "Override recorded" and a
+     * dozen more arrive as `{ success: true, message }` with no `data` key.
+     * This check used to require the key, and every one of those successes
+     * was shown to the user as "the server sent a response this app could not
+     * read" — while the action had in fact succeeded on the server. The
+     * server's own header (`utils/apiResponse.ts`) says `data?`.
+     *
+     * So the envelope is recognised by `data` OR by `success === true`. A
+     * proxy page or captive portal still fails: HTML is not an object, and a
+     * foreign JSON body carries neither.
+     */
+    // ⚠️ Binary responses (a patient's own voice-note audio) have no envelope
+    // by definition; the caller asked for bytes and gets bytes. Only a request
+    // that explicitly set `responseType: 'blob'` takes this path.
+    if (response.config.responseType === 'blob') return response.data as never
+
+    const body: unknown = response.data
+    const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : null
+    const envelopeOk = record !== null && ('data' in record || record.success === true)
+
+    if (!envelopeOk) {
+      // A real Error, so `instanceof Error` and stack traces keep working —
+      // the same shape the error branch below produces.
+      const err = new Error(
+        'The server sent a response this app could not read. It may be a proxy or captive '
+        + 'portal answering instead of the API. Try again, and check you are on the right network.',
+      ) as ApiError
+      err.status = response.status
+      err.fieldErrors = null
+      err.requestId = null
+      return Promise.reject(err)
+    }
+    return (body as { data: unknown }).data as never
+  },
   async (error) => {
     const status: number | undefined = error.response?.status
     const original: RetryableConfig = error.config ?? {}

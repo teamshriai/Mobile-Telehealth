@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Users, Star, Building2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Users, Star, Building2, CalendarPlus, BadgeCheck } from 'lucide-react'
 import * as careTeamService from '../../services/careteam.service'
 import { LoadingState, EmptyState, ErrorState } from '../../components/feedback/States'
 import type { CareTeamMember } from '../../types/domain'
@@ -34,19 +35,19 @@ export default function CareTeamPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My Care Team</h1>
-        <p className="mt-1.5 text-sm text-ink-muted">The clinicians looking after your recovery.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My doctors</h1>
+        <p className="mt-1.5 text-sm text-ink-muted">The doctors looking after you. Book a visit with any of them.</p>
       </div>
 
       {loading ? (
-        <LoadingState label="Loading your care team…" />
+        <LoadingState label="Loading your doctors…" />
       ) : error ? (
         <ErrorState description={error} onRetry={load} />
       ) : members.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No care team assigned yet"
-          description="Once your care team assigns clinicians to your case, they will appear here along with how to reach them."
+          title="No doctors assigned yet"
+          description="When your hospital assigns doctors to your care, they will appear here and you can book a visit with them."
         />
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -70,12 +71,30 @@ export default function CareTeamPage() {
                 </div>
               </div>
 
-              {m.doctor.hospitalName && (
-                <p className="mt-3 flex items-center gap-1.5 border-t border-border-soft pt-3 text-xs text-ink-subtle">
-                  <Building2 size={13} aria-hidden="true" />
-                  {m.doctor.hospitalName}
+              {m.doctor.qualifications && (
+                <p className="mt-2 text-xs text-ink-subtle">{m.doctor.qualifications}</p>
+              )}
+              {m.doctor.isVerified && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-success-fg">
+                  <BadgeCheck size={13} aria-hidden="true" /> Registration verified by the hospital
                 </p>
               )}
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-soft pt-3">
+                {m.doctor.hospitalName ? (
+                  <p className="flex items-center gap-1.5 text-xs text-ink-subtle">
+                    <Building2 size={13} aria-hidden="true" />
+                    {m.doctor.hospitalName}
+                  </p>
+                ) : <span />}
+                {/* Books from this clinician's real published slots. */}
+                <Link
+                  to={`/app/appointments?doctor=${encodeURIComponent(m.doctor.id)}`}
+                  className="focus-ring tap-target inline-flex items-center gap-1.5 rounded-lg border border-border-soft px-3 text-sm font-medium text-primary-700 hover:bg-surface-2"
+                >
+                  <CalendarPlus size={15} aria-hidden="true" /> Book a visit
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

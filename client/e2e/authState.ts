@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { DOCTOR, SECOND_CONSULTANT, RESIDENT } from './helpers'
+import { DOCTOR, SECOND_CONSULTANT, RESIDENT, PATIENT } from './helpers'
 
 /**
  * Where the suite's authenticated sessions live, and who they belong to.
@@ -27,6 +27,7 @@ export const DEMO_USERS = {
   doctor: DOCTOR,
   desai: SECOND_CONSULTANT,
   resident: RESIDENT,
+  patient: PATIENT,
 } as const
 
 export type DemoUser = keyof typeof DEMO_USERS
@@ -35,5 +36,6 @@ export function statePath(user: DemoUser): string {
   return path.join(AUTH_DIR, `${user}.json`)
 }
 
-/** `http://localhost:5000` — the API origin, which is NOT the app's origin. */
-export const API_ORIGIN = process.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
+// ⚠️ Re-exported, not defined here — see apiOrigin.ts for why. Keeping the
+// name importable from this module means no spec had to change.
+export { API_ORIGIN } from './apiOrigin'

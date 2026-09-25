@@ -38,3 +38,13 @@ coverage/
 secrets/
 backups/
 .scratch/
+
+# ⚠️ Development OTP outbox — holds live one-time codes. Never commit.
+.otp-outbox.json
+
+# Speech-to-text model (hundreds of MB) — fetched per environment by
+# `npm run models:fetch:whisper`, pinned by models/whisper-manifest.json.
+models/onnx-community/
+
+# Encrypted patient files (voice-note audio). Never commit, never serve statically.
+storage/

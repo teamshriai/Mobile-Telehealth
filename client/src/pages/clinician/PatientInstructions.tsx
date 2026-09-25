@@ -348,7 +348,7 @@ export default function PatientInstructions() {
       */}
       <div
         data-print="hide"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border-soft bg-surface-1/95 px-4 py-3 backdrop-blur"
+        className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-border-soft bg-surface-1/95 px-4 pt-3 backdrop-blur"
       >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-ink-subtle">

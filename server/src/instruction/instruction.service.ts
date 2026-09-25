@@ -62,7 +62,7 @@ export const issueInstructionSchema = z
 
 export type IssueInstructionDto = z.infer<typeof issueInstructionSchema>;
 
-function decryptInstruction(row: PatientInstruction): PatientInstruction {
+export function decryptInstruction(row: PatientInstruction): PatientInstruction {
   const out = { ...row };
   for (const field of ENCRYPTED_FIELDS) {
     const v = out[field];

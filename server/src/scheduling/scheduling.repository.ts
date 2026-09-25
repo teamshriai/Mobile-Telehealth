@@ -88,6 +88,22 @@ export const schedulingRepository = {
     });
   },
 
+  /** CONFIRMED appointments around one instant — what an approval must not
+   *  collide with. Other requests do not block: the first approved wins. */
+  async listConfirmedAround(doctorId: string, at: Date, paddingMinutes: number, excludeId: string) {
+    const from = new Date(at.getTime() - paddingMinutes * 60_000);
+    const to = new Date(at.getTime() + paddingMinutes * 60_000);
+    return prisma.appointment.findMany({
+      where: {
+        doctorId,
+        id: { not: excludeId },
+        scheduledAt: { gte: from, lte: to },
+        status: AppointmentStatus.Confirmed,
+      },
+      select: { id: true, scheduledAt: true, durationMins: true },
+    });
+  },
+
   async findAppointment(id: string) {
     const row = await prisma.appointment.findUnique({ where: { id } });
     if (row === null) return null;

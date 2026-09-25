@@ -14,12 +14,13 @@
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "type-check": "tsc --noEmit",
-    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts src/prescription/__tests__/*.test.ts src/clinicalNote/__tests__/*.test.ts src/services/__tests__/*.test.ts src/config/__tests__/*.test.ts",
+    "test": "tsx --test src/utils/__tests__/*.test.ts src/patient/__tests__/*.test.ts src/ai/__tests__/*.test.ts src/scheduling/__tests__/*.test.ts src/prescription/__tests__/*.test.ts src/clinicalNote/__tests__/*.test.ts src/services/__tests__/*.test.ts src/config/__tests__/*.test.ts src/auth/__tests__/*.test.ts src/transcription/__tests__/*.test.ts src/portal/__tests__/*.test.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "db:demo:enrich": "tsx prisma/scripts/enrich-demo-account.ts",
+    "db:create-admin": "tsx prisma/scripts/create-admin.ts",
     "db:demo:clinic": "tsx prisma/scripts/seed-demo-clinic.ts",
     "db:encrypt:cancel-reasons": "tsx prisma/scripts/encrypt-cancel-reasons.ts",
     "db:generate": "prisma generate",
@@ -32,7 +33,8 @@
     "db:demo:reset-breakglass": "tsx prisma/scripts/reset-demo-breakglass.ts",
     "db:demo:reset-encounters": "tsx prisma/scripts/reset-demo-encounters.ts",
     "db:demo:reset-clinical": "tsx prisma/scripts/reset-demo-clinical.ts",
-    "db:demo:check": "tsx prisma/scripts/check-demo-coherence.ts"
+    "db:demo:check": "tsx prisma/scripts/check-demo-coherence.ts",
+    "models:fetch:whisper": "tsx prisma/scripts/vendor-whisper-model.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

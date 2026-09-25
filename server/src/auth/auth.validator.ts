@@ -70,12 +70,22 @@ export const registerSchema = z.object({
   gender: z.nativeEnum(Gender).optional(),
 
   /**
-   * Which of the three portals this account is for. Admin is deliberately
-   * NOT an accepted value — the global Admin role stays seed/ops-created
-   * only, never self-registered. Defaults to Patient so every existing
-   * caller (and every existing test) that omits this field is unaffected.
+   * ⚠️ PATIENT ONLY. `Doctor` and `HospitalAdmin` were removed here, and
+   * removing them from the UI alone would have been theatre — this endpoint
+   * is public, and anyone who can send a POST could have gone on minting
+   * clinician accounts that the rest of the product treats as prescribers.
+   *
+   * Nothing in a self-service form establishes a medical registration. A
+   * clinician account is created by a hospital administrator through
+   * `POST /hospital-admin/doctors`, which binds a mobile number to a named,
+   * registration-numbered profile inside a specific hospital. OTP login then
+   * proves control of that handset, and only that.
+   *
+   * `Admin` was already absent for the same class of reason and stays absent.
+   * The default is unchanged, so every existing caller that omits the field
+   * is unaffected.
    */
-  role: z.enum(['Patient', 'Doctor', 'HospitalAdmin']).optional().default('Patient'),
+  role: z.enum(['Patient']).optional().default('Patient'),
 
   /**
    * The "I agree to the Terms of Service and Privacy Policy" checkbox.
@@ -96,6 +106,58 @@ export const registerSchema = z.object({
 // Password is NOT validated for complexity on login —
 // we only need it as a non-empty string to compare against the stored hash.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⚠️ The SAME India-only shape the rest of the platform already validates
+ * against (`profile.validator.ts`'s phoneSchema, `registerSchema.phoneNumber`,
+ * and `utils/phone.ts`). Accepting a looser form here than the write path
+ * accepts would produce numbers that can be typed at the login box and can
+ * never match a stored blind index.
+ */
+/**
+ * ⚠️ A DISCRIMINATED UNION, so each channel keeps its own error message and
+ * neither can smuggle the other's field. `.strict()` on both arms is what
+ * stops an unauthenticated caller appending `role` or `userId` to the one
+ * endpoint that runs before authentication.
+ */
+export const otpRequestSchema = z.discriminatedUnion('channel', [
+  z
+    .object({
+      channel: z.literal('Sms'),
+      identifier: z
+        .string()
+        .trim()
+        .min(1, 'Enter your mobile number.')
+        .regex(
+          /^(\+91[\s-]?)?[6-9]\d{9}$/,
+          'Enter a 10-digit Indian mobile number starting 6, 7, 8 or 9.',
+        ),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal('Email'),
+      identifier: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .email('Enter a valid email address.')
+        .max(255),
+    })
+    .strict(),
+]);
+
+export const otpVerifySchema = z
+  .object({
+    challengeId: z.string().uuid(),
+    // Exactly six digits. `.length(6)` rather than min/max so "12345 " and
+    // "1234567" are both refused before they reach a timing-safe compare.
+    code: z.string().trim().regex(/^\d{6}$/, 'Enter the 6-digit code.'),
+  })
+  .strict();
+
+export type OtpRequestDto = z.infer<typeof otpRequestSchema>;
+export type OtpVerifyDto = z.infer<typeof otpVerifySchema>;
 
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please provide a valid email address.'),

@@ -80,6 +80,56 @@ export async function listDoctors(): Promise<HospitalAdminDoctorRow[]> {
   return doctors
 }
 
+/**
+ * ⚠️ A CLOSED SET — and `HospitalAdmin` and `Admin` are absent deliberately.
+ * A hospital administrator must not be able to create a peer or a superior;
+ * that would turn one compromised admin account into every admin account.
+ * The server enforces the same enum, so this is a convenience, not the control.
+ */
+export const PROVISIONABLE_ROLES = [
+  { value: 'Doctor', label: 'Doctor' },
+  { value: 'Resident', label: 'Resident' },
+  { value: 'HealthcareWorker', label: 'Nurse / healthcare worker' },
+  { value: 'LabTechnician', label: 'Lab technician' },
+] as const
+
+export type ProvisionableRole = (typeof PROVISIONABLE_ROLES)[number]['value']
+
+export interface ProvisionStaffPayload {
+  role: ProvisionableRole
+  firstName: string
+  lastName: string
+  email: string
+  /** Digits only — the server normalizes again with utils/phone.ts. */
+  mobile: string
+  /** Specialty for a clinician; job title for other staff. */
+  specialty: string
+  /**
+   * ⚠️ Required. `completeOnboarding` refuses without it, so omitting it
+   * trapped every provisioned clinician on the onboarding screen — blocked by
+   * the one field the form never asked for.
+   */
+  yearsExperience: number
+  registrationNumber?: string
+  qualifications?: string
+}
+
+/**
+ * Create a doctor account.
+ *
+ * ⚠️ THE REPLACEMENT FOR PUBLIC DOCTOR SIGN-UP. No password is sent or
+ * returned — there isn't one. The server emails a single-use set-password link
+ * to the address registered here, and the doctor signs in with email + password.
+ */
+export async function provisionStaff(
+  payload: ProvisionStaffPayload,
+): Promise<{ profileId: string; userId: string; role: string }> {
+  return apiClient.post<{ profileId: string; userId: string; role: string }>(
+    '/hospital-admin/staff',
+    payload,
+  )
+}
+
 export async function verifyDoctor(doctorId: string): Promise<void> {
   return apiClient.post(`/hospital-admin/doctors/${doctorId}/verify`)
 }
@@ -147,4 +197,18 @@ export async function assignCareTeam(payload: AssignCareTeamPayload): Promise<{ 
 
 export async function endCareTeam(membershipId: string): Promise<void> {
   return apiClient.delete(`/hospital-admin/care-team/${membershipId}`)
+}
+
+/**
+ * Approve a patient's request. The server checks the doctor is working then
+ * and not already booked, and refuses with the reason if not. An unassigned
+ * ("no preference") request needs `doctorId` — a doctor at this hospital.
+ */
+export async function approveAppointment(id: string, doctorId?: string): Promise<void> {
+  await apiClient.post(`/hospital-admin/appointments/${id}/approve`, doctorId === undefined ? {} : { doctorId })
+}
+
+/** Decline a request; the patient is notified and asked to choose another time. */
+export async function declineAppointment(id: string, reason: string): Promise<void> {
+  await apiClient.post(`/hospital-admin/appointments/${id}/decline`, { reason })
 }

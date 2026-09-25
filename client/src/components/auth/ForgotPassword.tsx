@@ -1,11 +1,12 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Shield } from 'lucide-react'
 import apiClient from '../../lib/apiClient'
 import type { ApiError } from '../../types/api'
 import BrandMark from '../common/BrandMark'
 import AuthShell from './AuthShell'
+import { parseAudience } from './audience'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -33,6 +34,11 @@ function Spinner() {
 }
 
 export default function ForgotPassword() {
+  // Which door they came through, so "Back to sign in" returns them to it.
+  // Presentation only; the reset itself is identical for every role.
+  const [params] = useSearchParams()
+  const audience = parseAudience(params.get('as'))
+  const backTo = audience === null ? '/login' : `/login?as=${audience}`
   const [email, setEmail]           = useState('')
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
@@ -222,7 +228,7 @@ export default function ForgotPassword() {
                       Try a different email
                     </button>
                     <Link
-                      to="/login"
+                      to={backTo}
                       className="flex items-center justify-center gap-2 w-full text-sm
                                  text-ink-subtle hover:text-ink-muted transition-colors"
                     >
@@ -254,7 +260,7 @@ export default function ForgotPassword() {
                   <form onSubmit={handleSubmit} className="space-y-5" noValidate>
                     {/* Email field */}
                     <motion.div custom={0} variants={fadeIn} initial="initial" animate="animate">
-                      <label className="block text-sm font-medium text-ink mb-1.5">
+                      <label htmlFor="forgot-email" className="block text-sm font-medium text-ink mb-1.5">
                         Email address
                       </label>
                       <div className="relative group">
@@ -352,7 +358,7 @@ export default function ForgotPassword() {
                     className="text-center"
                   >
                     <Link
-                      to="/login"
+                      to={backTo}
                       id="back-to-login"
                       className="inline-flex items-center gap-2 text-sm font-medium text-ink-subtle
                                  hover:text-primary-700 transition-colors"
@@ -362,6 +368,9 @@ export default function ForgotPassword() {
                     </Link>
                   </motion.div>
 
+                  {/* ⚠️ Staff cannot self-register, so the link is offered to
+                      patients (and to anyone who arrived without choosing). */}
+                  {audience !== 'clinician' && audience !== 'hospital' && (
                   <motion.p
                     custom={3}
                     variants={fadeIn}
@@ -377,6 +386,7 @@ export default function ForgotPassword() {
                       Create account
                     </Link>
                   </motion.p>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

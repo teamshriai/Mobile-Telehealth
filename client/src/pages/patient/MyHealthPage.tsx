@@ -1,5 +1,8 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { FileText, Save } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Save } from 'lucide-react'
+import Tabs from '../../components/common/Tabs'
+import { ConditionsPanel, InstructionsPanel, VisitsPanel } from './myHealth/RecordPanels'
 import * as profileService from '../../services/profile.service'
 import type { HealthHistoryUpdate } from '../../services/profile.service'
 import { LoadingState, ErrorState, Banner } from '../../components/feedback/States'
@@ -7,7 +10,18 @@ import type { PatientProfile } from '../../types/domain'
 import type { ApiError } from '../../types/api'
 
 /**
- * My Health — health history view/edit, backed by the Phase 3 health-history
+ * My Health — the patient's longitudinal record, in four tabs:
+ *
+ *  - Conditions, Visits, Instructions: what the CARE TEAM recorded and signed
+ *    (read-only, GET /me/*). Every item carries a SourceBadge naming who.
+ *  - Your history: what the PATIENT told us, editable — the original Phase 3
+ *    health-history form, unchanged below.
+ *
+ * ⚠️ The two halves are separated on purpose. Mixing "you said you are
+ * allergic to penicillin" with "your consultant recorded hypothyroidism" in
+ * one list would make the patient's own words look like clinical findings.
+ *
+ * Health history view/edit is backed by the Phase 3 health-history
  * fields added to PatientProfile.
  *
  * Documents/records/reports are DEFERRED to Phase 4 (per the phase plan — no
@@ -100,7 +114,7 @@ function Select({ id, label, value, onChange, options }: SelectProps) {
   )
 }
 
-export default function MyHealthPage() {
+function HealthHistoryPanel() {
   const [profile, setProfile] = useState<PatientProfile | null>(null)
   const [form, setForm] = useState<HealthHistoryUpdate | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,13 +171,6 @@ export default function MyHealthPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My Health</h1>
-        <p className="mt-1.5 text-sm text-ink-muted">
-          A record of your medical history that your care team can rely on.
-        </p>
-      </div>
-
       {loading ? (
         <LoadingState label="Loading your health information…" />
       ) : loadError ? (
@@ -175,7 +182,7 @@ export default function MyHealthPage() {
           <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
             <h2 className="text-base font-semibold text-ink">Medical history</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              This is your own summary in your own words — it helps your care team, but it does
+              This is your own summary in your own words — it helps your doctors, but it does
               not replace a clinical record.
             </p>
 
@@ -196,7 +203,7 @@ export default function MyHealthPage() {
 
           <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
             <h2 className="text-base font-semibold text-ink">Lifestyle</h2>
-            <p className="mt-1 text-sm text-ink-muted">Helps your care team give you better advice.</p>
+            <p className="mt-1 text-sm text-ink-muted">Helps your doctors give you better advice.</p>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Select id="smoking" label="Smoking" options={SMOKING}
@@ -240,19 +247,42 @@ export default function MyHealthPage() {
         </form>
       )}
 
-      {/* Documents: deferred to Phase 4 — no Document model or file storage
-          exists. An honest state, not a fake upload. */}
-      <section className="rounded-xl border border-border-soft bg-surface-1 p-5">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
-          <FileText size={17} aria-hidden="true" className="text-ink-subtle" />
-          Reports and documents
-        </h2>
-        <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-muted">
-          Uploading scans, discharge summaries and lab reports is not available yet. We would
-          rather wait until it works properly than show you an upload that does not really save
-          your file.
+    </div>
+  )
+}
+
+const TABS = [
+  { id: 'conditions', label: 'Conditions' },
+  { id: 'visits', label: 'Visits' },
+  { id: 'instructions', label: 'Instructions' },
+  { id: 'history', label: 'Your history' },
+]
+
+export default function MyHealthPage() {
+  const [params, setParams] = useSearchParams()
+  const requested = params.get('tab')
+  const active = TABS.some((t) => t.id === requested) ? (requested as string) : 'conditions'
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">My Health</h1>
+        <p className="mt-1.5 max-w-prose text-sm text-ink-muted">
+          What your doctors have recorded about you, and the history you have told us yourself.
         </p>
-      </section>
+      </div>
+
+      <Tabs
+        label="My Health sections"
+        tabs={TABS}
+        activeId={active}
+        onChange={(id) => setParams({ tab: id }, { replace: true })}
+      >
+        {active === 'conditions' && <ConditionsPanel />}
+        {active === 'visits' && <VisitsPanel />}
+        {active === 'instructions' && <InstructionsPanel />}
+        {active === 'history' && <HealthHistoryPanel />}
+      </Tabs>
     </div>
   )
 }

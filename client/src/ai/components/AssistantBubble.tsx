@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { X, Send } from 'lucide-react'
 import { useAiMode } from '../useAi'
+import { useAuth } from '../../app/useAuth'
 import { touchpoint } from '../registry'
 import AiMark from './AiMark'
 import { isClinicalQuestion, routeFor, lookup, SUGGESTED } from '../fixtures/assistant'
@@ -38,6 +39,7 @@ type Turn =
 
 export default function AssistantBubble() {
   const { mode } = useAiMode()
+  const { role } = useAuth()
   const spec = touchpoint('AI-911')
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
@@ -84,6 +86,11 @@ export default function AssistantBubble() {
 
   // §6.1 guardrail 6 — hidden entirely, not greyed.
   if (mode === 'off') return null
+  // ⚠️ NOT FOR PATIENTS. This bubble's corpus is written for clinicians
+  // ("How do I correct a signed note?"), and patients have the real,
+  // record-grounded assistant at /app/ai-insights. Showing both put a
+  // simulated clinician helper on top of a patient's own records.
+  if (role === 'Patient') return null
 
   function ask(e: FormEvent) {
     e.preventDefault()
@@ -134,7 +141,7 @@ export default function AssistantBubble() {
           ref={panelRef}
           role="dialog"
           aria-label="Assistant"
-          className="fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-2xl border border-border-soft bg-surface-1 shadow-card-lg sm:inset-x-auto sm:bottom-6 sm:right-6 sm:max-h-[32rem] sm:w-[26rem] sm:rounded-2xl"
+          className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex max-h-[70dvh] flex-col rounded-t-2xl border border-border-soft bg-surface-1 shadow-card-lg sm:inset-x-auto sm:bottom-6 sm:right-6 sm:max-h-[32rem] sm:w-[26rem] sm:rounded-2xl"
         >
           <header className="flex items-start justify-between gap-2 border-b border-border-soft p-4">
             <div className="min-w-0">

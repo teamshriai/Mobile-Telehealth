@@ -43,7 +43,12 @@ test.describe('anonymous', () => {
     // `guards.tsx` redirects to /login carrying the attempted path, so the
     // clinician lands where they were going after signing in.
     await page.waitForURL(/\/login/, { timeout: 30_000 })
-    await expect(page.getByLabel(/email/i).first()).toBeVisible()
+    // ⚠️ `/login` with no `?as=` is the entry page ("Who are you?"), so the
+    // guard's redirect lands on the three doors — not on a form that would
+    // assume which kind of account the person has.
+    await expect(page.getByTestId('entry-patient')).toBeVisible()
+    await expect(page.getByTestId('entry-clinician')).toBeVisible()
+    await expect(page.getByTestId('entry-hospital')).toBeVisible()
 
     // ⚠️ And no clinical surface leaked on the way past. A guard that redirects
     // *after* painting the shell has still shown a patient banner to someone

@@ -14,8 +14,7 @@ import {
   Check,
   Shield,
   HeartPulse,
-  Stethoscope,
-  Building2,
+
 } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import BrandMark from '../common/BrandMark'
@@ -31,10 +30,19 @@ interface RoleOption {
 }
 
 /**
- * The role-selection step. Presented before the identity form so
- * registration branches into the right onboarding path from the start,
- * rather than defaulting everyone to Patient. Admin is deliberately absent
- * — the global Admin role stays seed/ops-created only, never self-service.
+ * ⚠️ PATIENT ONLY. Doctor and Hospital Administrator were removed here.
+ *
+ * Self-registration as a clinician is not an onboarding convenience, it is an
+ * authorization hole: anyone who could reach this page could mint an account
+ * that the rest of the product treats as a prescriber. Nothing in a sign-up
+ * form establishes a medical registration.
+ *
+ * Clinician and hospital-admin accounts are now created by a hospital
+ * administrator (`POST /hospital-admin/doctors`), which binds a mobile number
+ * to a named, registration-numbered profile inside a specific hospital. OTP
+ * login then proves control of that handset — and only that.
+ *
+ * Admin was already absent for the same class of reason and stays absent.
  */
 const ROLE_OPTIONS: RoleOption[] = [
   {
@@ -42,18 +50,6 @@ const ROLE_OPTIONS: RoleOption[] = [
     label: 'Patient',
     icon: HeartPulse,
     description: 'Book visits, track your health, and message your care team.',
-  },
-  {
-    value: 'Doctor',
-    label: 'Doctor',
-    icon: Stethoscope,
-    description: 'Manage your patients, availability, and clinical schedule.',
-  },
-  {
-    value: 'HospitalAdmin',
-    label: 'Hospital Administrator',
-    icon: Building2,
-    description: "Manage your hospital's doctors, patients and operations.",
   },
 ]
 
@@ -317,7 +313,7 @@ export default function Register() {
 
             <p className="mt-6 text-center text-xs sm:text-sm text-ink-muted">
               Already have an account?{' '}
-              <Link to="/login" className="font-semibold hover:opacity-80 transition-opacity text-primary-700">
+              <Link to="/login?as=patient" className="font-semibold hover:opacity-80 transition-opacity text-primary-700">
                 Sign in
               </Link>
             </p>
@@ -754,7 +750,7 @@ export default function Register() {
             >
               Already have an account?{' '}
               <Link
-                to="/login"
+                to="/login?as=patient"
                 className="font-semibold hover:opacity-80 transition-opacity text-primary-700"
               >
                 Sign in

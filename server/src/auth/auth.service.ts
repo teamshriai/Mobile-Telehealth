@@ -6,8 +6,11 @@ import { AppError } from '../middleware/errorHandler';
 import { auditService } from '../services/audit.service';
 import { AuditAction, AuditSeverity } from '../services/audit.service';
 import { signAccessToken } from '../utils/jwt';
+import { normalizeMobile } from '../utils/phone';
+import { hmacBlindIndex } from '../utils/encryption';
 import { authRepository, type UserWithRole } from './auth.repository';
 import { refreshTokenService } from './refreshToken.service';
+import { issuePasswordToken, RESET_TOKEN_TTL_MS, SETUP_TOKEN_TTL_MS } from './passwordToken';
 import { decryptProfile } from '../profile/profile.repository';
 import { toProfileResponseShape } from '../profile/profile.service';
 import { toDoctorProfileResponseShape } from '../doctor/doctorProfile.service';
@@ -72,6 +75,47 @@ function sanitize(user: UserWithRole): SanitizedUser {
 // Auth Service
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * ⚠️ THE ONE PLACE A SESSION IS CREATED.
+ *
+ * Password login and OTP login both end here, and that is the entire point:
+ * two call sites minting their own tokens is how a system acquires a second,
+ * subtly weaker authentication path that nobody audits. In particular
+ * `refreshTokenService.issue()` is the sole minting point for a `familyId` —
+ * writing a RefreshToken row directly anywhere else would break rotation,
+ * reuse detection and family revocation all at once.
+ *
+ * `method` is recorded on the audit row so "how did this session start" is
+ * answerable after the fact, which matters the first time a password login
+ * appears on an account that is supposed to be OTP-only.
+ */
+async function establishSession(
+  user: UserWithRole,
+  meta: { ipAddress?: string; userAgent?: string },
+  method: 'password' | 'otp',
+): Promise<{ token: string; refreshToken: string; user: SanitizedUser }> {
+  await authRepository.recordSuccessfulLogin(user.id);
+
+  const token = signAccessToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role.name,
+  });
+
+  const refresh = await refreshTokenService.issue(user.id, meta);
+
+  auditService.log({
+    action: AuditAction.UserLoginSuccess,
+    userId: user.id,
+    severity: AuditSeverity.Info,
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+    metadata: { method },
+  });
+
+  return { token, refreshToken: refresh.token, user: sanitize(user) };
+}
+
 export const authService = {
   /**
    * REGISTRATION
@@ -102,6 +146,18 @@ export const authService = {
       throw new AppError('An account with this email address already exists.', 409);
     }
 
+    // 1b. The mobile becomes a login identity, and `User.mobileHash` is unique.
+    // ⚠️ Same disclosure as the email check above — a registration form that
+    // cannot say "that number is taken" leaves the person stuck — and the same
+    // limiter covers both.
+    const mobile = dto.phoneNumber === undefined ? null : normalizeMobile(dto.phoneNumber);
+    if (
+      mobile !== null &&
+      (await authRepository.findByMobileHash(hmacBlindIndex(mobile))) !== null
+    ) {
+      throw new AppError('An account already uses this mobile number. Sign in instead.', 409);
+    }
+
     // 2. Hash password
     const passwordHash = await hash(dto.password, {
       algorithm: Algorithm.Argon2id,
@@ -120,40 +176,21 @@ export const authService = {
     const termsAcceptedAt = dto.agreed ? new Date() : null;
     const termsVersion = dto.agreed ? CURRENT_TERMS_VERSION : null;
 
-    // 4. Create user + the role-appropriate profile atomically
+    // 4. Create user + patient profile atomically
+    //
+    // ⚠️ The Doctor and HospitalAdmin branches were removed with the role
+    // enum above. The repository methods they called
+    // (`createUserWithDoctorProfile`, `createUserWithStaffProfile`) are KEPT —
+    // they are how a hospital admin provisions a clinician, and deleting a
+    // working provisioning primitive because its only *public* caller went
+    // away would have been the wrong cleanup.
     let user: UserWithRole;
-    if (dto.role === 'Doctor') {
-      user = await authRepository.createUserWithDoctorProfile({
-        email: dto.email,
-        passwordHash,
-        roleId: role.id,
-        termsAcceptedAt,
-        termsVersion,
-        profile: {
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          gender: dto.gender,
-          phoneNumber: dto.phoneNumber,
-        },
-      });
-    } else if (dto.role === 'HospitalAdmin') {
-      user = await authRepository.createUserWithStaffProfile({
-        email: dto.email,
-        passwordHash,
-        roleId: role.id,
-        termsAcceptedAt,
-        termsVersion,
-        profile: {
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          phoneNumber: dto.phoneNumber,
-        },
-      });
-    } else {
+    {
       user = await authRepository.createUserWithProfile({
         email: dto.email,
         passwordHash,
         roleId: role.id,
+        mobile,
         termsAcceptedAt,
         termsVersion,
         profile: {
@@ -186,15 +223,11 @@ export const authService = {
       metadata: { email: user.email, role: user.role.name },
     });
 
-    if (dto.role === 'HospitalAdmin') {
-      auditService.log({
-        action: AuditAction.HospitalAdminRegistered,
-        userId: user.id,
-        severity: AuditSeverity.Info,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-      });
-    }
+    // ⚠️ The HospitalAdminRegistered branch was removed with the role enum —
+    // a hospital admin can no longer self-register, so this could never fire.
+    // The AuditAction value itself stays (the enum comment in schema.prisma is
+    // explicit that values are never removed), and historical rows keep their
+    // meaning.
 
     return { token, refreshToken: refresh.token, user: sanitize(user) };
   },
@@ -217,7 +250,16 @@ export const authService = {
 
     // Always run verify() — prevents timing-based user enumeration.
     // If user doesn't exist, verify against a dummy hash.
-    const hashToVerify = user !== null ? user.passwordHash : await getDummyHash();
+    //
+    // ⚠️ A NULL passwordHash takes the SAME path as a missing user. An account
+    // provisioned for mobile + OTP has no password, and the honest answer to
+    // "log me in with a password" is the same generic refusal a wrong password
+    // gets — with the same timing, because the dummy verify still runs. Saying
+    // "this account has no password" instead would confirm the account exists
+    // AND disclose how it authenticates, which is two enumeration oracles in
+    // one sentence. The user is told to use OTP by the login screen, not by
+    // this endpoint's error.
+    const hashToVerify = user?.passwordHash ?? (await getDummyHash());
     const isPasswordValid = await verify(hashToVerify, dto.password);
 
     // Generic error for non-existent user or wrong password — same message, same timing.
@@ -273,25 +315,39 @@ export const authService = {
     }
 
     // 5. Success path
-    await authRepository.recordSuccessfulLogin(user.id);
+    return establishSession(user, meta, 'password');
+  },
 
-    const token = signAccessToken({
-      sub: user.id,
-      email: user.email,
-      role: user.role.name,
-    });
+  /**
+   * LOGIN BY VERIFIED OTP
+   *
+   * ⚠️ The OTP is checked by `otp.service.ts` BEFORE this is called. This
+   * function's only job is to turn an already-proven `userId` into exactly the
+   * session a password login would have produced — which is why it ends in the
+   * same `establishSession` call and not in a parallel implementation.
+   */
+  async loginWithVerifiedOtp(
+    userId: string,
+    meta: { ipAddress?: string; userAgent?: string },
+  ): Promise<{ token: string; refreshToken: string; user: SanitizedUser }> {
+    const user = await authRepository.findById(userId);
 
-    const refresh = await refreshTokenService.issue(user.id, meta);
+    // ⚠️ Re-checked here, not trusted from the challenge. A challenge can
+    // outlive the account it was issued against — deactivation and soft
+    // delete both have to be able to stop a login that is already in flight.
+    if (user === null || user.deletedAt !== null || !user.isActive) {
+      throw new AppError('This account is no longer active. Contact your administrator.', 403);
+    }
 
-    auditService.log({
-      action: AuditAction.UserLoginSuccess,
-      userId: user.id,
-      severity: AuditSeverity.Info,
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
-    });
+    // ⚠️ Defence in depth for the patient-only OTP rule. `otp.service.request`
+    // already never binds a staff account to a challenge, so this is reached
+    // only by a challenge issued before that rule existed. Same wording and
+    // status as a wrong code, so it confirms nothing about the account.
+    if (user.role.name !== RoleName.Patient) {
+      throw new AppError('That code is not correct.', 401);
+    }
 
-    return { token, refreshToken: refresh.token, user: sanitize(user) };
+    return establishSession(user, meta, 'otp');
   },
 
   /**
@@ -415,7 +471,7 @@ export const authService = {
   async forgotPassword(
     dto: ForgotPasswordDto,
     meta: { ipAddress?: string; userAgent?: string },
-  ): Promise<{ token: string | null; email: string }> {
+  ): Promise<{ token: string | null; email: string; expiresAt: Date | null }> {
     const user = await authRepository.findByEmail(dto.email);
 
     if (!user?.isActive) {
@@ -426,20 +482,10 @@ export const authService = {
         userAgent: meta.userAgent,
         metadata: { reason: 'forgot_password_email_not_found', email: dto.email },
       });
-      return { token: null, email: dto.email };
+      return { token: null, email: dto.email, expiresAt: null };
     }
 
-    // 1. Generate 32 bytes cryptographically secure random raw token (64 hex characters)
-    const rawToken = crypto.randomBytes(32).toString('hex');
-
-    // 2. Compute SHA-256 hash for database storage
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    // 3. Set expiry to exactly 15 minutes
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    // 4. Save SHA-256 token hash to database atomically (invalidating prior tokens)
-    await authRepository.savePasswordResetToken(user.id, tokenHash, expiresAt);
+    const { rawToken, expiresAt } = await issuePasswordToken(user.id, RESET_TOKEN_TTL_MS);
 
     auditService.log({
       action: AuditAction.PasswordChanged,
@@ -450,7 +496,21 @@ export const authService = {
       metadata: { stage: 'reset_token_issued', email: user.email },
     });
 
-    return { token: rawToken, email: user.email };
+    return { token: rawToken, email: user.email, expiresAt };
+  },
+
+  /**
+   * SET-PASSWORD INVITATION for a provisioned account.
+   *
+   * ⚠️ Provisioning never sets a password — no administrator ever types, sees
+   * or relays one. The new staff member instead receives this single-use link
+   * and chooses their own. It is the forgot-password token, reused: same
+   * table, same hashing, same single-use sweep, same `/reset-password`
+   * consumer. Only the lifetime differs, because an invitation is read on the
+   * person's first shift, not within fifteen minutes.
+   */
+  async issuePasswordSetupToken(userId: string): Promise<{ rawToken: string; expiresAt: Date }> {
+    return issuePasswordToken(userId, SETUP_TOKEN_TTL_MS);
   },
 
   /**
@@ -549,6 +609,15 @@ export const authService = {
       throw new AppError('User not found.', 404);
     }
 
+    // ⚠️ Authenticated already, so there is no enumeration risk here and the
+    // honest, actionable message is the right one — unlike login() above.
+    if (user.passwordHash === null) {
+      throw new AppError(
+        'This account signs in with a mobile number and OTP, so it has no password to change.',
+        400,
+      );
+    }
+
     const isCurrentPasswordValid = await verify(user.passwordHash, dto.currentPassword);
     if (!isCurrentPasswordValid) {
       auditService.log({
@@ -601,6 +670,21 @@ export const authService = {
     const user = await authRepository.findById(userId);
     if (user === null) {
       throw new AppError('User not found.', 404);
+    }
+
+    // ⚠️ FAIL CLOSED. Deleting an account is irreversible, and the password
+    // prompt is the re-authentication that stops a walked-up-to, already-open
+    // session from doing it. An OTP-only account has no password to re-check,
+    // so the correct behaviour is to REFUSE — not to skip the check, which
+    // would make account deletion strictly easier for passwordless users than
+    // for everyone else. Re-verifying by OTP at this point is the right
+    // feature; inventing it inside a delete handler is not.
+    if (user.passwordHash === null) {
+      throw new AppError(
+        'This account signs in with a mobile number and OTP. Deleting it needs to be done by '
+          + 'your hospital administrator, so the request can be confirmed with you directly.',
+        400,
+      );
     }
 
     const isPasswordValid = await verify(user.passwordHash, currentPassword);

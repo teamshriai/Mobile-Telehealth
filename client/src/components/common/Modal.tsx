@@ -142,8 +142,25 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            /* ⚠️ `z-10` IS LOAD-BEARING, not decoration.
+               The backdrop above is a sibling at the same z-index carrying
+               `backdrop-filter: blur(4px)`. Equal z-index means paint and
+               hit-test order fall back to DOM order, and a backdrop-filtered
+               layer composites separately — so the panel's position in the
+               stack would rest on sibling order alone. An explicit z-index
+               states it instead of relying on that.
+
+               ⚠️ WHAT THIS IS *NOT* A FIX FOR, recorded so nobody re-derives
+               it. Two sign specs were failing with
+               "<div class='bg-scrim'> intercepts pointer events", which reads
+               exactly like a modal layering bug. It was not one — the panel
+               was already above its own scrim. The tests were aiming at the
+               page's Sign button *underneath* the dialog, because
+               `.last()` resolved before the dialog had mounted. The fix is in
+               `e2e/helpers.ts` → `confirmSign`. If that symptom returns, look
+               at the locator before you look at this z-index. */
             className={`
-              focus-ring relative w-full bg-surface-1 rounded-xl
+              focus-ring relative z-10 w-full bg-surface-1 rounded-xl
               border border-border-soft overflow-hidden
               shadow-[0_20px_60px_0_rgba(15,23,42,0.18)]
               ${SIZES[size] || SIZES.md}

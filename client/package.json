@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:lan": "vite --host",
+    "dev:lan": "vite --host --port 3000 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext js,jsx,ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:lan": "playwright test --project=lan",
+    "test:e2e:auth": "playwright test --project=auth",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:patient": "playwright test --project=patient"
   },
   "dependencies": {
     "axios": "^1.18.1",

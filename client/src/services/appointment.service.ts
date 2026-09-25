@@ -44,3 +44,11 @@ export async function cancelAppointment(id: string, cancelReason?: string | null
   )
   return appointment
 }
+
+export async function rescheduleAppointment(id: string, scheduledAt: string): Promise<Appointment> {
+  const { appointment } = await apiClient.patch<{ appointment: Appointment }>(
+    `/appointments/${id}/reschedule`,
+    { scheduledAt },
+  )
+  return appointment
+}

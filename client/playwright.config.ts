@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import path from 'node:path'
 
 /**
  * Browser verification for the clinician portal.
@@ -43,6 +44,10 @@ export default defineConfig({
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
     {
       name: 'chromium',
+      // ⚠️ `lan.spec.ts` is excluded here and runs only in the `lan` project
+      // below. It needs a dev server bound to all interfaces, and every page
+      // load costs one of the 60 `/auth/refresh` calls per 15 minutes.
+      testIgnore: /(lan|auth-entry|patient-portal|health-notes)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // The default session. Specs that need another clinician declare it
@@ -51,6 +56,60 @@ export default defineConfig({
         storageState: './e2e/.auth/doctor.json',
       },
       dependencies: ['setup'],
+    },
+    /**
+     * ⚠️ OPT-IN: `npm run test:e2e:lan`. Not in the default run.
+     *
+     * Proves the app works when opened from another device on the Wi-Fi. It
+     * signs in through the form rather than reusing a `storageState` minted
+     * against localhost — reusing that would assume away the thing under test.
+     * No `dependencies: ['setup']` for the same reason.
+     *
+     * The LAN address is discovered at runtime (`e2e/lanAddress.ts`) and the
+     * spec skips itself, loudly, when there is no non-internal interface.
+     */
+    /**
+     * ⚠️ OPT-IN: `npm run test:e2e:auth`. The sign-in entry for every role —
+     * patient OTP (mobile + email) and password, staff password, forgot
+     * password, the staff invitation. Signs in for real, so it has no
+     * `storageState` and no `dependencies: ['setup']` — reusing a minted
+     * session would assume away the thing under test. Kept out of the default
+     * run because it spends the OTP, forgot-password and reset limiters
+     * (5 per 15 minutes each).
+     */
+    {
+      name: 'auth',
+      testMatch: /auth-entry\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    /**
+     * ⚠️ OPT-IN: `npm run test:e2e:patient`. The patient portal, signed in as
+     * SD-P-01 from the saved session. Its own project for two reasons: the
+     * page loads spend the shared `/auth/refresh` budget, and Chromium here
+     * is given a FAKE MICROPHONE that plays a real speech clip — so the voice
+     * note test exercises actual capture → 16 kHz conversion → upload →
+     * on-server Whisper, not a mocked transcript.
+     */
+    {
+      name: 'patient',
+      testMatch: /(patient-portal|health-notes)\.spec\.ts/,
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['microphone', 'camera'],
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+            `--use-file-for-fake-audio-capture=${path.resolve(process.cwd(), 'e2e/fixtures/voice-note-en-16k.wav')}`,
+          ],
+        },
+      },
+    },
+    {
+      name: 'lan',
+      testMatch: /lan\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: {

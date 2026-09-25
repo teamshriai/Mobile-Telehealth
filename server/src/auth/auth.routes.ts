@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   register,
   login,
+  requestOtp,
+  verifyOtp,
   logout,
   refresh,
   me,
@@ -21,6 +23,10 @@ import {
   forgotPasswordLimiter,
   verifyTokenLimiter,
   resetPasswordLimiter,
+  otpRequestPerIdentifierLimiter,
+  otpRequestPerIpLimiter,
+  otpVerifyPerChallengeLimiter,
+  otpVerifyPerIpLimiter,
 } from '../middleware/rateLimiter';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +45,14 @@ router.post('/login', loginSlowDown, loginLimiter, login);
 // Refresh is public — the caller has no valid access token by definition.
 // Authentication comes from the httpOnly refresh cookie. Rate-limited because
 // it is an unauthenticated endpoint that performs database writes.
+// ── Mobile OTP login ────────────────────────────────────────────────────────
+// ⚠️ TWO LIMITERS EACH, per-identity AND per-IP, and a request must satisfy
+// both. See the long note in middleware/rateLimiter.ts: a single combined
+// bucket is bypassed by varying whichever component is cheapest for the
+// attacker, so the axes are kept independent on purpose.
+router.post('/otp/request', otpRequestPerIpLimiter, otpRequestPerIdentifierLimiter, requestOtp);
+router.post('/otp/verify', otpVerifyPerIpLimiter, otpVerifyPerChallengeLimiter, verifyOtp);
+
 router.post('/refresh', refreshLimiter, refresh);
 
 // Forgot / verify token / reset password — rate-limited to prevent abuse

@@ -365,7 +365,13 @@ html[data-high-contrast='true']:root.dark {
 
   body {
     min-width: 320px;
+    /* ⚠️ `100dvh`, with `100vh` first as the fallback for engines that lack it.
+       On mobile `100vh` is the LARGE viewport — it includes the space the URL
+       bar occupies — so a page sized to it is always slightly taller than what
+       is actually visible, and the bottom of every screen sits under browser
+       chrome until the user scrolls. `dvh` tracks the viewport as it changes. */
     min-height: 100vh;
+    min-height: 100dvh;
     /* `clip`, not `hidden`: `hidden` makes body a scroll container in some
        engines, which breaks `position: sticky` descendants (the pinned hero). */
     overflow-x: clip;
@@ -589,6 +595,37 @@ html[data-high-contrast='true']:root.dark {
     justify-content: center;
   }
 
+  /**
+   * A 44px touch target WITHOUT a 44px box.
+   *
+   * ⚠️ `.tap-target` grows the element itself, which is right for a standalone
+   * control and wrong for a dense one: applying it to the Z6 calendar's
+   * month-nav would put two 44px hover slabs beside a 12px month label, and
+   * applying it to the day grid would push the grid wider than a 375px phone.
+   *
+   * This instead centres an invisible 44px pseudo-element over the control.
+   * Pointer events hit it, so the reachable target is 44px while the drawn
+   * control keeps its size. The month-nav chevrons measured 22×22 on every
+   * phone width — under the Atlas's ≥44px rule and under WCAG 2.5.8's floor
+   * too — while `--tap-min` sat in this file claiming the bar was enforced.
+   *
+   * ⚠️ On a grid, size the hit area to the PITCH (cell + gap) so neighbouring
+   * targets tile exactly rather than overlapping. Overlapping hit areas on a
+   * date picker turn a mis-tap into the wrong day.
+   */
+  .tap-reach {
+    position: relative;
+  }
+  .tap-reach::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
+
   /* Screen-reader-only, but focusable (skip links). */
   .sr-only {
     position: absolute;
@@ -615,6 +652,27 @@ html[data-high-contrast='true']:root.dark {
   }
   .skip-link:focus {
     top: 0.5rem;
+  }
+
+  /**
+   * ⚠️ SAFE AREA. On a notched or gesture-bar phone the bottom ~34px of the
+   * viewport belongs to the home indicator. Anything `fixed bottom-0` sits
+   * underneath it — which was true of `S-06-08`'s sticky action bar and
+   * `S-06-07`'s basket trigger, both of which carry a primary action.
+   *
+   * `env()` resolves to 0 on every device without an inset, and to 0 in any
+   * browser that does not support it, so these are safe to apply
+   * unconditionally. They require `viewport-fit=cover` in the viewport meta —
+   * without it the insets are never exposed and these silently do nothing.
+   *
+   * `.safe-bottom`  — adds the inset to existing bottom padding (full-width bars)
+   * `.safe-inset-b` — lifts a floating element clear of the indicator
+   */
+  .safe-bottom {
+    padding-bottom: calc(var(--safe-bottom-base, 0.75rem) + env(safe-area-inset-bottom, 0px));
+  }
+  .safe-inset-b {
+    bottom: calc(var(--safe-inset-base, 1rem) + env(safe-area-inset-bottom, 0px));
   }
 
   .scrollbar-hide {
