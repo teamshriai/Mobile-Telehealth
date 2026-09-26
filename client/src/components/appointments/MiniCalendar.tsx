@@ -90,7 +90,7 @@ export default function MiniCalendar({ marks, initialMonth, selected = null, onS
 
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((w) => (
-          <span key={w} className="pb-1 text-[11px] font-medium uppercase tracking-wide text-ink-subtle" aria-hidden="true">
+          <span key={w} className="pb-1 text-2xs font-medium uppercase tracking-wide text-ink-subtle" aria-hidden="true">
             {compact ? w.slice(0, 1) : w}
           </span>
         ))}
@@ -135,7 +135,7 @@ export default function MiniCalendar({ marks, initialMonth, selected = null, onS
         })}
       </div>
 
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-subtle">
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-subtle">
         <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-primary-600" /> Confirmed</span>
         <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full border border-warning-fg" /> Awaiting confirmation</span>
       </p>

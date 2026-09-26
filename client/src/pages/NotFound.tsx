@@ -33,7 +33,6 @@ export default function NotFound() {
           <p
             className="text-[160px] font-black leading-none select-none"
             style={{
-              fontFamily: 'DM Sans, Inter, sans-serif',
               letterSpacing: '-0.05em',
               background: 'linear-gradient(135deg, var(--color-surface-3) 0%, var(--color-border) 100%)',
               WebkitBackgroundClip: 'text',
@@ -90,10 +89,7 @@ export default function NotFound() {
           transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
           className="space-y-3 mb-8"
         >
-          <h1
-            className="text-2xl font-bold text-ink"
-            style={{ fontFamily: 'DM Sans, Inter, sans-serif', letterSpacing: '-0.02em' }}
-          >
+          <h1 className="text-2xl font-semibold text-ink">
             Page not found
           </h1>
           <p className="text-sm text-ink-subtle leading-relaxed max-w-sm">
@@ -141,7 +137,7 @@ export default function NotFound() {
           transition={{ duration: 0.5, delay: 0.5 }}
           className="mt-10 text-xs text-ink-subtle font-medium"
         >
-          Stroke AI — Patient Portal
+          SHRI HEALTH — Patient Portal
         </motion.p>
       </motion.div>
     </div>

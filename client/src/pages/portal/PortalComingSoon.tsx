@@ -75,7 +75,7 @@ export default function PortalComingSoon() {
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-16 items-center gap-2.5 border-b border-border-soft bg-surface-1 px-4 sm:px-6">
         <BrandMark size={16} />
-        <span className="text-[15px] font-bold tracking-tight text-ink">Stroke AI</span>
+        <span className="text-[15px] font-bold tracking-[0.06em] text-ink">SHRI HEALTH</span>
         <span aria-hidden="true" className="text-ink-subtle">/</span>
         <span className="text-sm font-medium text-ink-subtle">{config.name}</span>
 

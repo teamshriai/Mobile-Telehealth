@@ -373,6 +373,7 @@ export type AiMessageKind =
   | 'SafetyBlocked'
   | 'BudgetDeferred'
   | 'PolicyBlocked'
+  | 'ProviderUnavailable'
 
 export interface AiMessage {
   id: string

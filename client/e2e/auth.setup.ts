@@ -1,7 +1,7 @@
 import { test as setup, expect, request } from '@playwright/test'
 import fs from 'node:fs/promises'
 import { PASSWORD } from './helpers'
-import { AUTH_DIR, API_ORIGIN, DEMO_USERS, statePath, type DemoUser } from './authState'
+import { AUTH_DIR, API_ORIGIN, DEMO_USERS, passwordFor, statePath, type DemoUser } from './authState'
 
 /**
  * Mint one authenticated session per demo user, before any spec runs.
@@ -37,10 +37,17 @@ setup('mint authenticated sessions for the demo cast', async () => {
   await fs.mkdir(AUTH_DIR, { recursive: true })
 
   for (const [name, email] of Object.entries(DEMO_USERS) as Array<[DemoUser, string]>) {
+    const password = passwordFor(name)
+    // An optional account with no password configured: skipped, not failed —
+    // a failed login spends the limiter. Its specs skip on the same check.
+    if (password === '') {
+      await fs.rm(statePath(name), { force: true })
+      continue
+    }
     const ctx = await request.newContext({ baseURL: API_ORIGIN })
     try {
       const res = await ctx.post('/api/v1/auth/login', {
-        data: { email, password: PASSWORD },
+        data: { email, password },
       })
 
       expect(res.status(), `login failed for ${email} — is the API on ${API_ORIGIN}?`).toBe(200)

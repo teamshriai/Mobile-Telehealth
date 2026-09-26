@@ -30,7 +30,11 @@ export async function sendMessage(
   content: string,
   conversationId: string | null = null,
 ): Promise<{ conversationId: string; messages: AiMessage[] }> {
-  return apiClient.post('/ai/messages', { content, conversationId })
+  // ⚠️ 45s, not the shared 15s: a turn may wait for the provider's per-minute
+  // window and retry once (server AI_OVERALL_DEADLINE_MS = 30s). The server
+  // always gives up first, so the patient sees its own words, never a raw
+  // network timeout.
+  return apiClient.post('/ai/messages', { content, conversationId }, { timeout: 45_000 })
 }
 
 export async function renameConversation(id: string, title: string): Promise<AiConversation> {

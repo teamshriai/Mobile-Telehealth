@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { DOCTOR, SECOND_CONSULTANT, RESIDENT, PATIENT } from './helpers'
+import { DOCTOR, SECOND_CONSULTANT, RESIDENT, PATIENT, HOSPITAL_ADMIN, PITCH_PATIENT, PITCH_PASSWORD, PASSWORD } from './helpers'
 
 /**
  * Where the suite's authenticated sessions live, and who they belong to.
@@ -28,9 +28,20 @@ export const DEMO_USERS = {
   desai: SECOND_CONSULTANT,
   resident: RESIDENT,
   patient: PATIENT,
+  hadmin: HOSPITAL_ADMIN,
+  meenakshi: PITCH_PATIENT,
 } as const
 
 export type DemoUser = keyof typeof DEMO_USERS
+
+/**
+ * Each account's password. Everyone in the demo clinic shares
+ * DEMO_CLINIC_PASSWORD; the pitch account has its own. An empty value means
+ * "not configured here" — setup skips that account and its specs skip too.
+ */
+export function passwordFor(user: DemoUser): string {
+  return user === 'meenakshi' ? PITCH_PASSWORD : PASSWORD
+}
 
 export function statePath(user: DemoUser): string {
   return path.join(AUTH_DIR, `${user}.json`)

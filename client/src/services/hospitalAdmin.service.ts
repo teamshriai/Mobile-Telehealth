@@ -163,6 +163,55 @@ export async function listFeedback(): Promise<{ feedback: Feedback[]; averageRat
   return apiClient.get('/hospital-admin/feedback')
 }
 
+// ── Refill requests ──────────────────────────────────────────────────────────
+// The administrator routes a patient's request to a doctor, or declines it
+// with a reason the patient sees. Only a doctor's signed prescription fulfils it.
+
+export type RefillQueueStatus = 'Requested' | 'Forwarded' | 'Fulfilled' | 'Declined' | 'Cancelled'
+
+export interface RefillQueueRow {
+  id: string
+  status: RefillQueueStatus
+  requestedAt: string
+  resolvedAt: string | null
+  patientName: string
+  shriPatientId: string
+  medicine: string
+  form: string
+  frequency: string
+  prescribedBy: string | null
+  prescriberUserId: string | null
+  /** Days of supply left on the course; negative once it has run out. */
+  supplyDaysLeft: number | null
+  note: string | null
+  forwardedToName: string | null
+  declineReason: string | null
+}
+
+export interface RefillDoctor {
+  id: string
+  userId: string
+  name: string
+  specialty: string | null
+}
+
+export async function listRefills(): Promise<{ refills: RefillQueueRow[]; doctors: RefillDoctor[] }> {
+  return apiClient.get('/hospital-admin/refills')
+}
+
+/** Without a doctor id, the request goes to the doctor who prescribed it. */
+export async function forwardRefill(id: string, doctorId?: string): Promise<{ forwardedToName: string }> {
+  const { refill } = await apiClient.post<{ refill: { forwardedToName: string } }>(
+    `/hospital-admin/refills/${encodeURIComponent(id)}/forward`,
+    doctorId === undefined ? {} : { doctorId },
+  )
+  return refill
+}
+
+export async function declineRefill(id: string, reason: string): Promise<void> {
+  await apiClient.post(`/hospital-admin/refills/${encodeURIComponent(id)}/decline`, { reason })
+}
+
 export interface CareTeamAssignmentRow {
   id: string
   careRole: string

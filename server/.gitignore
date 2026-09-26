@@ -48,3 +48,6 @@ models/onnx-community/
 
 # Encrypted patient files (voice-note audio). Never commit, never serve statically.
 storage/
+
+# Downloaded demo sources (NLM Visible Human) — never committed
+.cache/

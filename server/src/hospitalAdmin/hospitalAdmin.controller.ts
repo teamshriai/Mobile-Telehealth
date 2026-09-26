@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { hospitalAdminService } from './hospitalAdmin.service';
 import { appointmentApproval, approveSchema, declineSchema } from './appointmentApproval';
+import { refillQueue, forwardSchema, declineRefillSchema } from './refillQueue';
 import {
   updateHospitalSchema,
   setDoctorActiveSchema,
@@ -118,6 +119,23 @@ export const declineHospitalAppointment = asyncHandler(
     res.status(200).json(ApiResponseBuilder.success('Appointment request declined.', { appointment }));
   },
 );
+
+export const listRefillRequests = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const [refills, doctors] = await Promise.all([refillQueue.list(req.user!.id), refillQueue.doctors(req.user!.id)]);
+  res.status(200).json(ApiResponseBuilder.success('Refill requests retrieved.', { refills, doctors }));
+});
+
+export const forwardRefillRequest = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const id = z.string().uuid('Invalid reference.').parse(req.params.id);
+  const refill = await refillQueue.forward(req.user!.id, id, forwardSchema.parse(req.body ?? {}), getRequestMeta(req));
+  res.status(200).json(ApiResponseBuilder.success('Refill request sent to the doctor.', { refill }));
+});
+
+export const declineRefillRequest = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const id = z.string().uuid('Invalid reference.').parse(req.params.id);
+  const refill = await refillQueue.decline(req.user!.id, id, declineRefillSchema.parse(req.body ?? {}), getRequestMeta(req));
+  res.status(200).json(ApiResponseBuilder.success('Refill request declined.', { refill }));
+});
 
 export const getHospitalAnalytics = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {

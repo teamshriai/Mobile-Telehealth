@@ -19,7 +19,7 @@
  */
 
 /** Bumped whenever the rules below change, and stored on the turn. */
-export const SAFETY_RULE_VERSION = 'emergency-2026-09-18';
+export const SAFETY_RULE_VERSION = 'emergency-2026-09-25';
 
 export type EmergencyCategory = 'stroke' | 'medical' | 'selfHarm';
 
@@ -78,7 +78,9 @@ const STROKE_RULES: { id: string; patterns: RegExp[] }[] = [
     id: 'befast.balance',
     patterns: [
       /\bsudden(ly)? (lost|loss of) balance\b/,
-      /\b(can'?t|cannot|unable to) (walk|stand|stay upright)\b/,
+      // Not "can't walk far / for long / without a stick": that is how a
+      // recovering patient describes where they are, not a new event.
+      /\b(can'?t|cannot|unable to) (walk|stand|stay upright)\b(?! (far|long|much|very far|as far|for long|fast|quickly|without|up ?stairs|properly without)\b)/,
       /\b(keep )?(falling|collaps(ed|ing)) over\b/,
     ],
   },
@@ -130,7 +132,12 @@ const MEDICAL_RULES: { id: string; patterns: RegExp[] }[] = [
   { id: 'acute.seizure', patterns: [/\b(seizure|fitting|convulsion|convulsing)\b/] },
   {
     id: 'acute.bleeding',
-    patterns: [/\bbleeding (won'?t|will not|doesn'?t) stop\b/, /\bheavy bleeding\b/],
+    patterns: [
+      /\bbleeding (still )?(won'?t|will not|doesn'?t|does not) stop\b/,
+      /\bheavy bleeding\b/,
+      /\bbleeding (heavily|a lot|badly|profusely)\b/,
+      /\b(vomiting|throwing up|coughing up|coughing) blood\b/,
+    ],
   },
 ];
 
@@ -144,22 +151,35 @@ const SELF_HARM_RULES: { id: string; patterns: RegExp[] }[] = [
     patterns: [
       /\b(kill|killing) myself\b/,
       /\bsuicid(e|al)\b/,
-      /\bend (my|it all|my life)\b/,
+      /\bend it all\b/,
+      // "end my …" fires on anything but a short list of administrative
+      // objects ("end my course of antibiotics" is not a crisis). Anything
+      // not on the list — life, suffering, or a word we did not foresee —
+      // still fires.
+      /\bend my\b(?! (course|courses|medicine|medicines|medication|medications|treatment|appointment|appointments|prescription|prescriptions|tablets?|pills?|physio\w*|therapy|visit|session|call|chat|conversation|account|subscription|day|week|shift|fast|streak)\b)/,
       /\b(want|going) to die\b/,
       /\bno (point|reason) (in )?(living|going on)\b/,
+      /\bno reason to (live|go on)\b/,
       /\bharm myself\b/,
       /\bhurt myself\b/,
+      // Added 25 Sep 2026 — phrasings the first rule set missed.
+      /\bending (it all|my life|my own life|everything)\b/,
+      /\b(want|going|plan|planning|thinking about|thinking of|like) to end it\b/,
+      /\btak(e|ing) my (own )?life\b/,
+      /\b(don'?t|do not|no longer) want to (live|be alive|be here|exist|wake up|go on)\b/,
+      /\bbetter off dead\b|\bwish i (was|were) dead\b|\bwish i could die\b/,
+      /\b(life|living) (is )?(not|isn'?t) worth (living|it)\b/,
     ],
   },
 ];
 
 /**
  * Sentences that are ASKING ABOUT a symptom rather than reporting one.
- * This is the only suppression family, and it deliberately does NOT include
- * any grammatical-subject requirement — requiring "I am" would have missed
+ * These suppress unconditionally, and deliberately do NOT include any
+ * grammatical-subject requirement — requiring "I am" would have missed
  * "face drooping right now", which is exactly the message that must fire.
  */
-const SUPPRESSORS: RegExp[] = [
+const EDUCATIONAL: RegExp[] = [
   // Hypothetical / reference / educational framing
   /\bwhat (is|are|does|do)\b/,
   /\bwhat'?s\b/,
@@ -185,7 +205,16 @@ const SUPPRESSORS: RegExp[] = [
   //       negates having experienced it, distinct from "will not stop".
   /\b(no|not|never|don'?t|doesn'?t|didn'?t|haven'?t|hasn'?t|isn'?t|wasn'?t) (have|having|had|felt|feel|noticed|experienced|seen|any)\b/,
   /\bwithout any\b/,
-  // Past / historical
+];
+
+/**
+ * Framing that places a symptom in the past, or asks whether a medicine
+ * causes it. These suppress ONLY when the sentence carries no acute marker
+ * (below): "since my stroke my arm is weak" is where a patient is in their
+ * recovery; "since my stroke … and today my arm went numb again" is a new
+ * event and must fire.
+ */
+const HISTORY: RegExp[] = [
   /\bsince my stroke\b/,
   /\bafter my stroke\b/,
   /\bwhen i had\b/,
@@ -194,27 +223,79 @@ const SUPPRESSORS: RegExp[] = [
   /\bused to\b/,
   /\bat the time\b/,
   /\bback then\b/,
+  /\byesterday\b/,
+  /\b(\d+|a|an|one|two|three|four|five|six|few|couple of) (days?|weeks?|months?|years?) ago\b/,
+  // Asking whether a medicine causes it
+  /\bside[- ]effects?\b/,
+  /\b(can|could|does|do|will|would|might|may)\b[^.?!]{0,50}\b(cause|causes|causing|lead to|give (me|you))\b/,
+];
+
+/**
+ * Recovery and rehabilitation — suppresses the STROKE-deficit rules only
+ * (again, absent an acute marker). "I can't walk far since physio started"
+ * is recovery; chest pain or bleeding during exercise is not, so the
+ * medical rules never see this family.
+ */
+const RECOVERY: RegExp[] = [
+  /\b(physio\w*|rehab\w*|therapy|therapist|exercises?|recovery|recovering|improv(e|ed|es|ing)|ever since)\b/,
+  /\bfor (months|weeks|years)\b/,
+  /\blong[- ]term\b/,
+];
+
+/**
+ * Words that make a sentence about NOW. They override HISTORY and RECOVERY (never
+ * EDUCATIONAL). "Sudden" is not one of them: it is part of the symptom
+ * phrases themselves, and "what does sudden loss of balance mean" is a
+ * question.
+ */
+const ACUTE: RegExp[] = [
+  /\b(right now|just now|at the moment|currently|this morning|this evening|tonight|today)\b/,
+  /\b(started|began|came on|happening|happened)\b[^.?!]{0,20}\b(now|today|tonight|this morning|an hour|minutes?|just)\b/,
+  /\bjust (started|began|happened|came on)\b/,
+  /\b(an|one|two|few) hours? ago\b|\bminutes? ago\b/,
+  /\bagain\b/,
+  /\b(getting|got|gone|going|is|feels?) worse\b|\bworse (now|today|than)\b/,
+  /\bnew (weakness|numbness|pain|symptoms?|drooping)\b/,
 ];
 
 /** Lowercase, fold punctuation, collapse space. NFKC so unicode look-alikes
  *  cannot slip a phrase past the matcher. */
 function normalise(text: string): string {
-  return text
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}'\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    text
+      .normalize('NFKC')
+      // Phone keyboards type curly apostrophes: "can’t" must match "can't".
+      .replace(/[\u2018\u2019\u02BC]/g, "'")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}'\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /** Split on sentence-ish boundaries BEFORE punctuation is folded away, so
  *  "what is clopidogrel — also my face is drooping" is judged as two clauses
  *  and the second one still fires. */
 function sentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?;])\s+|\s+[—–-]{1,2}\s+|\n+/u)
-    .map((s) => normalise(s))
-    .filter((s) => s.length > 0);
+  return (
+    text
+      // Clause boundaries too: "I don't have chest pain but my face is
+      // drooping" must not let the first clause's negation hide the second.
+      .split(/(?<=[.!?;])\s+|\s+[—–-]{1,2}\s+|\n+|,?\s+(?:but|although|though|however|also)\s+/iu)
+      .map((s) => normalise(s))
+      .filter((s) => s.length > 0)
+  );
+}
+
+/**
+ * Asking or negating (always), or — with no acute marker — past or
+ * side-effect framing, and for stroke deficits also recovery framing.
+ */
+export function isSuppressed(s: string, family: 'stroke' | 'medical'): boolean {
+  if (EDUCATIONAL.some((p) => p.test(s))) return true;
+  if (ACUTE.some((p) => p.test(s))) return false;
+  if (HISTORY.some((p) => p.test(s))) return true;
+  return family === 'stroke' && RECOVERY.some((p) => p.test(s));
 }
 
 function anyMatch(rules: { id: string; patterns: RegExp[] }[], s: string): string | null {
@@ -246,13 +327,11 @@ export function detectEmergency(message: string): EmergencyMatch | null {
   }
 
   for (const s of candidates) {
-    if (SUPPRESSORS.some((p) => p.test(s))) continue;
-
-    const stroke = anyMatch(STROKE_RULES, s);
+    const stroke = isSuppressed(s, 'stroke') ? null : anyMatch(STROKE_RULES, s);
     if (stroke !== null) {
       return { category: 'stroke', ruleId: stroke, ruleVersion: SAFETY_RULE_VERSION };
     }
-    const medical = anyMatch(MEDICAL_RULES, s);
+    const medical = isSuppressed(s, 'medical') ? null : anyMatch(MEDICAL_RULES, s);
     if (medical !== null) {
       return { category: 'medical', ruleId: medical, ruleVersion: SAFETY_RULE_VERSION };
     }

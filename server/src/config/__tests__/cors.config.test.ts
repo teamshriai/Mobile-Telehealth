@@ -52,10 +52,10 @@ describe('isPrivateNetworkOrigin — accepted', () => {
 
     // ⚠️ IPv6 on a dual-stack Wi-Fi. Without these the LAN works over IPv4 and
     // fails inexplicably over IPv6 on the very same network.
-    'http://[fd00::1]:3000',                      // unique local (fc00::/7)
-    'http://[fc00::1234]:3000',                   // unique local
-    'http://[fe80::1ff:fe23:4567:890a]:3000',     // link-local
-    'http://[feb0::1]:3000',                      // link-local, top of range
+    'http://[fd00::1]:3000', // unique local (fc00::/7)
+    'http://[fc00::1234]:3000', // unique local
+    'http://[fe80::1ff:fe23:4567:890a]:3000', // link-local
+    'http://[feb0::1]:3000', // link-local, top of range
 
     // APIPA — what a device self-assigns when DHCP is unavailable.
     'http://169.254.10.5:3000',

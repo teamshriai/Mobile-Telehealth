@@ -103,14 +103,14 @@ export function EmptyState({
 /**
  * The support reference for a failed request. Deliberately understated: it is
  * useful when someone rings up about a failure and noise the rest of the time.
- * Monospaced and selectable, because its whole job is being copied accurately.
+ * Tabular and selectable, because its whole job is being copied accurately.
  */
 export function ReferenceId({ id, className = '' }: { id?: string | null; className?: string }) {
   if (!id) return null
   return (
     <p className={`text-xs text-ink-subtle ${className}`}>
       Reference:{' '}
-      <span className="select-all font-mono text-ink-subtle">{id}</span>
+      <span className="select-all tabular-nums tracking-wide text-ink-subtle">{id}</span>
     </p>
   )
 }

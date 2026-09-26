@@ -48,7 +48,7 @@ export default function OnboardingShell({
     <div className="min-h-screen bg-bg">
       <header className="flex h-16 items-center gap-2.5 border-b border-border-soft bg-surface-1 px-4 sm:px-6">
         <BrandMark size={16} />
-        <span className="text-[15px] font-bold tracking-tight text-ink">Stroke AI</span>
+        <span className="text-[15px] font-bold tracking-[0.06em] text-ink">SHRI HEALTH</span>
         <button
           type="button"
           onClick={handleSignOut}

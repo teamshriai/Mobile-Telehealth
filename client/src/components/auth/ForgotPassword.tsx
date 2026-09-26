@@ -125,14 +125,14 @@ export default function ForgotPassword() {
               {/* Brand */}
               <div className="flex items-center gap-3 mb-12">
                 <div className="shadow-lg rounded-xl">
-                  <BrandMark size={26} />
+                  <BrandMark size={26} tile />
                 </div>
-                <span className="text-2xl font-bold tracking-tight text-on-primary">Stroke AI</span>
+                <span className="text-2xl font-bold tracking-[0.06em] text-on-primary">SHRI HEALTH</span>
               </div>
 
               {/* Content */}
               <div className="space-y-6">
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-on-primary leading-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-on-primary leading-tight">
                   Account Recovery
                 </h1>
                 <p className="text-lg text-on-primary/90 leading-relaxed">
@@ -197,7 +197,7 @@ export default function ForgotPassword() {
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
+                    <h2 className="text-2xl font-semibold tracking-tight text-ink">
                       Check your inbox
                     </h2>
                     <p className="text-sm text-ink-subtle leading-relaxed max-w-xs mx-auto">
@@ -248,7 +248,7 @@ export default function ForgotPassword() {
                 >
                   {/* Heading */}
                   <div className="mb-8">
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink leading-tight">
+                    <h2 className="text-2xl font-semibold tracking-tight text-ink">
                       Forgot password?
                     </h2>
                     <p className="mt-2 text-sm text-ink-subtle">

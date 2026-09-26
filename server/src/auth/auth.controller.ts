@@ -1,6 +1,16 @@
 import type { Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema, otpRequestSchema, otpVerifySchema, forgotPasswordSchema, verifyResetTokenSchema, resetPasswordSchema, changePasswordSchema, deleteAccountSchema } from './auth.validator';
+import {
+  registerSchema,
+  loginSchema,
+  otpRequestSchema,
+  otpVerifySchema,
+  forgotPasswordSchema,
+  verifyResetTokenSchema,
+  resetPasswordSchema,
+  changePasswordSchema,
+  deleteAccountSchema,
+} from './auth.validator';
 import { authService } from './auth.service';
 import { otpService } from './otp.service';
 import { OtpChannel } from '@prisma/client';
@@ -69,11 +79,7 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
  */
 export const requestOtp = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const dto = otpRequestSchema.parse(req.body);
-  const result = await otpService.request(
-    dto.channel === 'Sms' ? OtpChannel.Sms : OtpChannel.Email,
-    dto.identifier,
-    getRequestMeta(req),
-  );
+  const result = await otpService.request(OtpChannel.Sms, dto.identifier, getRequestMeta(req));
 
   if ('tooSoon' in result) {
     res.status(429).json(
@@ -86,13 +92,10 @@ export const requestOtp = asyncHandler(async (req: Request, res: Response): Prom
 
   res.status(200).json(
     ApiResponseBuilder.success(
-      // ⚠️ IDENTICAL WORDING FOR BOTH CHANNELS AND FOR REGISTERED OR NOT. The
-      // only variable is the noun, which the caller already knows because they
-      // chose it. Saying anything conditional here would rebuild the
-      // enumeration oracle the whole flow is built to avoid.
-      dto.channel === 'Sms'
-        ? 'If an account is registered with this mobile number, a 6-digit code has been sent.'
-        : 'If an account is registered with this email address, a 6-digit code has been sent.',
+      // ⚠️ IDENTICAL WORDING FOR REGISTERED OR NOT. Saying anything
+      // conditional here would rebuild the enumeration oracle the whole flow
+      // is built to avoid.
+      'If an account is registered with this mobile number, a 6-digit code has been sent.',
       {
         challengeId: result.challengeId,
         // ⚠️ The client countdown is driven by THIS, not by a local timer, so
@@ -244,11 +247,13 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
     });
   }
 
-  res.status(200).json(
-    ApiResponseBuilder.success(
-      'If an account exists, password reset instructions have been sent.',
-    ),
-  );
+  res
+    .status(200)
+    .json(
+      ApiResponseBuilder.success(
+        'If an account exists, password reset instructions have been sent.',
+      ),
+    );
 });
 
 /**
@@ -277,9 +282,13 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response): P
 
   await authService.resetPassword(dto, meta);
 
-  res.status(200).json(
-    ApiResponseBuilder.success('Password reset successfully. Please sign in with your new password.'),
-  );
+  res
+    .status(200)
+    .json(
+      ApiResponseBuilder.success(
+        'Password reset successfully. Please sign in with your new password.',
+      ),
+    );
 });
 
 /**

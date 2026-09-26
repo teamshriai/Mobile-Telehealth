@@ -186,7 +186,7 @@ export default function ResetPassword() {
         <div className="px-6 py-10 sm:px-10 sm:py-12">
           <div className="flex items-center justify-center gap-2.5 mb-8">
             <BrandMark size={18} />
-            <span className="text-lg font-bold tracking-tight text-ink">Stroke AI</span>
+            <span className="text-lg font-bold tracking-[0.06em] text-ink">SHRI HEALTH</span>
           </div>
 
           <AnimatePresence mode="wait">
@@ -223,7 +223,7 @@ export default function ResetPassword() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+                  <h2 className="text-2xl font-semibold tracking-tight text-ink">
                     Link expired or invalid
                   </h2>
                   <p className="text-sm text-ink-subtle leading-relaxed max-w-sm mx-auto">
@@ -271,7 +271,7 @@ export default function ResetPassword() {
                   </motion.div>
                 </div>
                 <div className="space-y-2">
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+                  <h2 className="text-2xl font-semibold tracking-tight text-ink">
                     {isSetup ? 'Password set' : 'Password reset'}
                   </h2>
                   <p className="text-sm text-ink-subtle">
@@ -284,7 +284,7 @@ export default function ResetPassword() {
             {tokenStatus === 'valid' && !done && (
               <motion.div key="form" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                 <div className="mb-6">
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink">
+                  <h2 className="text-2xl font-semibold tracking-tight text-ink">
                     {isSetup ? 'Set your password' : 'Set a new password'}
                   </h2>
                   <p className="mt-1.5 text-sm text-ink-subtle">

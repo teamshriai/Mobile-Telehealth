@@ -1,26 +1,29 @@
 import {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
-  type ComponentType, type FormEvent, type KeyboardEvent,
+  type FormEvent, type KeyboardEvent,
 } from 'react'
 import {
   Sparkles, Send, Plus, MessageSquare, Trash2, Info, X, PanelLeft,
-  Search, Pencil, Check, Copy, ArrowDown, Siren, Phone, ShieldAlert, Clock,
+  Search, Pencil, Check, Copy, ArrowDown,
 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import * as aiService from '../../services/ai.service'
 import { Banner, Spinner } from '../../components/feedback/States'
-import type { AiConversationSummary, AiMessage, AiMessageKind } from '../../types/domain'
+import MessageBubble from '../../components/aiChat/MessageBubble'
+import { CHAT_SUGGESTIONS } from '../../components/aiChat/suggestions'
+import type { AiConversationSummary, AiMessage } from '../../types/domain'
 import type { ApiError } from '../../types/api'
 
 /**
- * AI Insights.
+ * AI Insights — the full view of the assistant.
  *
- * Conversations are persisted (server/src/ai). The model is NOT connected yet:
- * every assistant turn is stored and shown as an explicit placeholder rather
- * than invented prose. navigation.js records that the previous assistant was
- * removed from this product for "canned replies presented as clinical
- * reassurance" — writing fabricated answers into a permanent transcript would
- * be a worse version of that, so the placeholder stays until a real model is
- * behind it.
+ * Answers come from the patient's own record (server/src/ai: medicines and
+ * dose log, appointments, visits, lab results, vital signs, scan reports,
+ * instructions, health notes); each fact carries a source tag that opens the
+ * page it came from. Every assistant turn records what produced it (`kind`),
+ * and a fixed safety or service message is always styled apart from a
+ * generated answer. The same conversation pieces power the floating chat on
+ * every patient page (components/aiChat).
  *
  * Geometry note: radii here are deliberately tighter than the rest of the
  * portal (12px panels, 8px controls, against the app's 16-20px cards). A
@@ -28,66 +31,9 @@ import type { ApiError } from '../../types/api'
  * than soft; the softer radius elsewhere suits content cards, not a console.
  */
 
-const SUGGESTIONS = [
-  'What happened at my last visit?',
-  'What is Clopidogrel for?',
-  'What do my blood pressure readings mean?',
-  'What should I ask at my next appointment?',
-]
+const SUGGESTIONS = CHAT_SUGGESTIONS
 
 const DAY = 86_400_000
-
-interface TurnStyle {
-  icon: ComponentType<{ size?: number }>
-  iconClass: string
-  wrapClass: string
-  role: 'alert' | 'status'
-  showCallButton: boolean
-}
-
-/**
- * Every assistant turn carries `kind`, set by the server — see
- * server/prisma/schema.prisma's AiMessageKind. Rendering it distinctly is
- * what lets a patient always tell what did and did not come from the model:
- * a fixed safety message must never look identical to a generated answer.
- */
-const TURN_STYLE: Partial<Record<AiMessageKind, TurnStyle>> = {
-  SafetyInterlock: {
-    icon: Siren,
-    iconClass: 'bg-critical-bg text-critical-fg',
-    wrapClass: 'rounded-lg border border-critical-fg/30 bg-critical-bg px-3.5 py-3 text-critical-fg',
-    role: 'alert',
-    showCallButton: true,
-  },
-  SafetyBlocked: {
-    icon: ShieldAlert,
-    iconClass: 'bg-warning-bg text-warning-fg',
-    wrapClass: 'rounded-lg rounded-bl-sm bg-warning-bg px-3.5 py-2.5 text-warning-fg',
-    role: 'status',
-    showCallButton: false,
-  },
-  BudgetDeferred: {
-    icon: Clock,
-    iconClass: 'bg-surface-2 text-ink-subtle',
-    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-subtle',
-    role: 'status',
-    showCallButton: false,
-  },
-  PolicyBlocked: {
-    icon: Info,
-    iconClass: 'bg-surface-2 text-ink-subtle',
-    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-subtle',
-    role: 'status',
-    showCallButton: false,
-  },
-  Placeholder: {
-    icon: Info,
-    iconClass: 'bg-surface-2 text-ink-muted',
-    wrapClass: 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-muted',
-    role: 'status',
-    showCallButton: false,
-  },
-}
 
 function timeOfDay(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
@@ -178,6 +124,21 @@ export default function AiInsightsPage() {
 
   useEffect(() => { void loadConversations() }, [loadConversations])
 
+  // A question handed over by another page ("Ask about this medicine") lands
+  // in the composer, NOT sent: asking spends the patient's daily allowance,
+  // so they press Send themselves. Cleared from the URL so a reload or the
+  // back button does not refill it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const q = searchParams.get('q')?.trim()
+    if (!q) return
+    setDraft(q.slice(0, 500))
+    const next = new URLSearchParams(searchParams)
+    next.delete('q')
+    setSearchParams(next, { replace: true })
+    inputRef.current?.focus()
+  }, [searchParams, setSearchParams])
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     endRef.current?.scrollIntoView({ behavior, block: 'end' })
   }, [])
@@ -222,6 +183,20 @@ export default function AiInsightsPage() {
       setLoadingThread(false)
     }
   }
+
+  // "Open full view" from the floating chat lands here with ?c=<id>. Opened
+  // once, then cleared from the URL so reload and back behave.
+  const openFromUrl = useRef<string | null>(null)
+  useEffect(() => {
+    const c = searchParams.get('c')
+    if (c === null || openFromUrl.current === c) return
+    openFromUrl.current = c
+    void openConversation(c)
+    const next = new URLSearchParams(searchParams)
+    next.delete('c')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openConversation is a plain handler; this runs per ?c value
+  }, [searchParams, setSearchParams])
 
   const startNew = () => {
     setActiveId(null)
@@ -540,7 +515,7 @@ export default function AiInsightsPage() {
             </span>
           </h1>
           <p className="mt-0.5 text-sm text-ink-muted">
-            Ask about your medicines, visits and recovery.
+            Ask about your appointments, medicines, lab results, scans and visits — or a general health question.
           </p>
         </div>
       </div>
@@ -602,7 +577,7 @@ export default function AiInsightsPage() {
               </p>
               <p className="text-2xs text-ink-subtle">
                 {activeId === null
-                  ? 'Not connected yet — your questions are saved'
+                  ? 'Answers come from your record, with where each fact came from'
                   : `${messages.length} messages`}
               </p>
             </div>
@@ -657,78 +632,40 @@ export default function AiInsightsPage() {
             )}
 
             {!loadingThread &&
-              messages.map((m) => {
-                const isUser = m.role === 'User'
-                const special = !isUser ? TURN_STYLE[m.kind] : undefined
-                return (
-                  <div key={m.id} className={`flex gap-2.5 ${isUser ? 'justify-end' : ''}`}>
-                    {!isUser && (
-                      <span
-                        aria-hidden="true"
-                        className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md ${
-                          special ? special.iconClass : 'bg-accent-sky text-accent-sky-fg'
-                        }`}
+              messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  m={m}
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void copyMessage(m)}
+                        aria-label={canCopy ? 'Copy this reply' : 'Select this reply to copy it'}
+                        className="focus-ring rounded p-0.5 text-ink-subtle transition-colors hover:text-ink"
                       >
-                        {special ? <special.icon size={13} /> : <Sparkles size={13} />}
-                      </span>
-                    )}
-
-                    <div className={`group/msg min-w-0 max-w-[85%] ${isUser ? 'items-end' : ''}`}>
-                      <p
-                        id={`msg-body-${m.id}`}
-                        role={special?.role}
-                        className={`whitespace-pre-wrap break-words text-sm leading-relaxed ${
-                          isUser
-                            ? 'rounded-lg rounded-br-sm bg-primary-600 px-3.5 py-2.5 text-on-primary'
-                            : (special?.wrapClass ?? 'rounded-lg rounded-bl-sm bg-surface-2 px-3.5 py-2.5 text-ink-muted')
-                        }`}
-                      >
-                        {m.content}
-                      </p>
-
-                      {special?.showCallButton && (
-                        <a
-                          href="tel:108"
-                          className="focus-ring mt-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-danger px-4 text-sm font-semibold text-on-primary transition-colors hover:bg-danger-fg"
-                        >
-                          <Phone size={15} aria-hidden="true" /> Call 108 — Ambulance
-                        </a>
-                      )}
-
-                      <div
-                        className={`mt-1 flex items-center gap-2 px-0.5 ${isUser ? 'justify-end' : ''}`}
-                      >
-                        <span className="text-2xs text-ink-subtle">
-                          {m.createdAt ? timeOfDay(m.createdAt) : 'Sending…'}
+                        {copiedId === m.id
+                          ? <Check size={12} aria-hidden="true" className="text-success-fg" />
+                          : <Copy size={12} aria-hidden="true" />}
+                      </button>
+                      {/* ⚠️ Beside the button that was pressed. The page-level
+                          error banner lives above the header, outside this
+                          scroll container, so from the bottom of a long thread
+                          it is invisible — which made this a silent no-op. */}
+                      {copyFailedId === m.id && (
+                        <span role="status" className="text-2xs text-ink-muted">
+                          Selected — copy it with your usual shortcut.
                         </span>
-                        {!isUser && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => void copyMessage(m)}
-                              aria-label={canCopy ? 'Copy this reply' : 'Select this reply to copy it'}
-                              className="focus-ring rounded p-0.5 text-ink-subtle transition-colors hover:text-ink"
-                            >
-                              {copiedId === m.id
-                                ? <Check size={12} aria-hidden="true" className="text-success-fg" />
-                                : <Copy size={12} aria-hidden="true" />}
-                            </button>
-                            {/* ⚠️ Beside the button that was pressed. The page-level
-                                error banner lives above the header, outside this
-                                scroll container, so from the bottom of a long thread
-                                it is invisible — which made this a silent no-op. */}
-                            {copyFailedId === m.id && (
-                              <span role="status" className="text-2xs text-ink-muted">
-                                Selected — copy it with your usual shortcut.
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+                      )}
+                    </>
+                  }
+                />
+              ))}
+            {sending && (
+              <p className="flex items-center gap-2 pl-9 text-xs text-ink-subtle" role="status">
+                <Spinner size={12} /> Looking through your record…
+              </p>
+            )}
             <div ref={endRef} />
           </div>
 
@@ -781,9 +718,15 @@ export default function AiInsightsPage() {
                 </summary>
                 <div className="mt-2 space-y-1.5 rounded-md bg-surface-2 p-2.5 text-xs leading-relaxed text-ink-muted">
                   <p>
-                    It answers only from your own medicines, visits and care-team notes — it
-                    cannot see lab results, scans or uploaded reports, because none exist in this
-                    system yet.
+                    It can see what your portal shows you: your appointments, prescribed medicines and
+                    the doses you have marked, lab results with the lab&rsquo;s own ranges and flags, vital
+                    signs, scan and X-ray reports, signed visits (including the doctor&rsquo;s assessment
+                    and plan), instructions, and your own health notes. Each fact it gives links to where it
+                    came from.
+                  </p>
+                  <p>
+                    It cannot see anything the hospital has not released to you, and it does not look at
+                    the scan images themselves. It answers in English.
                   </p>
                   <p className="text-critical-fg">
                     It will never diagnose you, judge whether a symptom is serious, or change a

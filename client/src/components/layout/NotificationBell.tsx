@@ -121,7 +121,7 @@ export default function NotificationBell() {
         {unread > 0 && (
           <span
             aria-hidden="true"
-            className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold leading-none text-on-primary"
+            className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-2xs font-semibold leading-none tabular-nums text-on-primary"
           >
             {unread > 9 ? '9+' : unread}
           </span>
@@ -179,7 +179,7 @@ export default function NotificationBell() {
                             <span className="text-sm font-semibold text-ink">{n.title}</span>
                             {/* Unread is never colour-only — the word "New" carries it too. */}
                             {!n.isRead && (
-                              <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">
+                              <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-2xs font-semibold text-primary-700">
                                 New
                               </span>
                             )}

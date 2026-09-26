@@ -253,6 +253,47 @@ axiosInstance.interceptors.response.use(
   },
 )
 
+/**
+ * `fetch` with the same session as apiClient — for responses that must be
+ * STREAMED (imaging frames), which axios in the browser cannot do.
+ *
+ * Same bearer token, same single-flight refresh: a 401 refreshes once and
+ * retries; a second 401 ends the session exactly as apiClient does. A non-OK
+ * response is rejected with the server's own message as an ApiError.
+ */
+export async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const url = `${BASE_URL}/api/v1${path}`
+  const run = (token: string | null): Promise<Response> =>
+    fetch(url, {
+      ...init,
+      credentials: 'include',
+      headers: { ...(init.headers ?? {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+  let res = await run(accessToken)
+  if (res.status === 401) {
+    const token = await refreshAccessToken().catch(() => null)
+    if (token) res = await run(token)
+    if (res.status === 401) {
+      clearAccessToken()
+      onSessionExpired()
+    }
+  }
+  if (!res.ok) {
+    let message = 'Something went wrong. Please try again.'
+    try {
+      const body = (await res.json()) as { message?: string }
+      if (body.message) message = body.message
+    } catch {
+      /* not JSON */
+    }
+    const err = new Error(message) as ApiError
+    err.status = res.status
+    err.requestId = res.headers.get('x-request-id')
+    throw err
+  }
+  return res
+}
+
 const apiClient = axiosInstance as unknown as ApiClient
 
 export default apiClient

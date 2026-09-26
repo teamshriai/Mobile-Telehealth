@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { assemblePrompt, toTokens, promptCharCount } from '../prompt/assemblePrompt';
+import {
+  assemblePrompt,
+  historyTurns,
+  toTokens,
+  promptCharCount,
+  type RecentTurn,
+} from '../prompt/assemblePrompt';
 import { delimitUntrustedContent, SYSTEM_PROMPT } from '../prompt/systemPrompt';
 import { AiChunkSource } from '@prisma/client';
 import type { PatientContext } from '../context/patientContext';
@@ -13,6 +19,8 @@ function section(text: string): PatientContext['sections'][number] {
     sourceId: 'test-profile-id',
     sourceField: 'test',
     sourceUpdatedAt: NOW,
+    sortAt: NOW,
+    section: 'about',
     text,
   };
 }
@@ -25,6 +33,7 @@ const FULL_CONTEXT: PatientContext = {
     section('Current medicines: Clopidogrel 75mg once daily.'),
     section('Known allergies: Penicillin (rash).'),
   ],
+  guard: { conditions: [], prescribed: [], labs: [], sourceTags: new Set() },
 };
 
 /** assemblePrompt takes retrieval's OUTPUT shape, not the raw PatientContext
@@ -183,6 +192,113 @@ describe('assemblePrompt — budget and trimming', () => {
       recentTurns: [],
       question: 'hello',
     });
-    assert.ok(result.messages.length >= 3);
+    assert.equal(result.messages.length, 2);
+    assert.equal(result.messages[1].role, 'user');
+  });
+});
+
+describe('assemblePrompt v2 — shape', () => {
+  it("puts the record, today's date and the question in the final user turn, with no priming reply", () => {
+    const result = assemblePrompt({
+      patientContext: BASE_CONTEXT,
+      longTermMemorySummaries: [],
+      conversationSummary: null,
+      recentTurns: [],
+      question: 'When is my next appointment?',
+      now: new Date('2026-09-25T08:35:00Z'),
+    });
+    assert.equal(result.messages.length, 2);
+    const last = result.messages[1];
+    assert.equal(last.role, 'user');
+    assert.ok(last.content.includes('<patient_record>'));
+    assert.ok(last.content.includes('Today is Friday, 25 Sep 2026, 14:05 (India time).'));
+    assert.ok(last.content.includes('Question: When is my next appointment?'));
+    assert.ok(
+      last.content.endsWith('(When you use the record, copy the source tag after each fact.)'),
+    );
+    assert.ok(
+      !result.messages.some(
+        (m) => m.role === 'assistant' && /answer only from that record/i.test(m.content),
+      ),
+    );
+    assert.ok(
+      result.groundText.includes('Clopidogrel 75mg'),
+      'the guard grounds in the record shown',
+    );
+  });
+
+  it('keeps history before the final turn, oldest first', () => {
+    const result = assemblePrompt({
+      patientContext: BASE_CONTEXT,
+      longTermMemorySummaries: [],
+      conversationSummary: null,
+      recentTurns: [
+        { role: 'User', content: 'What is clopidogrel?', kind: 'Model' },
+        { role: 'Assistant', content: 'In general, it is a blood thinner.', kind: 'Model' },
+      ],
+      question: 'And when do I take it?',
+    });
+    assert.deepEqual(
+      result.messages.map((m) => m.role),
+      ['system', 'user', 'assistant', 'user'],
+    );
+  });
+});
+
+describe('assemblePrompt — no-citation mode (medicine summary)', () => {
+  it('tells the model not to write bracketed tags when the record has none', () => {
+    const result = assemblePrompt({
+      patientContext: BASE_CONTEXT,
+      longTermMemorySummaries: [],
+      conversationSummary: null,
+      recentTurns: [],
+      question: 'Summarise my medicines.',
+      citeSources: false,
+    });
+    const last = result.messages[result.messages.length - 1].content;
+    assert.match(last, /do not write any text in square brackets/);
+    assert.doesNotMatch(last, /copy the source tag/);
+  });
+});
+
+describe('historyTurns', () => {
+  const q = (content: string): RecentTurn => ({ role: 'User', content });
+  const a = (content: string, kind: RecentTurn['kind'] = 'Model'): RecentTurn => ({
+    role: 'Assistant',
+    content,
+    kind,
+  });
+
+  it('drops a refused turn together with its question', () => {
+    const out = historyTurns([
+      q('Q1'),
+      a("I can't answer that one safely", 'SafetyBlocked'),
+      q('Q2'),
+      a('A2'),
+    ]);
+    assert.deepEqual(
+      out.map((t) => t.content),
+      ['Q2', 'A2'],
+    );
+  });
+
+  it('drops budget, provider and placeholder turns the same way', () => {
+    for (const kind of [
+      'BudgetDeferred',
+      'ProviderUnavailable',
+      'Placeholder',
+      'PolicyBlocked',
+    ] as const) {
+      assert.deepEqual(historyTurns([q('Q'), a('fixed text', kind)]), []);
+    }
+  });
+
+  it('keeps an emergency interlock as a one-line marker', () => {
+    const out = historyTurns([
+      q('my face is drooping'),
+      a('Some of what you have described…', 'SafetyInterlock'),
+    ]);
+    assert.equal(out.length, 2);
+    assert.match(out[1].content, /emergency message was shown/i);
   });
 });

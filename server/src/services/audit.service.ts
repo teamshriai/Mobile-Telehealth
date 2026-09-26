@@ -111,6 +111,17 @@ export enum AuditAction {
   HealthNoteDeleted = 'HealthNoteDeleted',
   HealthNoteAudioAccessed = 'HealthNoteAudioAccessed',
   TranscriptionRequested = 'TranscriptionRequested',
+  // Patient portal: medicines.
+  DoseLogged = 'DoseLogged',
+  DoseLogRemoved = 'DoseLogRemoved',
+  RefillRequested = 'RefillRequested',
+  RefillForwarded = 'RefillForwarded',
+  RefillDeclined = 'RefillDeclined',
+  RefillCancelled = 'RefillCancelled',
+  RefillFulfilled = 'RefillFulfilled',
+  MedicationSummaryGenerated = 'MedicationSummaryGenerated',
+  ImagingStudyViewed = 'ImagingStudyViewed',
+  ImagingImagesAccessed = 'ImagingImagesAccessed',
 }
 
 export enum AuditSeverity {

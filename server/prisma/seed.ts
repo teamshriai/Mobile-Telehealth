@@ -318,7 +318,7 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
       // in the same free-text-summary shape a patient would type themselves.
       knownAllergies: encryptField('Penicillin (rash)'),
       currentMedications: encryptField('Clopidogrel 75mg once daily; Atorvastatin 40mg at night; Amlodipine 5mg once daily'),
-      existingDiseases: encryptField('Hypertension (since 2015); Ischemic stroke, left MCA territory (March 2026), currently in recovery'),
+      existingDiseases: encryptField('Hypertension (since 2015); Ischemic stroke, left MCA territory (June 2026), currently in recovery'),
       familyHistory: encryptField('Father had a heart attack at age 62. Elder sister has type 2 diabetes.'),
       previousSurgeries: encryptField('Cholecystectomy (gallbladder removal), 2011'),
     },
@@ -407,7 +407,7 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
           scheduledAt: inTenDays,
           mode: AppointmentMode.Video,
           status: AppointmentStatus.Confirmed,
-          reason: encryptField('Physiotherapy progress check — left arm mobility'),
+          reason: encryptField('Physiotherapy progress check — right arm mobility'),
         },
       });
     }
@@ -443,7 +443,7 @@ async function seedDemoPatient(patientRoleId: string, doctorRoleId: string): Pro
         {
           userId: user.id,
           type: NotificationType.General,
-          title: 'Welcome to Stroke AI',
+          title: 'Welcome to SHRI HEALTH',
           body: 'Your account is set up. You can review your health information any time under My Health.',
           actionUrl: '/app',
           readAt: null,

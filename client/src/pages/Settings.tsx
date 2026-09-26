@@ -675,7 +675,7 @@ function PrivacySection({ profile, onSave }: PreferenceSectionProps) {
         <SettingsRow icon={Globe} label="Anonymized Research" sub="Contribute anonymized data to stroke care research"
           tone="success"
           control={<ToggleSwitch enabled={settings.researchOpt} onToggle={() => toggle('researchOpt')} />} />
-        <SettingsRow icon={Monitor} label="Platform Analytics" sub="Help improve Stroke AI with usage data"
+        <SettingsRow icon={Monitor} label="Platform Analytics" sub="Help improve SHRI HEALTH with usage data"
           tone="primary"
           control={<ToggleSwitch enabled={settings.analytics} onToggle={() => toggle('analytics')} />} />
         <SettingsRow icon={AlertTriangle} label="Third-Party Integrations" sub="Allow connected apps to access your data"

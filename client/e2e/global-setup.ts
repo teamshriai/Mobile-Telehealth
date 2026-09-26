@@ -37,7 +37,9 @@ export default async function globalSetup(): Promise<void> {
      * shells with no chief complaint, no problems or instructions, no signed
      * note and no basket with items. Anything a clinician typed survives.
      */
-    for (const script of ['db:demo:reset-breakglass', 'db:demo:reset-encounters']) {
+    // The third removes the refill requests the medicines spec made (marked
+    // "[e2e]"): one open request per medicine is all the database allows.
+    for (const script of ['db:demo:reset-breakglass', 'db:demo:reset-encounters', 'db:demo:reset-refills']) {
       const { stdout } = await run('npm', ['run', '--silent', script], { cwd })
       process.stdout.write(`[global-setup] ${stdout.trim()}\n`)
     }

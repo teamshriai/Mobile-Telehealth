@@ -1,10 +1,21 @@
 /* ─────────────────────────────────────────────────────────────────────
-   Google Font  —  Plus Jakarta Sans
-   Closest publicly available match to the reference screenshot font.
-   Characteristics: monolinear stroke, humanist grotesque, open forms,
-   slightly rounded terminals — matching the "Your care connected" text.
+   One typeface — Plus Jakarta Sans, self-hosted as a variable font.
+
+   Variable 200–800, so every weight the UI asks for is the real cut, not a
+   browser-synthesised one (the old CDN link shipped only 300–500, so every
+   semibold heading rendered as medium). Self-hosted: no third-party request
+   on a health portal, and the CSP stays 'self'.
+
+   The four Noto Sans families are unicode-range fallbacks for the app's
+   Indian-language text: each downloads only when a page actually contains
+   that script, and they share Jakarta's proportions closely enough that a
+   mixed-language line reads as one voice.
 ──────────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500&display=swap');
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/noto-sans-kannada';
+@import '@fontsource-variable/noto-sans-devanagari';
+@import '@fontsource-variable/noto-sans-tamil';
+@import '@fontsource-variable/noto-sans-malayalam';
 
 @import "tailwindcss";
 
@@ -26,10 +37,12 @@
      with no `dark:` variant at the call site.
   ═══════════════════════════════════════════════════════════════════════ */
 
-  /* ── Type families ─────────────────────────────────────────────────────
-     Two, total. Plus Jakarta Sans carries the entire application; Playfair
-     is reserved for landing display headings. */
-  --font-sans:   'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* ── Type family ───────────────────────────────────────────────────────
+     One. Plus Jakarta Sans carries the entire application; the Noto
+     families only ever render characters Jakarta does not have. */
+  --font-sans:   'Plus Jakarta Sans Variable', 'Noto Sans Kannada Variable',
+                 'Noto Sans Devanagari Variable', 'Noto Sans Tamil Variable',
+                 'Noto Sans Malayalam Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: var(--font-sans);
 
 

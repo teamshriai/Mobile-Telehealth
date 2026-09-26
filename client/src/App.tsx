@@ -37,6 +37,7 @@ const VisitDetail     = lazy(() => import('./pages/patient/VisitDetail'))
 const NotificationsPage = lazy(() => import('./pages/patient/NotificationsPage'))
 const HealthNotesPage = lazy(() => import('./pages/patient/HealthNotesPage'))
 const ReportsPage     = lazy(() => import('./pages/patient/ReportsPage'))
+const StudyPage       = lazy(() => import('./pages/patient/StudyPage'))
 const Profile         = lazy(() => import('./pages/Profile'))
 const Settings        = lazy(() => import('./pages/Settings'))
 
@@ -77,6 +78,7 @@ const HospitalAdminPatientsPage    = lazy(() => import('./pages/hospitalAdmin/Ho
 const HospitalAdminHospitalPage    = lazy(() => import('./pages/hospitalAdmin/HospitalAdminHospitalPage'))
 const HospitalAdminAppointmentsPage = lazy(() => import('./pages/hospitalAdmin/HospitalAdminAppointmentsPage'))
 const HospitalAdminFeedbackPage    = lazy(() => import('./pages/hospitalAdmin/HospitalAdminFeedbackPage'))
+const HospitalAdminRefillsPage     = lazy(() => import('./pages/hospitalAdmin/HospitalAdminRefillsPage'))
 
 /* ── HealthcareWorker/LabTechnician/Admin: architecture only, no fabricated UI ── */
 const PortalComingSoon = lazy(() => import('./pages/portal/PortalComingSoon'))
@@ -139,7 +141,7 @@ function SessionExpiryBridge() {
 function RootRedirect() {
   const { isChecking, isAuthenticated, role, needsOnboarding } = useAuth()
 
-  if (isChecking) return <FullPageLoader label="Loading Indostates Health…" />
+  if (isChecking) return <FullPageLoader label="Loading SHRI HEALTH…" />
   if (!isAuthenticated) return <EntryPage />
   return <Navigate to={needsOnboarding ? '/onboarding' : homeForRole(role)} replace />
 }
@@ -189,7 +191,7 @@ export default function App() {
                   no clinical state and reaches no network. */}
               <AiProvider>
               <SessionExpiryBridge />
-              <Suspense fallback={<FullPageLoader label="Loading Stroke AI…" />}>
+              <Suspense fallback={<FullPageLoader label="Loading SHRI HEALTH…" />}>
                 <Routes>
                   {/* ── Public ──
                       "/" is the entry page for signed-out visitors and the
@@ -236,6 +238,7 @@ export default function App() {
                     <Route path="visits/:visitId" element={<VisitDetail />} />
                     <Route path="health-notes"  element={<HealthNotesPage />} />
                     <Route path="reports"       element={<ReportsPage />} />
+                    <Route path="reports/imaging/:studyId" element={<StudyPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
                     <Route path="ai-insights"   element={<AiInsightsPage />} />
                     <Route path="my-doctors"    element={<CareTeamPage />} />
@@ -323,6 +326,7 @@ export default function App() {
                     <Route path="patients"    element={<HospitalAdminPatientsPage />} />
                     <Route path="hospital"    element={<HospitalAdminHospitalPage />} />
                     <Route path="appointments" element={<HospitalAdminAppointmentsPage />} />
+                    <Route path="refills"     element={<HospitalAdminRefillsPage />} />
                     <Route path="feedback"    element={<HospitalAdminFeedbackPage />} />
                   </Route>
 

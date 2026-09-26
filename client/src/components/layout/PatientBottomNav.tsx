@@ -15,6 +15,9 @@ import { Calendar, Home, Menu, Mic, Pill } from 'lucide-react'
  * step away and there is one list of them, not two.
  */
 export default function PatientBottomNav({ onOpenMenu }: { onOpenMenu: () => void }) {
+  // ⚠️ 11px on purpose — the one fixed size in the patient UI. Tab labels are
+  // chrome under an icon (as on iOS/Android); they must fit five-across at
+  // 320px, so they do not grow with the large-text setting. Page text does.
   const tab = (isActive: boolean) =>
     `focus-ring flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[11px] font-medium transition-colors ${
       isActive ? 'text-primary-700' : 'text-ink-subtle hover:text-ink'

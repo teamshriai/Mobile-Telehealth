@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { medicationPeriod } from '../medicationPeriod';
+import { medicationPeriod, replacedAt } from '../medicationPeriod';
 import { frequencyInWords, routeInWords } from '../plainLanguage';
 import { decryptBuffer, encryptBuffer } from '../../utils/encryption';
 
@@ -23,6 +23,39 @@ describe('medicationPeriod — current vs finished, derived only from the prescr
     const p = medicationPeriod(signed, null, new Date(signed.getTime() + 900 * DAY));
     assert.equal(p.status, 'current');
     assert.equal(p.endsAt, null);
+  });
+});
+
+describe('replacedAt — a renewal replaces the course it renews', () => {
+  const d = (iso: string): Date => new Date(iso);
+  const old = { drugId: 'levo', prescriptionId: 'rx1', signedAt: d('2026-06-26T10:00:00Z') };
+  it('a later prescription for the same medicine replaces the earlier line', () => {
+    const renewal = { drugId: 'levo', prescriptionId: 'rx2', signedAt: d('2026-06-27T10:00:00Z') };
+    assert.equal(replacedAt(old, [old, renewal])?.toISOString(), renewal.signedAt.toISOString());
+    assert.equal(replacedAt(renewal, [old, renewal]), null);
+  });
+  it('the EARLIEST later renewal is the one that replaced it', () => {
+    const a = { drugId: 'levo', prescriptionId: 'rx3', signedAt: d('2026-08-01T10:00:00Z') };
+    const b = { drugId: 'levo', prescriptionId: 'rx2', signedAt: d('2026-07-01T10:00:00Z') };
+    assert.equal(replacedAt(old, [old, a, b])?.toISOString(), b.signedAt.toISOString());
+  });
+  it('lines on the same prescription never replace each other', () => {
+    const sibling = { drugId: 'levo', prescriptionId: 'rx1', signedAt: d('2026-06-26T10:00:00Z') };
+    assert.equal(replacedAt(old, [old, sibling]), null);
+  });
+  it('a different medicine does not replace it', () => {
+    const other = { drugId: 'iron', prescriptionId: 'rx2', signedAt: d('2026-07-01T10:00:00Z') };
+    assert.equal(replacedAt(old, [old, other]), null);
+  });
+  it('a replaced course is finished even inside its prescribed duration', () => {
+    const p = medicationPeriod(
+      old.signedAt,
+      180,
+      d('2026-07-10T00:00:00Z'),
+      d('2026-06-27T10:00:00Z'),
+    );
+    assert.equal(p.status, 'completed');
+    assert.equal(p.replacedAt?.toISOString(), '2026-06-27T10:00:00.000Z');
   });
 });
 

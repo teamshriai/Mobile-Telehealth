@@ -18,6 +18,13 @@ export default defineConfig({
     tailwindcss(),
   ],
   build: {
+    /*
+     * ⚠️ FONTS ARE NEVER INLINED. Vite base64-inlines assets under 4 KB, and
+     * one tiny font subset would otherwise land in the CSS as a `data:` URL —
+     * which a `font-src 'self'` Content-Security-Policy on the hosting blocks.
+     * Every font is a hashed, cacheable file instead.
+     */
+    assetsInlineLimit: (filePath) => (/\.(woff2?|ttf|otf)$/.test(filePath) ? false : undefined),
     rollupOptions: {
       output: {
         /*

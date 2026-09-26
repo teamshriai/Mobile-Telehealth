@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Calendar, Video, Phone, MapPin, Clock, X, Plus, Stethoscope, CalendarClock, Camera } from 'lucide-react'
 import Modal from '../../components/common/Modal'
@@ -340,7 +340,14 @@ export default function AppointmentsPage() {
   const [params, setParams] = useSearchParams()
   // `?doctor=<id>` arrives from "Book with" on My Care Team.
   const preselectedDoctor = params.get('doctor') ?? ''
-  const [scope, setScope] = useState<'upcoming' | 'past'>('upcoming')
+  // `?day=YYYY-MM-DD` arrives from a day clicked on the Home calendar, and
+  // `?new=1` from its "Request an appointment". Read once, then cleared.
+  const dayParam = params.get('day')
+  const initialDay = dayParam !== null && /^\d{4}-\d{2}-\d{2}$/.test(dayParam) ? dayParam : null
+  const [scope, setScope] = useState<'upcoming' | 'past'>(() =>
+    initialDay !== null && initialDay < dayKey(new Date()) ? 'past' : 'upcoming',
+  )
+  const pendingDay = useRef<string | null>(initialDay)
   const [toCancel, setToCancel] = useState<Appointment | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [toMove, setToMove] = useState<Appointment | null>(null)
@@ -354,7 +361,7 @@ export default function AppointmentsPage() {
   const [doctors, setDoctors] = useState<BookableDoctor[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<ApiError | null>(null)
-  const [showForm, setShowForm] = useState(preselectedDoctor !== '')
+  const [showForm, setShowForm] = useState(preselectedDoctor !== '' || params.get('new') === '1')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -370,7 +377,21 @@ export default function AppointmentsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load(scope); setDay(null) }, [scope, load])
+  // A day handed over in the URL applies to the first load only; switching
+  // between Upcoming and Past afterwards starts from "all days" again.
+  useEffect(() => {
+    load(scope)
+    setDay(pendingDay.current)
+    pendingDay.current = null
+  }, [scope, load])
+
+  useEffect(() => {
+    if (!params.has('day') && !params.has('new')) return
+    const next = new URLSearchParams(params)
+    next.delete('day')
+    next.delete('new')
+    setParams(next, { replace: true })
+  }, [params, setParams])
 
   useEffect(() => {
     let cancelled = false

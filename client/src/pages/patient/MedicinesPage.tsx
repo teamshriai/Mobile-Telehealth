@@ -1,125 +1,295 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Info, Pill } from 'lucide-react'
+import { ChevronDown, History, Info, Pill } from 'lucide-react'
 import * as portal from '../../services/portal.service'
-import * as profileService from '../../services/profile.service'
-import type { Medication } from '../../services/portal.service'
+import type { Medicine, MedicinesOverview, TodayDose } from '../../services/portal.service'
 import { EmptyState, ErrorState, LoadingState } from '../../components/feedback/States'
 import SourceBadge from '../../components/common/SourceBadge'
-import MedicationCard from './MedicationCard'
+import IconTile from '../../components/common/IconTile'
+import { useToast } from '../../components/common/useToast'
+import { useAuth } from '../../app/useAuth'
+import SummaryBar from '../../components/medicines/SummaryBar'
+import QuickAccess from '../../components/medicines/QuickAccess'
+import AiMedicineSummary from '../../components/medicines/AiMedicineSummary'
+import TodaySchedule from '../../components/medicines/TodaySchedule'
+import MedicineCard from '../../components/medicines/MedicineCard'
+import MedicineListPrint from '../../components/medicines/MedicineListPrint'
+import { formVisual, prescriberLine } from '../../components/medicines/medicineVisuals'
 import type { ApiError } from '../../types/api'
 
 /**
- * Medicines — what the patient's clinicians have PRESCRIBED and signed.
+ * Medicines — what the patient's doctors PRESCRIBED, and what the patient
+ * says they TOOK.
  *
- * ⚠️ READ-ONLY, BY DESIGN. Prescribing is a clinical act; this page shows it
- * and never offers to change it. Refill requests arrive with secure messaging
- * (a later phase) and are therefore absent here, not greyed out.
+ * ⚠️ TWO SOURCES, NEVER BLENDED. Every medicine, dose, direction and date is
+ * from a signed prescription and is read-only here; changing a medicine is a
+ * conversation with the doctor, which the page says. The dose ticks and the
+ * 30-day figures are the patient's own log and are labelled as such. The
+ * patient's free-text list from their health history sits in its own section,
+ * marked as theirs, because it can legitimately disagree with the prescriptions.
  *
- * The patient's own free-text "current medications" from their health
- * history is shown separately and labelled as theirs, because the two can
- * legitimately disagree (a medicine bought over the counter, one another
- * hospital prescribed) and a patient must be able to see which is which.
+ * ⚠️ NOT BUILT, ON PURPOSE: an interaction checker, pill photos and pharmacy
+ * ordering. Each needs a vetted drug database this product does not have, and
+ * a guessed interaction or a wrong photo is a safety problem, not a gap.
  */
-export default function MedicinesPage() {
-  const [meds, setMeds] = useState<{ current: Medication[]; past: Medication[] } | null>(null)
-  const [error, setError] = useState<ApiError | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [ownList, setOwnList] = useState<string | null>(null)
-  const [showPast, setShowPast] = useState(false)
 
-  const load = () => {
-    setLoading(true)
-    setError(null)
-    portal.getMedications()
-      .then(setMeds)
-      .catch((err: ApiError) => setError(err))
-      .finally(() => setLoading(false))
+const reduceMotion = (): boolean =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function jumpTo(id: string): void {
+  const el = document.getElementById(id)
+  if (el === null) return
+  el.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' })
+  // Move focus too, so keyboard and screen-reader users land where they asked.
+  const target = el.querySelector<HTMLElement>('h2, h3') ?? el
+  target.setAttribute('tabindex', '-1')
+  target.focus({ preventScroll: true })
+}
+
+interface PastGroup {
+  key: string
+  latest: Medicine
+  count: number
+  firstStarted: string
+}
+
+/** Repeated courses of the same regimen read as one line with a count. */
+function groupPast(past: Medicine[]): PastGroup[] {
+  const groups = new Map<string, PastGroup>()
+  for (const m of past) {
+    const key = [m.name, m.dose, m.doseUnit, m.frequency, m.route].join('|')
+    const g = groups.get(key)
+    if (g === undefined) {
+      groups.set(key, { key, latest: m, count: 1, firstStarted: m.startedAt })
+      continue
+    }
+    g.count += 1
+    if (m.startedAt > g.latest.startedAt) g.latest = m
+    if (m.startedAt < g.firstStarted) g.firstStarted = m.startedAt
   }
+  return [...groups.values()].sort((a, b) => (a.latest.startedAt < b.latest.startedAt ? 1 : -1))
+}
 
-  useEffect(() => {
-    load()
-    // The patient-reported list is secondary; if it fails the page still works.
-    profileService.getProfile().then((r) => setOwnList(r.profile?.currentMedications ?? null)).catch(() => {})
-  }, [])
-
+function PastRow({ g }: { g: PastGroup }) {
+  const m = g.latest
+  const { icon } = formVisual(m.form)
+  const ended =
+    m.replacedAt !== null
+      ? `Replaced by a newer prescription on ${portal.formatDay(m.replacedAt)}`
+      : m.endsAt !== null
+        ? `Course ended ${portal.formatDay(m.endsAt)}`
+        : 'Course ended'
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Medicines</h1>
-        <p className="mt-1.5 max-w-prose text-sm text-ink-muted">
-          Medicines your doctors have prescribed. To change a dose or stop a medicine, talk to the
-          doctor who prescribed it.
+    <li className="flex items-start gap-3 py-3.5">
+      <IconTile icon={icon} tone="gray" size="sm" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">
+          {m.name} <span className="font-medium text-ink-muted">{m.dose} {m.doseUnit}</span>
+          <span className="font-normal text-ink-subtle"> · {m.form}</span>
+        </p>
+        <p className="text-xs text-ink-muted">
+          {m.frequencyInWords} · {m.routeInWords}
+          {m.indication !== null && <> · for {m.indication.title}</>}
+        </p>
+        <p className="mt-0.5 text-xs text-ink-subtle">
+          {ended} · {prescriberLine(m.prescriber)}
+          {g.count > 1 && <> · {g.count} courses since {portal.formatDay(g.firstStarted)}</>}
         </p>
       </div>
+    </li>
+  )
+}
 
-      {loading ? (
+export default function MedicinesPage() {
+  const { user } = useAuth()
+  const toast = useToast()
+  const [data, setData] = useState<MedicinesOverview | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [showPast, setShowPast] = useState(false)
+
+  /** `quiet`: refresh behind the current view (after a tap) without a spinner. */
+  const load = useCallback(async (quiet = false): Promise<void> => {
+    if (!quiet) {
+      setError(null)
+      setData(null)
+    }
+    try {
+      setData(await portal.getMedicinesOverview())
+    } catch (err) {
+      if (!quiet) setError(err as ApiError)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const timesByItem = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const d of data?.today ?? []) map.set(d.itemId, [...(map.get(d.itemId) ?? []), d.at])
+    return map
+  }, [data])
+
+  const pastGroups = useMemo(() => groupPast(data?.past ?? []), [data])
+
+  const onLog = async (dose: TodayDose, status: 'Taken' | 'Skipped'): Promise<void> => {
+    setBusyKey(dose.key)
+    try {
+      await portal.logDose(dose.itemId, dose.at, status)
+      await load(true)
+    } catch (err) {
+      toast.notify((err as ApiError).message || 'Could not save that. Please try again.', 'error')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const onUndo = async (dose: TodayDose): Promise<void> => {
+    if (dose.logId === null) return
+    setBusyKey(dose.key)
+    try {
+      await portal.undoDose(dose.logId)
+      await load(true)
+    } catch (err) {
+      toast.notify((err as ApiError).message || 'Could not undo that. Please try again.', 'error')
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const jumpToRefills = (): void => {
+    const current = data?.current ?? []
+    const target =
+      current.find((m) => m.refill !== null && (m.refill.status === 'Requested' || m.refill.status === 'Forwarded')) ??
+      current.find((m) => m.supplyDaysLeft !== null && m.supplyDaysLeft <= 7) ??
+      current[0]
+    jumpTo(target !== undefined ? `medicine-${target.id}` : 'current')
+  }
+
+  const hasAny = data !== null && (data.current.length > 0 || data.past.length > 0)
+
+  return (
+    <div className="space-y-6" data-testid="medicines-page">
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Medicines</h1>
+          <p className="mt-1.5 max-w-prose text-sm text-ink-muted">
+            What your doctors have prescribed, today&rsquo;s doses and refills. To change a dose or stop a medicine, talk to
+            the doctor who prescribed it.
+          </p>
+        </div>
+        {data !== null && hasAny && (
+          <QuickAccess
+            remainingToday={data.summary.today.total - data.summary.today.taken - data.summary.today.skipped}
+            refillsDue={data.summary.refillsDueSoon}
+            onToday={() => jumpTo('today')}
+            onRefills={jumpToRefills}
+          />
+        )}
+      </div>
+
+      {data === null && error === null ? (
         <LoadingState label="Loading your medicines…" />
       ) : error !== null ? (
-        <ErrorState description={error} onRetry={load} />
-      ) : meds === null || (meds.current.length === 0 && meds.past.length === 0) ? (
+        <ErrorState description={error} onRetry={() => void load()} />
+      ) : data !== null && !hasAny ? (
         <EmptyState
           icon={Pill}
           title="No prescriptions yet"
           description="When a doctor signs a prescription for you, it will appear here with how and when to take it."
         />
-      ) : (
+      ) : data !== null ? (
         <>
-          <section aria-labelledby="meds-current" className="space-y-3">
-            <h2 id="meds-current" className="text-base font-semibold text-ink">
-              Current <span className="font-normal text-ink-subtle">({meds.current.length})</span>
-            </h2>
-            {meds.current.length === 0 ? (
-              <p className="text-sm text-ink-muted">No current prescriptions. Your past prescriptions are below.</p>
-            ) : (
-              <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {meds.current.map((m) => <li key={m.id}><MedicationCard m={m} /></li>)}
-              </ul>
-            )}
-          </section>
+          <SummaryBar summary={data.summary} />
+          <AiMedicineSummary hasCurrent={data.current.length > 0} />
 
-          {meds.past.length > 0 && (
-            <section aria-labelledby="meds-past" className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 id="meds-past" className="text-base font-semibold text-ink">
-                  Past <span className="font-normal text-ink-subtle">({meds.past.length})</span>
-                </h2>
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+            <div className="min-w-0 xl:col-start-2 xl:row-start-1">
+              <TodaySchedule
+                doses={data.today}
+                asNeeded={data.current.filter((m) => m.schedule === 'as_needed')}
+                busyKey={busyKey}
+                onLog={(d, s) => void onLog(d, s)}
+                onUndo={(d) => void onUndo(d)}
+              />
+            </div>
+
+            <section id="current" aria-labelledby="meds-current" className="min-w-0 scroll-mt-24 space-y-3 xl:col-start-1 xl:row-start-1">
+              <h2 id="meds-current" className="text-lg font-semibold tracking-tight text-ink">
+                Current medicines <span className="font-normal text-ink-subtle">({data.current.length})</span>
+              </h2>
+              {data.current.length === 0 ? (
+                <p className="rounded-2xl border border-border-soft bg-surface-1 p-5 text-sm text-ink-muted">
+                  No current prescriptions. Your past medicines are below.
+                </p>
+              ) : (
+                <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-1">
+                  {data.current.map((m) => (
+                    <li key={m.id} className="min-w-0">
+                      <MedicineCard medicine={m} times={timesByItem.get(m.id) ?? []} onChanged={() => void load(true)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          {pastGroups.length > 0 && (
+            <section aria-labelledby="meds-past" className="rounded-2xl border border-border-soft bg-surface-1 shadow-card">
+              <h2 id="meds-past" className="m-0">
                 <button
                   type="button"
                   onClick={() => setShowPast((v) => !v)}
                   aria-expanded={showPast}
-                  className="focus-ring tap-target rounded-lg px-3 text-sm font-medium text-primary-700 hover:bg-surface-2"
+                  aria-controls="meds-past-list"
+                  className="focus-ring flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left sm:px-5"
                 >
-                  {showPast ? 'Hide' : 'Show'}
+                  <IconTile icon={History} tone="gray" size="sm" />
+                  <span className="min-w-0 flex-1 text-base font-semibold text-ink">
+                    Past medicines <span className="font-normal text-ink-subtle">({data.past.length})</span>
+                  </span>
+                  <ChevronDown size={18} aria-hidden="true" className={`text-ink-subtle transition-transform ${showPast ? 'rotate-180' : ''}`} />
                 </button>
-              </div>
+              </h2>
               {showPast && (
-                <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {meds.past.map((m) => <li key={m.id}><MedicationCard m={m} /></li>)}
+                <ul id="meds-past-list" className="divide-y divide-border-soft border-t border-border-soft px-4 sm:px-5">
+                  {pastGroups.map((g) => <PastRow key={g.key} g={g} />)}
                 </ul>
               )}
             </section>
           )}
         </>
-      )}
+      ) : null}
 
-      {ownList !== null && ownList.trim() !== '' && (
-        <section aria-labelledby="meds-own" className="rounded-xl border border-border-soft bg-surface-1 p-4">
+      {data !== null && data.selfReported !== null && (
+        <section aria-labelledby="meds-own" className="rounded-2xl border border-border-soft bg-surface-1 p-4 sm:p-5">
           <h2 id="meds-own" className="text-sm font-semibold text-ink">Medicines you told us about</h2>
-          <p className="mt-1 whitespace-pre-line text-sm text-ink">{ownList}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="mt-1 whitespace-pre-line text-sm text-ink">{data.selfReported}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <SourceBadge kind="patient" />
-            <Link to="/app/health?tab=history" className="focus-ring rounded text-xs font-medium text-primary-700 hover:underline">
+            <Link to="/app/health?tab=history" className="focus-ring rounded px-1 text-xs font-medium text-primary-700 hover:underline">
               Edit
             </Link>
           </div>
         </section>
       )}
 
-      <p className="flex items-start gap-2 text-xs text-ink-subtle">
-        <Info size={14} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
-        This list shows what was prescribed. It cannot tell whether a medicine was bought or taken.
-      </p>
+      {data !== null && hasAny && (
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-ink-subtle">
+          <Info size={14} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+          Prescriptions are shown exactly as your doctors signed them. The portal cannot tell whether a medicine was bought or
+          taken — only what you mark here, which counts a dose you took but did not mark as missed.
+        </p>
+      )}
+
+      {data !== null && (
+        <MedicineListPrint
+          patientName={user?.name ?? null}
+          current={data.current}
+          timesByItem={timesByItem}
+          allergies={data.summary.allergies}
+          selfReported={data.selfReported}
+        />
+      )}
     </div>
   )
 }

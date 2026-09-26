@@ -85,7 +85,9 @@ export const aiRepository = {
   async listMessages(conversationId: string): Promise<MessageRow[]> {
     const rows = await prisma.aiMessage.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+      // role breaks ties for rows written before timestamps were explicit
+      // (User sorts before Assistant).
+      orderBy: [{ createdAt: 'asc' }, { role: 'asc' }],
       take: MAX_MESSAGES,
       select: {
         id: true,
@@ -104,7 +106,7 @@ export const aiRepository = {
   async listRecentMessages(conversationId: string, limit: number): Promise<MessageRow[]> {
     const rows = await prisma.aiMessage.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { role: 'desc' }],
       take: limit,
       select: {
         id: true,
@@ -142,9 +144,14 @@ export const aiRepository = {
       safetyRuleVersion?: string;
     }[],
   ): Promise<void> {
+    // ⚠️ Explicit, strictly increasing timestamps: createMany would give the
+    // question and its reply the same `now()`, and ordering by createdAt
+    // alone could then show a reply above its own question.
+    const base = Date.now();
     await prisma.$transaction([
       prisma.aiMessage.createMany({
-        data: turns.map((t) => ({
+        data: turns.map((t, i) => ({
+          createdAt: new Date(base + i),
           conversationId,
           role: t.role,
           content: encryptField(t.content),

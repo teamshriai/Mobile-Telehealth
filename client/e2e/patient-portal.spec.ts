@@ -50,13 +50,14 @@ test('Medicines shows the signed prescription, in words, attributed', async ({ p
   await expect(card).toContainText('Once a day')
   await expect(card).toContainText('(OD)')
   await expect(card).toContainText('By mouth')
-  await expect(card).toContainText(/Recorded by Dr\.? Ananya Iyer/)
+  await expect(card).toContainText(/Prescribed by Dr\.? Ananya Iyer/)
   await expect(card).toContainText(/empty stomach/i)
   // The finished starting course is history, behind a toggle.
-  await page.getByRole('button', { name: /^show$/i }).click()
+  await page.getByRole('button', { name: /Past medicines/ }).click()
   await expect(page.getByRole('region', { name: /past/i }).getByText('Levothyroxine').first()).toBeVisible()
-  // Prescribing stays with clinicians: nothing here offers to change a dose.
-  await expect(page.getByRole('button', { name: /refill|change dose|stop/i })).toHaveCount(0)
+  // Prescribing stays with clinicians: a refill can be ASKED for (see
+  // medicines.spec.ts), but nothing here offers to change or stop a dose.
+  await expect(page.getByRole('button', { name: /change dose|stop/i })).toHaveCount(0)
   for (const w of WIDTHS) {
     await page.setViewportSize({ width: w, height: 900 })
     await expectNoHorizontalOverflow(page)
@@ -171,18 +172,25 @@ test('phone layout: bottom bar with a record button; Emergency stays in the head
 })
 
 
-test('Reports has its own place in the navigation, and says plainly what will appear there', async ({ page }) => {
+test('Reports has its own place in the navigation, and each tab says plainly when it is empty', async ({ page }) => {
+  // SD-P-01 has no scans, lab reports or vital signs on record — only the
+  // demo patient does — so every tab shows its own honest empty state.
   const watcher = watchConsole(page)
   await openAuthed(page, '/app/reports', watcher)
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Reports' })).toBeVisible()
-  await expect(page.getByText('No reports yet')).toBeVisible()
-  for (const kind of ['X-ray', 'CT and MRI', 'Ultrasound', 'ECG', 'Lab reports']) {
-    await expect(page.getByText(kind, { exact: true })).toBeVisible()
-  }
-  for (const w of WIDTHS) {
-    await page.setViewportSize({ width: w, height: 900 })
-    await expectNoHorizontalOverflow(page)
+  const tabs: Array<[RegExp, string]> = [
+    [/Scans and X-rays/, 'No scans or X-rays yet'],
+    [/Lab results/, 'No lab results yet'],
+    [/Vitals/, 'No vital signs recorded yet'],
+  ]
+  for (const [tab, empty] of tabs) {
+    await page.getByRole('tab', { name: tab }).click()
+    await expect(page.getByRole('heading', { name: empty })).toBeVisible()
+    for (const w of WIDTHS) {
+      await page.setViewportSize({ width: w, height: 900 })
+      await expectNoHorizontalOverflow(page)
+    }
   }
   expect(watcher.errors, 'console errors').toEqual([])
 })

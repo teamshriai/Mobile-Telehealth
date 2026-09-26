@@ -164,7 +164,7 @@ export default function DoctorOnboarding() {
                 onClick={() => setAffiliation('hospital')}
                 className={`focus-ring flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${affiliation === 'hospital' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-border-soft text-ink-muted hover:bg-surface-2'}`}
               >
-                A hospital on Stroke AI
+                A hospital on SHRI HEALTH
               </button>
               <button
                 type="button"

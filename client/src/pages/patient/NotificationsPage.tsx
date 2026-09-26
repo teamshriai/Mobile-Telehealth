@@ -124,7 +124,7 @@ export default function NotificationsPage() {
                       <span className="text-sm font-semibold text-ink">{n.title}</span>
                       {/* Unread is never colour-only — the word carries it. */}
                       {!n.isRead && (
-                        <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-bold text-primary-700">New</span>
+                        <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-2xs font-semibold text-primary-700">New</span>
                       )}
                     </span>
                     {n.body && <span className="mt-0.5 block text-sm leading-snug text-ink-muted">{n.body}</span>}

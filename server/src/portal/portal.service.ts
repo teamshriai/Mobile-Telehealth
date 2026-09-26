@@ -5,7 +5,12 @@ import { decryptFieldOptional } from '../utils/encryption';
 import { decryptEncounter } from '../encounter/encounter.repository';
 import { decryptInstruction } from '../instruction/instruction.service';
 import { requireOwnPatientId } from './ownPatient';
-import { medicationPeriod, type MedicationPeriod } from './medicationPeriod';
+import {
+  medicationPeriod,
+  replacedAt,
+  type MedicationPeriod,
+  type SignedLine,
+} from './medicationPeriod';
 import { frequencyInWords, routeInWords } from './plainLanguage';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,9 +83,9 @@ const RX_INCLUDE = {
   encounter: { select: { visitId: true } },
 };
 
-type RxRow = Prisma.PrescriptionGetPayload<{ include: typeof RX_INCLUDE }>;
+export type RxRow = Prisma.PrescriptionGetPayload<{ include: typeof RX_INCLUDE }>;
 
-function loadSignedPrescriptions(patientId: string, encounterId?: string): Promise<RxRow[]> {
+export function loadSignedPrescriptions(patientId: string, encounterId?: string): Promise<RxRow[]> {
   return prisma.prescription.findMany({
     where: { patientId, ...SIGNED_RX, ...(encounterId === undefined ? {} : { encounterId }) },
     include: RX_INCLUDE,
@@ -89,11 +94,28 @@ function loadSignedPrescriptions(patientId: string, encounterId?: string): Promi
   });
 }
 
-function toMedications(rx: RxRow[], now = new Date()): MedicationView[] {
+/** Every signed line, for deciding which course a newer prescription replaced. */
+export function signedLines(rx: RxRow[]): SignedLine[] {
+  return rx.flatMap((p) =>
+    p.items.map((i) => ({
+      drugId: i.drugId,
+      prescriptionId: p.id,
+      signedAt: p.signedAt ?? p.createdAt,
+    })),
+  );
+}
+
+/**
+ * `all` is every signed prescription of the patient — pass it when `rx` is a
+ * subset (one visit), so a later renewal elsewhere still ends these courses.
+ */
+export function toMedications(rx: RxRow[], now = new Date(), all: RxRow[] = rx): MedicationView[] {
+  const lines = signedLines(all);
   return rx.flatMap((p) =>
     p.items.map((i) => {
       // A Signed row always has signedAt; the fallback keeps the type honest.
       const signedAt = p.signedAt ?? p.createdAt;
+      const replaced = replacedAt({ drugId: i.drugId, prescriptionId: p.id, signedAt }, lines);
       return {
         id: i.id,
         rxNumber: p.rxNumber,
@@ -111,7 +133,7 @@ function toMedications(rx: RxRow[], now = new Date()): MedicationView[] {
         instructions: decryptFieldOptional(i.instructions),
         prescribedBy: p.signerName,
         prescriberRegistration: p.signerRegistrationNumber,
-        ...medicationPeriod(signedAt, i.durationDays, now),
+        ...medicationPeriod(signedAt, i.durationDays, now, replaced),
       };
     }),
   );
@@ -158,15 +180,6 @@ function toInstruction(
 const SIGNED_VISIT = { clinicalNotes: { some: { status: 'Signed' as const } } };
 
 export const portalService = {
-  async medications(userId: string) {
-    const patientId = await requireOwnPatientId(userId);
-    const meds = toMedications(await loadSignedPrescriptions(patientId));
-    return {
-      current: meds.filter((m) => m.status === 'current'),
-      past: meds.filter((m) => m.status === 'completed'),
-    };
-  },
-
   async conditions(userId: string) {
     const patientId = await requireOwnPatientId(userId);
     const rows = await prisma.problem.findMany({
@@ -246,12 +259,14 @@ export const portalService = {
     if (raw === null) throw new AppError('Visit not found.', 404);
     const e = decryptEncounter(raw);
 
-    const [problems, rx, instructions] = await Promise.all([
+    const [problems, rx, allRx, instructions] = await Promise.all([
       prisma.problem.findMany({
         where: { patientId, onsetEncounterId: e.id },
         orderBy: { createdAt: 'asc' },
       }),
       loadSignedPrescriptions(patientId, e.id),
+      // Every signed prescription: a later renewal ends this visit's course.
+      loadSignedPrescriptions(patientId),
       prisma.patientInstruction.findMany({
         where: { patientId, encounterId: e.id },
         include: { encounter: { select: { visitId: true } } },
@@ -272,7 +287,7 @@ export const portalService = {
         signedAt: n.signedAt,
       })),
       diagnoses: problems.map(toCondition),
-      medications: toMedications(rx),
+      medications: toMedications(rx, new Date(), allRx),
       instructions: instructions.map(toInstruction),
     };
   },

@@ -155,11 +155,25 @@ async function bumpDaily(
  * only the prompt would let several concurrent long replies blow the
  * per-minute ceiling even though every individual reservation looked fine.
  */
+/**
+ * Who a reservation is for:
+ *  - `patient`: a patient's question. Counts toward their daily messages.
+ *  - `patient-retry`: the one retry of that same question (ai/pipeline.ts).
+ *    Its tokens are the patient's, but it is not a second message.
+ *  - `system`: background work on the patient's behalf (the conversation
+ *    summariser). Shared limits only; never the patient's allowance.
+ */
+export type BudgetScope = 'patient' | 'patient-retry' | 'system';
+
 export async function reserveBudget(params: {
   userId: string;
   estimatedTokens: number;
+  scope?: BudgetScope;
 }): Promise<BudgetResult> {
   const { userId, estimatedTokens } = params;
+  const scope = params.scope ?? 'patient';
+  const countsMessage = scope === 'patient';
+  const patientRow = scope === 'system' ? null : userId;
   const headroom = env.AI_LIMIT_HEADROOM;
   const rpmCap = Math.floor(env.AI_LIMIT_RPM * headroom);
   const tpmCap = Math.floor(env.AI_LIMIT_TPM * headroom);
@@ -167,13 +181,15 @@ export async function reserveBudget(params: {
   const tpdCap = Math.floor(env.AI_LIMIT_TPD * headroom);
 
   // ── Per-patient daily message cap — cheapest check, evaluated first ──────
-  const patientDaily = await readDailyTotals(userId);
-  if (patientDaily.requests >= env.AI_PATIENT_DAILY_MESSAGES) {
-    return {
-      ok: false,
-      reason: 'patient_daily_messages',
-      retryAfterSeconds: secondsUntilMidnightUtc(),
-    };
+  if (countsMessage) {
+    const patientDaily = await readDailyTotals(userId);
+    if (patientDaily.requests >= env.AI_PATIENT_DAILY_MESSAGES) {
+      return {
+        ok: false,
+        reason: 'patient_daily_messages',
+        retryAfterSeconds: secondsUntilMidnightUtc(),
+      };
+    }
   }
 
   // ── Shared minute window (global, across all users) ──────────────────────
@@ -225,7 +241,14 @@ export async function reserveBudget(params: {
       if (settled) return;
       settled = true;
       globalMinute.tokens = Math.max(0, globalMinute.tokens - estimatedTokens);
-      void bumpDaily(userId, { requests: 1, promptTokens: 0, completionTokens: 0, blocked: false });
+      if (patientRow !== null) {
+        void bumpDaily(patientRow, {
+          requests: countsMessage ? 1 : 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          blocked: false,
+        });
+      }
       void bumpDaily(null, { requests: 1, promptTokens: 0, completionTokens: 0 });
     },
     commit: async (actual) => {
@@ -236,11 +259,13 @@ export async function reserveBudget(params: {
       // Reconcile the in-memory minute window to the real figure.
       globalMinute.tokens = Math.max(0, globalMinute.tokens - estimatedTokens + actualTotal);
       await Promise.all([
-        bumpDaily(userId, {
-          requests: 1,
-          promptTokens: actual.promptTokens,
-          completionTokens: actual.completionTokens,
-        }),
+        patientRow === null
+          ? Promise.resolve()
+          : bumpDaily(patientRow, {
+              requests: countsMessage ? 1 : 0,
+              promptTokens: actual.promptTokens,
+              completionTokens: actual.completionTokens,
+            }),
         bumpDaily(null, {
           requests: 1,
           promptTokens: actual.promptTokens,

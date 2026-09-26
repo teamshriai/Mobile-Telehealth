@@ -36,7 +36,7 @@ import { seedM06Visits } from './m06Visits';
  * a penicillin-allergic adult are added and FLAGGED in the database
  * (`isAtlasVocabulary = false`) so they can be folded into §8.5 properly.
  */
-const ATLAS_EXTENSIONS = new Set(['Azithromycin', 'Doxycycline', 'Levofloxacin', 'Levothyroxine']);
+const ATLAS_EXTENSIONS = new Set(['Azithromycin', 'Doxycycline', 'Levofloxacin', 'Levothyroxine', 'Amlodipine']);
 
 /*
  * ⚠️ SECOND DOCUMENTED DEVIATION: Levothyroxine 50mcg.
@@ -90,6 +90,11 @@ const DRUGS: DrugSpec[] = [
     dose: { min: 250, max: 750, unit: 'mg', maxPerDay: 750 } },
   { genericName: 'Levothyroxine', form: 'Tablet', strength: '50mcg', route: 'Oral', allergenClass: null, therapeuticClass: 'Thyroid hormone', isNlem: true,
     dose: { min: 12.5, max: 200, unit: 'mcg', maxPerDay: 200 } },
+  // THIRD flagged extension for the portal demo: the base demo patient's own
+  // profile has listed "Amlodipine 5mg once daily" since Phase 3, and §8.5 has
+  // no antihypertensive. Flagged `isAtlasVocabulary = false` like the others.
+  { genericName: 'Amlodipine', form: 'Tablet', strength: '5mg', route: 'Oral', allergenClass: null, therapeuticClass: 'Calcium channel blocker', isNlem: true,
+    dose: { min: 2.5, max: 10, unit: 'mg', maxPerDay: 10 } },
 ];
 
 /**

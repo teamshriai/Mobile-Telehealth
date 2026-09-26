@@ -85,24 +85,10 @@ describe('request validation — mobile channel', () => {
 });
 
 describe('request validation — email channel', () => {
-  it('accepts an ordinary address', () => {
-    for (const identifier of ['a@b.com', 'Dr.Iyer@Hospital.CO.IN', ' x@y.org ']) {
-      const r = otpRequestSchema.safeParse({ channel: 'Email', identifier });
-      assert.equal(r.success, true, identifier);
-    }
-  });
-
-  it('normalises case and whitespace, so one address is one identity', () => {
-    // ⚠️ The blind index is computed over this value. If the validator and the
-    // service disagreed about case, `A@b.com` and `a@b.com` would be two
-    // different login identities for one inbox.
-    const r = otpRequestSchema.safeParse({ channel: 'Email', identifier: '  Dr.Iyer@Hospital.COM ' });
-    assert.equal(r.success, true);
-    if (r.success) assert.equal(r.data.identifier, 'dr.iyer@hospital.com');
-  });
-
-  it('refuses malformed addresses', () => {
-    for (const identifier of ['not-an-email', 'a@', '@b.com', 'a b@c.com', '']) {
+  it('is refused: sign-in codes go by SMS only', () => {
+    // ⚠️ Withdrawn 25 Sep 2026. Patients sign in with a mobile code or with
+    // email and password; an emailed code is not a way in any more.
+    for (const identifier of ['a@b.com', 'Dr.Iyer@Hospital.CO.IN']) {
       const r = otpRequestSchema.safeParse({ channel: 'Email', identifier });
       assert.equal(r.success, false, identifier);
     }
@@ -135,7 +121,8 @@ describe('request validation — the union itself', () => {
     // `.strict()` — a client must not smuggle a role or a userId into an
     // unauthenticated endpoint.
     assert.equal(
-      otpRequestSchema.safeParse({ channel: 'Sms', identifier: '9876543210', role: 'Doctor' }).success,
+      otpRequestSchema.safeParse({ channel: 'Sms', identifier: '9876543210', role: 'Doctor' })
+        .success,
       false,
     );
     assert.equal(
@@ -169,7 +156,10 @@ describe('verify validation', () => {
     // ⚠️ `000123` must survive as six characters. A generator or parser that
     // treats the code as a NUMBER silently shrinks the keyspace by dropping
     // leading zeros — roughly 10% of all codes.
-    assert.equal(otpVerifySchema.safeParse({ challengeId: crypto.randomUUID(), code: '000123' }).success, true);
+    assert.equal(
+      otpVerifySchema.safeParse({ challengeId: crypto.randomUUID(), code: '000123' }).success,
+      true,
+    );
   });
 });
 

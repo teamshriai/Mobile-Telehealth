@@ -55,7 +55,7 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
                       {m.doctor?.name}
                     </p>
                     {m.isPrimary && (
-                      <span className="rounded bg-success-bg px-1.5 py-0.5 text-[11px] font-semibold text-success-fg">
+                      <span className="rounded bg-success-bg px-1.5 py-0.5 text-2xs font-semibold text-success-fg">
                         Primary
                       </span>
                     )}

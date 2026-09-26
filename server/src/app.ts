@@ -33,6 +33,8 @@ import { adminRouter } from './admin/admin.routes';
 import { feedbackRouter } from './feedback/feedback.routes';
 import { portalRouter } from './portal/portal.routes';
 import { healthNoteRouter } from './healthNote/healthNote.routes';
+import { medicationRouter } from './medication/medication.routes';
+import { imagingRouter, labsRouter, vitalsRouter } from './reports/reports.routes';
 
 const HEALTH_NOTES_PATH = '/api/v1/me/health-notes';
 
@@ -156,6 +158,10 @@ export function createApp(): Application {
   app.use('/api/v1/feedback', feedbackRouter);
   // The patient's own record. Health notes first: its path is more specific.
   app.use(HEALTH_NOTES_PATH, healthNoteRouter);
+  app.use('/api/v1/me/medications', medicationRouter);
+  app.use('/api/v1/me/labs', labsRouter);
+  app.use('/api/v1/me/vitals', vitalsRouter);
+  app.use('/api/v1/me/imaging', imagingRouter);
   app.use('/api/v1/me', portalRouter);
 
   // ── 404 ───────────────────────────────────────────────────────────────────

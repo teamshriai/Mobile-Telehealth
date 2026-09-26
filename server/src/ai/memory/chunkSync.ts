@@ -23,7 +23,9 @@ import type { PatientContext, ContextSection } from '../context/patientContext';
 // chunk must stop being retrievable, not just stop being updated.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function chunkKey(s: Pick<ContextSection, 'sourceType' | 'sourceId' | 'sourceField'>): string {
+export function chunkKey(
+  s: Pick<ContextSection, 'sourceType' | 'sourceId' | 'sourceField'>,
+): string {
   return `${s.sourceType}:${s.sourceId}:${s.sourceField}`;
 }
 
@@ -39,7 +41,14 @@ export async function syncPatientChunks(
 ): Promise<void> {
   const existing = await prisma.aiMemoryChunk.findMany({
     where: { ownerUserId, patientId: patientContext.patientId },
-    select: { id: true, sourceType: true, sourceId: true, sourceField: true, contentHash: true },
+    select: {
+      id: true,
+      sourceType: true,
+      sourceId: true,
+      sourceField: true,
+      contentHash: true,
+      embeddingModel: true,
+    },
   });
   const existingByKey = new Map(existing.map((c) => [chunkKey(c), c]));
   const candidateKeys = new Set(patientContext.sections.map((s) => chunkKey(s)));
@@ -49,9 +58,11 @@ export async function syncPatientChunks(
     const contentHash = hmacBlindIndex(section.text);
     const prior = existingByKey.get(key);
 
-    // Unchanged: skip both the write and the embed. This is the common case
-    // on every turn after the first for a patient whose record has not moved.
-    if (prior !== undefined && prior.contentHash === contentHash) continue;
+    // Unchanged AND embedded: skip both the write and the embed — the common
+    // case on every turn after the first. A row stored without a vector
+    // (the embedder was down) is retried here rather than left unsearchable.
+    if (prior !== undefined && prior.contentHash === contentHash && prior.embeddingModel !== null)
+      continue;
 
     let embedding: number[] | null = null;
     try {
@@ -70,36 +81,39 @@ export async function syncPatientChunks(
     const tokenCount = estimateChunkTokens(section.text);
     const encryptedContent = encryptField(section.text);
 
-    if (prior === undefined) {
-      const created = await prisma.aiMemoryChunk.create({
-        data: {
+    // One upsert on the natural key: no create-then-update race when two
+    // turns for the same patient sync at once.
+    const row = await prisma.aiMemoryChunk.upsert({
+      where: {
+        ownerUserId_sourceType_sourceId_sourceField: {
           ownerUserId,
-          patientId: patientContext.patientId,
           sourceType: section.sourceType,
           sourceId: section.sourceId,
           sourceField: section.sourceField,
-          content: encryptedContent,
-          contentHash,
-          tokenCount,
-          sourceUpdatedAt: section.sourceUpdatedAt,
-          embeddingModel: embedding !== null ? 'Xenova/all-MiniLM-L6-v2' : null,
         },
-        select: { id: true },
-      });
-      if (embedding !== null) await writeEmbedding(created.id, embedding);
-    } else {
-      await prisma.aiMemoryChunk.update({
-        where: { id: prior.id },
-        data: {
-          content: encryptedContent,
-          contentHash,
-          tokenCount,
-          sourceUpdatedAt: section.sourceUpdatedAt,
-          embeddingModel: embedding !== null ? 'Xenova/all-MiniLM-L6-v2' : null,
-        },
-      });
-      if (embedding !== null) await writeEmbedding(prior.id, embedding);
-    }
+      },
+      create: {
+        ownerUserId,
+        patientId: patientContext.patientId,
+        sourceType: section.sourceType,
+        sourceId: section.sourceId,
+        sourceField: section.sourceField,
+        content: encryptedContent,
+        contentHash,
+        tokenCount,
+        sourceUpdatedAt: section.sourceUpdatedAt,
+        embeddingModel: embedding !== null ? 'Xenova/all-MiniLM-L6-v2' : null,
+      },
+      update: {
+        content: encryptedContent,
+        contentHash,
+        tokenCount,
+        sourceUpdatedAt: section.sourceUpdatedAt,
+        embeddingModel: embedding !== null ? 'Xenova/all-MiniLM-L6-v2' : null,
+      },
+      select: { id: true },
+    });
+    if (embedding !== null) await writeEmbedding(row.id, embedding);
   }
 
   // Tombstone: a source row that no longer renders a chunk (deleted
@@ -126,7 +140,13 @@ async function writeEmbedding(chunkId: string, embedding: number[]): Promise<voi
   `;
 }
 
-export type RetrievedChunk = { sourceType: AiChunkSource; text: string; tokenCount: number };
+export type RetrievedChunk = {
+  sourceType: AiChunkSource;
+  sourceId: string;
+  sourceField: string;
+  text: string;
+  tokenCount: number;
+};
 
 /** All currently-synced chunks for a patient, decrypted, in no particular
  *  order — the caller decides whether to use all of them (bypass rule) or
@@ -137,10 +157,19 @@ export async function listSyncedChunks(
 ): Promise<RetrievedChunk[]> {
   const rows = await prisma.aiMemoryChunk.findMany({
     where: { ownerUserId, patientId },
-    select: { sourceType: true, content: true, tokenCount: true },
+    select: {
+      sourceType: true,
+      sourceId: true,
+      sourceField: true,
+      content: true,
+      tokenCount: true,
+    },
+    orderBy: [{ sourceType: 'asc' }, { sourceUpdatedAt: 'desc' }, { id: 'asc' }],
   });
   return rows.map((r) => ({
     sourceType: r.sourceType,
+    sourceId: r.sourceId,
+    sourceField: r.sourceField,
     text: safeDecryptChunk(r.content),
     tokenCount: r.tokenCount,
   }));
@@ -160,9 +189,15 @@ export async function topKChunksByCosine(
 ): Promise<RetrievedChunk[]> {
   const vectorLiteral = `[${queryEmbedding.join(',')}]`;
   const rows = await prisma.$queryRaw<
-    { source_type: AiChunkSource; content: string; token_count: number }[]
+    {
+      source_type: AiChunkSource;
+      source_id: string;
+      source_field: string;
+      content: string;
+      token_count: number;
+    }[]
   >`
-    SELECT source_type, content, token_count
+    SELECT source_type, source_id, source_field, content, token_count
     FROM ai_memory_chunks
     WHERE owner_user_id = ${ownerUserId}::uuid
       AND patient_id = ${patientId}::uuid
@@ -172,6 +207,8 @@ export async function topKChunksByCosine(
   `;
   return rows.map((r) => ({
     sourceType: r.source_type,
+    sourceId: r.source_id,
+    sourceField: r.source_field,
     text: safeDecryptChunk(r.content),
     tokenCount: r.token_count,
   }));

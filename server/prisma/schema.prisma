@@ -240,6 +240,18 @@ enum AuditAction {
   HealthNoteDeleted
   HealthNoteAudioAccessed
   TranscriptionRequested
+  // ── Patient portal: medicines ───────────────────────────────────────────
+  DoseLogged
+  DoseLogRemoved
+  RefillRequested
+  RefillForwarded
+  RefillDeclined
+  RefillCancelled
+  RefillFulfilled
+  MedicationSummaryGenerated
+  // ── Patient portal: reports ──────────────────────────────────────────────
+  ImagingStudyViewed
+  ImagingImagesAccessed
 
   @@map("audit_action")
 }
@@ -593,12 +605,21 @@ model PatientProfile {
   clinicalNotes ClinicalNote[]
 
   // ── Clinical authoring (M-06) ─────────────────────────────────────────────
-  problems         Problem[]
-  prescriptions    Prescription[]
-  instructions     PatientInstruction[]
-  breakGlassGrants BreakGlassGrant[]
-  healthNotes      PatientHealthNote[]
-  storedFiles      StoredFile[]
+  problems          Problem[]
+  prescriptions     Prescription[]
+  instructions      PatientInstruction[]
+  breakGlassGrants  BreakGlassGrant[]
+  healthNotes       PatientHealthNote[]
+  storedFiles       StoredFile[]
+  doseLogs          MedicationDoseLog[]
+  refillRequests    RefillRequest[]
+  medicationSummary MedicationSummaryCache?
+  imagingStudies    ImagingStudy[]
+  imagingReports    ImagingReport[]
+  imagingInstances  ImagingInstance[]
+  labReports        LabReport[]
+  labResults        LabResult[]
+  vitalSigns        VitalSign[]
 
   // ── Indexes ───────────────────────────────────────────────────────────────
   // [lastName, firstName]: name search — clinical staff search patients by name.
@@ -1333,6 +1354,9 @@ enum AiMessageKind {
   BudgetDeferred
   /// Refused because this deployment may not send real patient data upstream.
   PolicyBlocked
+  /// The provider failed, timed out, or returned nothing usable after one
+  /// retry. Fixed wording; the model's partial output (if any) is discarded.
+  ProviderUnavailable
 
   @@map("ai_message_kind")
 }
@@ -1353,6 +1377,12 @@ enum AiChunkSource {
   Instruction
   /// The PATIENT'S OWN words. Rendered to the model labelled patient-reported.
   HealthNote
+  // Assistant v2 (25 Sep 2026) — appended, never reordered.
+  LabReport
+  VitalSign
+  ImagingStudy
+  /// Smoking, alcohol, tobacco and activity — as the patient reported them.
+  Lifestyle
 
   @@map("ai_chunk_source")
 }
@@ -1493,9 +1523,12 @@ model Encounter {
   clinicalNotes    ClinicalNote[]
 
   // ── Clinical authoring (M-06) ─────────────────────────────────────────────
-  problems      Problem[]
-  prescriptions Prescription[]
-  instructions  PatientInstruction[]
+  problems       Problem[]
+  prescriptions  Prescription[]
+  instructions   PatientInstruction[]
+  imagingStudies ImagingStudy[]
+  labReports     LabReport[]
+  vitalSigns     VitalSign[]
 
   @@index([patientId, startedAt])
   @@index([status])
@@ -2033,8 +2066,10 @@ model PrescriptionItem {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
-  drug         Drug         @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  prescription   Prescription        @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  drug           Drug                @relation(fields: [drugId], references: [id], onDelete: Restrict)
+  doseLogs       MedicationDoseLog[]
+  refillRequests RefillRequest[]
 
   @@index([prescriptionId])
   @@map("prescription_items")
@@ -2222,6 +2257,7 @@ model BreakGlassGrant {
 /// insurance cards (later phases) reuse this table.
 enum StoredFileKind {
   HealthNoteAudio
+  DicomInstance
 
   @@map("stored_file_kind")
 }
@@ -2234,19 +2270,23 @@ enum StoredFileKind {
 /// (see src/storage/fileStore.ts). `sha256` is of the PLAINTEXT, so a
 /// corrupted or swapped file is detected on read.
 model StoredFile {
-  id         String         @id @default(uuid()) @db.Uuid
-  patientId  String         @map("patient_id") @db.Uuid
-  kind       StoredFileKind
-  storageKey String         @unique @map("storage_key")
-  mimeType   String         @map("mime_type")
-  bytes      Int
-  sha256     String
-  encrypted  Boolean        @default(true)
-  createdAt  DateTime       @default(now()) @map("created_at")
-  deletedAt  DateTime?      @map("deleted_at")
+  id              String         @id @default(uuid()) @db.Uuid
+  patientId       String         @map("patient_id") @db.Uuid
+  kind            StoredFileKind
+  storageKey      String         @unique @map("storage_key")
+  mimeType        String         @map("mime_type")
+  bytes           Int
+  sha256          String
+  encrypted       Boolean        @default(true)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  deletedAt       DateTime?      @map("deleted_at")
+  /// 'gzip' when the stored plaintext is gzip-compressed before encryption
+  /// (DICOM); null for files stored as-is (voice notes).
+  contentEncoding String?        @map("content_encoding")
 
-  patient     PatientProfile      @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  healthNotes PatientHealthNote[]
+  patient         PatientProfile      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  healthNotes     PatientHealthNote[]
+  imagingInstance ImagingInstance?
 
   @@index([patientId, kind])
   @@map("stored_files")
@@ -2322,4 +2362,367 @@ model PatientHealthNote {
   @@index([patientId, status, recordedAt])
   @@index([status, createdAt])
   @@map("patient_health_notes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Patient portal — medicines: dose logging, refills, AI summary cache
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DoseLogStatus {
+  Taken
+  Skipped
+
+  @@map("dose_log_status")
+}
+
+/// One dose the PATIENT says they took or skipped.
+///
+/// ⚠️ PATIENT-GENERATED, and it is the only adherence evidence there is: no
+/// dispensing, pill-box or pharmacy data exists. A scheduled dose with no row
+/// is "missed" by derivation (portal/adherence.ts) — never stored — so the
+/// record holds only what the patient actually said.
+///
+/// `scheduledFor` is the slot the dose belongs to (08:00 India time for an OD
+/// medicine), validated by the server against the item's frequency, so a
+/// dose cannot be logged against a time that was never scheduled.
+model MedicationDoseLog {
+  id                 String        @id @default(uuid()) @db.Uuid
+  patientId          String        @map("patient_id") @db.Uuid
+  prescriptionItemId String        @map("prescription_item_id") @db.Uuid
+  scheduledFor       DateTime      @map("scheduled_for")
+  status             DoseLogStatus
+  recordedAt         DateTime      @default(now()) @map("recorded_at")
+
+  patient PatientProfile   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  item    PrescriptionItem @relation(fields: [prescriptionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([prescriptionItemId, scheduledFor])
+  @@index([patientId, scheduledFor])
+  @@map("medication_dose_logs")
+}
+
+/// Requested → (hospital admin) Forwarded to the prescriber or Declined →
+/// Fulfilled automatically when a newer signed prescription for the same drug
+/// appears. The patient may Cancel while it is still Requested.
+enum RefillStatus {
+  Requested
+  Forwarded
+  Fulfilled
+  Declined
+  Cancelled
+
+  @@map("refill_status")
+}
+
+/// A patient's request for more of a medicine they were prescribed.
+///
+/// ⚠️ A REQUEST, NEVER A PRESCRIPTION. Nothing here dispenses or re-prescribes;
+/// the hospital administrator routes it to a doctor, who prescribes (or not)
+/// through the normal signed-prescription path.
+model RefillRequest {
+  id                 String       @id @default(uuid()) @db.Uuid
+  patientId          String       @map("patient_id") @db.Uuid
+  prescriptionItemId String       @map("prescription_item_id") @db.Uuid
+  status             RefillStatus @default(Requested)
+  /// Encrypted. The patient's optional note ("running out on Friday").
+  note               String?
+  /// Encrypted. Why an administrator declined — shown to the patient.
+  declineReason      String?      @map("decline_reason")
+  forwardedToUserId  String?      @map("forwarded_to_user_id") @db.Uuid
+  forwardedToName    String?      @map("forwarded_to_name")
+  handledByUserId    String?      @map("handled_by_user_id") @db.Uuid
+  requestedAt        DateTime     @default(now()) @map("requested_at")
+  resolvedAt         DateTime?    @map("resolved_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  patient PatientProfile   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  item    PrescriptionItem @relation(fields: [prescriptionItemId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@index([status, requestedAt])
+  @@map("refill_requests")
+}
+
+/// The last AI medicine summary for a patient, keyed by a hash of exactly the
+/// facts it was written from. Same facts → same summary, without spending
+/// another of the patient's daily AI requests; changed facts → regenerated.
+model MedicationSummaryCache {
+  patientId   String   @id @map("patient_id") @db.Uuid
+  contextHash String   @map("context_hash")
+  /// Encrypted.
+  text        String
+  model       String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medication_summary_cache")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Patient portal — Reports (imaging, laboratory) and vital signs.
+//
+// ⚠️ CLINICIAN- OR DEVICE-AUTHORED, READ-ONLY TO THE PATIENT. The patient
+// portal reads these; nothing in it writes them. Narrative text (report
+// findings and impression, lab comments, vital notes) is encrypted with
+// encryptField; numbers, codes, dates and names stay plain so trends and the
+// assistant's context stay indexable — the same split problems and
+// prescriptions already use.
+//
+// ⚠️ A LAB FLAG IS THE LAB'S. `LabResult.flag` is stored exactly as the
+// laboratory issued it; the product never derives one from the range.
+//
+// ⚠️ ILLUSTRATIVE IMAGES ARE LABELLED AS SUCH. Demo studies carry sample
+// images from a public source; `isIllustrative` requires an attribution (a
+// CHECK constraint in the migration), and every viewer surface shows it.
+// ═════════════════════════════════════════════════════════════════════════════
+
+enum ImagingModality {
+  CT
+  MR
+  XR
+
+  @@map("imaging_modality")
+}
+
+enum DiagnosticReportStatus {
+  Preliminary
+  Final
+  Amended
+  EnteredInError
+
+  @@map("diagnostic_report_status")
+}
+
+enum LabFlag {
+  Low
+  High
+  CriticalLow
+  CriticalHigh
+  Abnormal
+
+  @@map("lab_flag")
+}
+
+enum VitalType {
+  BloodPressure
+  HeartRate
+  SpO2
+  Temperature
+  RespiratoryRate
+  BloodGlucose
+  Weight
+  Height
+  Bmi
+
+  @@map("vital_type")
+}
+
+enum VitalSource {
+  Facility
+  HomeDevice
+  PatientReported
+
+  @@map("vital_source")
+}
+
+model ImagingStudy {
+  id                     String          @id @default(uuid()) @db.Uuid
+  patientId              String          @map("patient_id") @db.Uuid
+  encounterId            String?         @map("encounter_id") @db.Uuid
+  accessionNumber        String          @unique @map("accession_number")
+  studyInstanceUid       String          @unique @map("study_instance_uid")
+  modality               ImagingModality
+  title                  String
+  bodyPart               String          @map("body_part")
+  performedAt            DateTime        @map("performed_at")
+  performingFacilityName String          @map("performing_facility_name")
+  orderedByName          String?         @map("ordered_by_name")
+  seriesCount            Int             @default(0) @map("series_count")
+  instanceCount          Int             @default(0) @map("instance_count")
+  /// Sample images from a public source, not this patient's own scans.
+  isIllustrative         Boolean         @default(false) @map("is_illustrative")
+  imageAttribution       String?         @map("image_attribution")
+  illustrativeNote       String?         @map("illustrative_note")
+  isAtlasVocabulary      Boolean         @default(true) @map("is_atlas_vocabulary")
+  deletedAt              DateTime?       @map("deleted_at")
+  createdAt              DateTime        @default(now()) @map("created_at")
+  updatedAt              DateTime        @updatedAt @map("updated_at")
+
+  patient   PatientProfile  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter?      @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  report    ImagingReport?
+  series    ImagingSeries[]
+
+  @@index([patientId, performedAt])
+  @@index([encounterId])
+  @@map("imaging_studies")
+}
+
+model ImagingReport {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  studyId                String                 @unique @map("study_id") @db.Uuid
+  patientId              String                 @map("patient_id") @db.Uuid
+  reportNumber           String                 @unique @map("report_number")
+  status                 DiagnosticReportStatus @default(Final)
+  /// Encrypted.
+  clinicalIndication     String?                @map("clinical_indication")
+  /// Encrypted.
+  technique              String?
+  /// Encrypted.
+  comparison             String?
+  /// Encrypted.
+  findings               String
+  /// Encrypted.
+  impression             String
+  reportedByName         String                 @map("reported_by_name")
+  reportedByRegistration String?                @map("reported_by_registration")
+  reportedByRole         String?                @map("reported_by_role")
+  reportingFacilityName  String?                @map("reporting_facility_name")
+  reportedAt             DateTime               @map("reported_at")
+  amendedAt              DateTime?              @map("amended_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+
+  study   ImagingStudy   @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, reportedAt])
+  @@map("imaging_reports")
+}
+
+model ImagingSeries {
+  id                  String   @id @default(uuid()) @db.Uuid
+  studyId             String   @map("study_id") @db.Uuid
+  seriesNumber        Int      @map("series_number")
+  seriesInstanceUid   String   @unique @map("series_instance_uid")
+  dicomModality       String   @map("dicom_modality")
+  description         String
+  instanceCount       Int      @map("instance_count")
+  keyInstanceNumber   Int?     @map("key_instance_number")
+  rows                Int
+  columns             Int
+  sliceThicknessMm    Float?   @map("slice_thickness_mm")
+  spacingMm           Float?   @map("spacing_mm")
+  defaultWindowCenter Float?   @map("default_window_center")
+  defaultWindowWidth  Float?   @map("default_window_width")
+  /// Sum of the stored (compressed) file sizes — for progress in the viewer.
+  totalBytes          Int      @default(0) @map("total_bytes")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  study     ImagingStudy      @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  instances ImagingInstance[]
+
+  @@unique([studyId, seriesNumber])
+  @@map("imaging_series")
+}
+
+model ImagingInstance {
+  id             String   @id @default(uuid()) @db.Uuid
+  seriesId       String   @map("series_id") @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  instanceNumber Int      @map("instance_number")
+  sopInstanceUid String   @unique @map("sop_instance_uid")
+  fileId         String   @unique @map("file_id") @db.Uuid
+  sliceLocation  Float?   @map("slice_location")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  series  ImagingSeries  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  file    StoredFile     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([seriesId, instanceNumber])
+  @@map("imaging_instances")
+}
+
+model LabReport {
+  id                      String                 @id @default(uuid()) @db.Uuid
+  patientId               String                 @map("patient_id") @db.Uuid
+  encounterId             String?                @map("encounter_id") @db.Uuid
+  reportNumber            String                 @unique @map("report_number")
+  panelName               String                 @map("panel_name")
+  panelCode               String?                @map("panel_code")
+  specimen                String
+  fasting                 Boolean?
+  collectedAt             DateTime               @map("collected_at")
+  receivedAt              DateTime?              @map("received_at")
+  reportedAt              DateTime               @map("reported_at")
+  status                  DiagnosticReportStatus @default(Final)
+  labName                 String                 @map("lab_name")
+  validatedByName         String?                @map("validated_by_name")
+  validatedByRegistration String?                @map("validated_by_registration")
+  validatedByRole         String?                @map("validated_by_role")
+  orderedByName           String?                @map("ordered_by_name")
+  /// Encrypted — the lab's own interpretive comment, as issued.
+  comment                 String?
+  isAtlasVocabulary       Boolean                @default(true) @map("is_atlas_vocabulary")
+  deletedAt               DateTime?              @map("deleted_at")
+  createdAt               DateTime               @default(now()) @map("created_at")
+  updatedAt               DateTime               @updatedAt @map("updated_at")
+
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter?     @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  results   LabResult[]
+
+  @@index([patientId, collectedAt])
+  @@map("lab_reports")
+}
+
+model LabResult {
+  id                 String   @id @default(uuid()) @db.Uuid
+  reportId           String   @map("report_id") @db.Uuid
+  patientId          String   @map("patient_id") @db.Uuid
+  sortOrder          Int      @map("sort_order")
+  /// LOINC where known — the key a trend is drawn on.
+  analyteCode        String   @map("analyte_code")
+  analyteName        String   @map("analyte_name")
+  /// The result exactly as issued ("12.4", "<0.5", "Negative").
+  value              String
+  valueNumeric       Float?   @map("value_numeric")
+  unit               String?
+  referenceRangeText String?  @map("reference_range_text")
+  referenceLow       Float?   @map("reference_low")
+  referenceHigh      Float?   @map("reference_high")
+  /// The LAB's flag, stored as issued. Never derived by this product.
+  flag               LabFlag?
+  method             String?
+  collectedAt        DateTime @map("collected_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  report  LabReport      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  patient PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, analyteCode, collectedAt])
+  @@index([reportId, sortOrder])
+  @@map("lab_results")
+}
+
+model VitalSign {
+  id             String      @id @default(uuid()) @db.Uuid
+  patientId      String      @map("patient_id") @db.Uuid
+  encounterId    String?     @map("encounter_id") @db.Uuid
+  type           VitalType
+  value          Float
+  /// Diastolic, for blood pressure only (enforced by a CHECK constraint).
+  value2         Float?
+  unit           String
+  qualifier      String?
+  source         VitalSource
+  placeName      String?     @map("place_name")
+  recordedByRole String?     @map("recorded_by_role")
+  deviceName     String?     @map("device_name")
+  /// True for a calculated value (BMI from weight and height).
+  isDerived      Boolean     @default(false) @map("is_derived")
+  measuredAt     DateTime    @map("measured_at")
+  /// Encrypted.
+  note           String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  patient   PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter Encounter?     @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+
+  @@unique([patientId, type, measuredAt, source])
+  @@index([patientId, type, measuredAt])
+  @@index([patientId, measuredAt])
+  @@map("vital_signs")
 }

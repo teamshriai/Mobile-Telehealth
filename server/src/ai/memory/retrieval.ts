@@ -1,114 +1,213 @@
-import { AiChunkSource } from '@prisma/client';
-import type { PatientContext } from '../context/patientContext';
-import { syncPatientChunks, listSyncedChunks, topKChunksByCosine } from './chunkSync';
+import { env } from '../../config/env.config';
+import {
+  SECTIONS,
+  type ContextSection,
+  type PatientContext,
+  type SectionKey,
+} from '../context/patientContext';
+import { syncPatientChunks, topKChunksByCosine, chunkKey } from './chunkSync';
 import { embedText } from '../embeddings/embedder';
+import { routeQuestion, questionTerms, type Route } from './questionRouter';
+import { medicineNamesIn } from '../safety/drugLexicon';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Retrieval decision: bypass vs. similarity search.
+// Retrieval v2 — what part of the record goes in front of the model.
 //
-// Measured on the real demo patient, the entire clinical record renders to
-// ~540 tokens — 0.4% of the model's context window. Below the threshold set
-// here, there is nothing to gain from search and something to lose (a missed
-// match): return every chunk. Only once a patient's record grows past it does
-// a similarity query run at all.
+// ONE budget (AI_CONTEXT_TOKENS). v1 had two that disagreed (a 900-token
+// bypass and a 600-token prompt slot), so a record between them was cut in
+// half mid-sentence. Now:
 //
-// This keeps the two code paths both genuinely live: the bypass path is what
-// every patient hits today and is exercised on every real request; the
-// pgvector path is exercised by tests and engages automatically the day a
-// patient's record outgrows the threshold — no code change, no flag to flip.
+//  1. The whole record fits → all of it, in section order.
+//  2. It does not → build it up, whole lines only, never cut:
+//       a. core sections (about you, allergies, conditions, current
+//          medicines, upcoming appointments, doctors) — at most half;
+//       b. the sections the question is about (questionRouter), lines that
+//          mention the question's words first, then newest first;
+//       c. for a "summarise everything" question, the newest two of every
+//          other section;
+//       d. the 24 lines most similar to the question (pgvector), if the
+//          embedder is up;
+//       e. anything else that still fits, section order, newest first.
+//     Each section notes "(N older entries not included)" so the model
+//     knows the record goes further and says so rather than guessing.
+//
+// The chunk table is synced first (awaited), so a record edited a moment ago
+// is what this turn sees. A sync or embedding failure degrades to keyword
+// selection; it never fails the turn.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Below this many tokens of synced chunk content, skip retrieval entirely
- *  and use everything. Matches the clinical-context prompt budget (600
- *  tokens) plus headroom, so the bypass path never itself exceeds budget. */
-export const RETRIEVAL_BYPASS_TOKENS = 900;
+const CHARS_PER_TOKEN = 3.6;
+const tokensOf = (text: string): number => Math.ceil(text.length / CHARS_PER_TOKEN);
+const CORE_SHARE = 0.5;
+const SIMILAR_K = 24;
+const HEADING_TOKENS = 8;
 
-/** Cross-conversation memory chunks are handled separately by the
- *  summariser/ai.repository path — this function only ever grounds against
- *  the patient's own clinical record. */
-const CLINICAL_SOURCE_TYPES = new Set<AiChunkSource>([
-  AiChunkSource.ProfileMedical,
-  AiChunkSource.Appointment,
-  AiChunkSource.Encounter,
-  AiChunkSource.StrokeAssessment,
-  AiChunkSource.CareTeam,
-  AiChunkSource.Prescription,
-  AiChunkSource.Problem,
-  AiChunkSource.Instruction,
-  AiChunkSource.HealthNote,
-]);
+export interface Selection {
+  /** Rendered, sectioned text for inside <patient_record>. */
+  text: string;
+  included: ContextSection[];
+  /** Lines left out, per section. */
+  omitted: Partial<Record<SectionKey, number>>;
+  usedAll: boolean;
+}
 
-export type RetrievalResult = {
-  /** The rendered text to place inside <patient_record> — already assembled,
-   *  ready for assemblePrompt. */
-  contextText: string;
-  /** Whether similarity search actually ran, for observability/tests. */
+function newestFirst(a: ContextSection, b: ContextSection): number {
+  return b.sortAt.getTime() - a.sortAt.getTime();
+}
+
+function render(
+  included: ContextSection[],
+  all: ContextSection[],
+): Pick<Selection, 'text' | 'omitted'> {
+  const omitted: Partial<Record<SectionKey, number>> = {};
+  const blocks: string[] = [];
+  for (const s of SECTIONS) {
+    const mine = included.filter((c) => c.section === s.key).sort(newestFirst);
+    const total = all.filter((c) => c.section === s.key).length;
+    if (mine.length === 0) {
+      if (total > 0) omitted[s.key] = total;
+      continue;
+    }
+    const left = total - mine.length;
+    if (left > 0) omitted[s.key] = left;
+    blocks.push(
+      [
+        `## ${s.heading}`,
+        ...mine.map((c) => c.text),
+        ...(left > 0 ? [`(${left} older entr${left === 1 ? 'y' : 'ies'} not included)`] : []),
+      ].join('\n'),
+    );
+  }
+  const notShown = SECTIONS.filter(
+    (s) => (omitted[s.key] ?? 0) > 0 && !included.some((c) => c.section === s.key),
+  );
+  if (notShown.length > 0) {
+    blocks.push(
+      `(Also on record but not included here: ${notShown.map((s) => s.heading.toLowerCase().replace(/ \(.*\)$/, '')).join(', ')}.)`,
+    );
+  }
+  return { text: blocks.join('\n\n'), omitted };
+}
+
+/**
+ * Pure selection — exported for tests. `similar` is chunk keys ranked by
+ * similarity to the question (may be empty).
+ */
+export function selectContext(
+  sections: ContextSection[],
+  question: string,
+  route: Route,
+  similar: string[],
+  budgetTokens: number = env.AI_CONTEXT_TOKENS,
+): Selection {
+  const total =
+    sections.reduce((n, s) => n + tokensOf(s.text), 0) + SECTIONS.length * HEADING_TOKENS;
+  if (total <= budgetTokens) {
+    return { ...render(sections, sections), included: sections, usedAll: true };
+  }
+
+  const picked = new Set<ContextSection>();
+  const sectionsUsed = new Set<SectionKey>();
+  let used = 0;
+  const tryAdd = (c: ContextSection, cap: number): boolean => {
+    if (picked.has(c)) return false;
+    const cost = tokensOf(c.text) + (sectionsUsed.has(c.section) ? 0 : HEADING_TOKENS);
+    if (used + cost > cap) return false;
+    picked.add(c);
+    sectionsUsed.add(c.section);
+    used += cost;
+    return true;
+  };
+  const of = (key: SectionKey): ContextSection[] => sections.filter((c) => c.section === key);
+
+  // a. Core, at most half the budget.
+  const coreCap = Math.floor(budgetTokens * CORE_SHARE);
+  for (const s of SECTIONS.filter((x) => x.core))
+    for (const c of of(s.key).sort(newestFirst)) tryAdd(c, coreCap);
+
+  // b. The routed sections, best-matching lines first.
+  const terms = questionTerms(question);
+  const hits = (c: ContextSection): number => {
+    const t = c.text.toLowerCase();
+    return terms.reduce((n, w) => n + (t.includes(w) ? 1 : 0), 0);
+  };
+  for (const s of SECTIONS.filter((x) => route.sections.has(x.key))) {
+    const ranked = of(s.key).sort((a, b) => hits(b) - hits(a) || newestFirst(a, b));
+    for (const c of ranked) tryAdd(c, budgetTokens);
+  }
+
+  // c. Broad questions: the newest two of everything else.
+  if (route.broad) {
+    for (const s of SECTIONS)
+      for (const c of of(s.key).sort(newestFirst).slice(0, 2)) tryAdd(c, budgetTokens);
+  }
+
+  // d. Similar lines.
+  const byKey = new Map(sections.map((c) => [chunkKey(c), c]));
+  for (const key of similar) {
+    const c = byKey.get(key);
+    if (c !== undefined) tryAdd(c, budgetTokens);
+  }
+
+  // e. Whatever else fits.
+  for (const s of SECTIONS) for (const c of of(s.key).sort(newestFirst)) tryAdd(c, budgetTokens);
+
+  const included = [...picked];
+  return { ...render(included, sections), included, usedAll: false };
+}
+
+export type RetrievalResult = Selection & {
   usedSimilaritySearch: boolean;
   chunkCount: number;
 };
 
 /**
- * Syncs the chunk table to the patient's current record, then decides how
- * much of it to surface for this question. Sync is awaited, not
- * fire-and-forget: a test (and a real patient) editing a medication and
- * immediately asking about it must see the new text on the very next turn,
- * not the next-but-one.
+ * Syncs the chunk table to the patient's current record, then selects what
+ * this question needs.
  */
 export async function retrievePatientContext(
   ownerUserId: string,
   patientContext: PatientContext,
   question: string,
+  /** The previous question in this conversation: "and in June?" is about
+   *  whatever the last question was about. */
+  previousQuestion: string | null = null,
 ): Promise<RetrievalResult> {
-  await syncPatientChunks(ownerUserId, patientContext);
-
-  const allChunks = (await listSyncedChunks(ownerUserId, patientContext.patientId)).filter((c) =>
-    CLINICAL_SOURCE_TYPES.has(c.sourceType),
-  );
-  const totalTokens = allChunks.reduce((sum, c) => sum + c.tokenCount, 0);
-
-  if (totalTokens <= RETRIEVAL_BYPASS_TOKENS) {
-    return {
-      contextText: allChunks.map((c) => c.text).join(' '),
-      usedSimilaritySearch: false,
-      chunkCount: allChunks.length,
-    };
-  }
-
-  // Over the threshold: embed the question and take the closest chunks up to
-  // roughly the same budget, rather than every chunk that exists.
-  let queryEmbedding: number[];
   try {
-    queryEmbedding = await embedText(question);
+    await syncPatientChunks(ownerUserId, patientContext);
   } catch (err) {
-    // Embedder unavailable: fail toward showing SOMETHING rather than
-    // nothing — fall back to the most recent chunks by taking the full set
-    // truncated to budget. Correctness over cleverness when degraded.
     console.error(
-      '[ai/retrieval] question embed failed, falling back to unranked chunks:',
+      '[ai/retrieval] chunk sync failed (continuing without it):',
       err instanceof Error ? err.message : err,
     );
-    let running = 0;
-    const kept: string[] = [];
-    for (const c of allChunks) {
-      if (running + c.tokenCount > RETRIEVAL_BYPASS_TOKENS) break;
-      kept.push(c.text);
-      running += c.tokenCount;
-    }
-    return { contextText: kept.join(' '), usedSimilaritySearch: false, chunkCount: kept.length };
   }
 
-  const topK = 8;
-  const nearest = await topKChunksByCosine(
-    ownerUserId,
-    patientContext.patientId,
-    queryEmbedding,
-    topK,
+  const routingText = previousQuestion === null ? question : `${question}\n${previousQuestion}`;
+  const route = routeQuestion(
+    routingText,
+    medicineNamesIn(patientContext.sections.map((s) => s.text).join(' ')),
   );
-  const clinicalNearest = nearest.filter((c) => CLINICAL_SOURCE_TYPES.has(c.sourceType));
+  const total = patientContext.sections.reduce((n, s) => n + tokensOf(s.text), 0);
+  let similar: string[] = [];
+  let usedSimilaritySearch = false;
+  if (total > env.AI_CONTEXT_TOKENS) {
+    try {
+      const nearest = await topKChunksByCosine(
+        ownerUserId,
+        patientContext.patientId,
+        await embedText(routingText),
+        SIMILAR_K,
+      );
+      similar = nearest.map((c) => chunkKey(c));
+      usedSimilaritySearch = true;
+    } catch (err) {
+      console.error(
+        '[ai/retrieval] similarity search unavailable (keyword selection only):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
 
-  return {
-    contextText: clinicalNearest.map((c) => c.text).join(' '),
-    usedSimilaritySearch: true,
-    chunkCount: clinicalNearest.length,
-  };
+  const selection = selectContext(patientContext.sections, routingText, route, similar);
+  return { ...selection, usedSimilaritySearch, chunkCount: selection.included.length };
 }

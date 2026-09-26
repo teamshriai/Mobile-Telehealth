@@ -6,7 +6,7 @@ import {
   EncounterType,
   EncounterStatus,
 } from '@prisma/client';
-import { encryptField } from '../../src/utils/encryption';
+import { decryptFieldOptional, encryptField } from '../../src/utils/encryption';
 import { withGeneratedVisitId } from '../../src/services/patientIdentity.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,8 +106,20 @@ interface InstructionSpec {
   bodyEnglish?: string;
 }
 
+/**
+ * The §8.3 consultants who lead visits, with the identifiers printed on what
+ * they sign. A visit names its lead with `lead`; the default is SD-S-01.
+ */
+const CLINICIANS = {
+  'SD-S-01': { name: 'Dr. Ananya Iyer', registration: 'KA-MC-58211', hpr: 'IN-HPR-2291840' },
+  'SD-S-02': { name: 'Dr. Rohit Desai', registration: 'KA-MC-41180', hpr: 'IN-HPR-1180422' },
+} as const;
+type ClinicianRef = keyof typeof CLINICIANS;
+
 interface VisitSpec {
   patient: string;
+  /** Who led the visit and signs its note, prescriptions and instructions. */
+  lead?: ClinicianRef;
   daysAgo: number;
   type: EncounterType;
   status: EncounterStatus;
@@ -744,6 +756,60 @@ const VISITS: VisitSpec[] = [
       plan:
         'Thrombolysis given after checking the exclusion criteria. Stroke unit admission. Half-hourly neurological observations for four hours. Repeat imaging at 24 hours. Swallow screen before anything by mouth.',
     }],
+    // Stroke-unit clot prevention while she was immobile — a finished course.
+    prescriptions: [{
+      status: PrescriptionStatus.Signed,
+      items: [{ drug: 'Enoxaparin', dose: 40, unit: 'mg', freq: 'OD', days: 5, indication: 'I63.9',
+        instructions: 'Given as an injection under the skin once a day by the ward nurse while you were in the stroke unit.' }],
+    }],
+  },
+  {
+    // ⚠️ Led by SD-S-02 Dr Rohit Desai, the §8.3 stroke neurologist at the same
+    // hospital that treated her stroke, and already on her care team. The
+    // three medicines match what her own profile has listed since Phase 3.
+    patient: BASE_DEMO_PATIENT,
+    lead: 'SD-S-02',
+    daysAgo: 14,
+    type: EncounterType.FollowUp,
+    status: EncounterStatus.Completed,
+    chiefComplaint: 'Follow-up review after hospital discharge',
+    location: 'Indostates Whitefield — Stroke Clinic',
+    problems: [
+      { code: 'I10', title: 'Essential (primary) hypertension', status: ProblemStatus.Active,
+        note: 'Known hypertension since 2015. Controlled on amlodipine.', onsetBeforeDays: 3900 },
+    ],
+    notes: [{
+      status: ClinicalNoteStatus.Signed,
+      code: 'I63.9',
+      codeText: 'Cerebral infarction, unspecified',
+      subjective:
+        'Eleven weeks after a left MCA territory stroke. Speech improving with therapy; right arm still weaker than the left. Taking her tablets every day with her husband\'s help. No new weakness, no headaches.',
+      objective:
+        'Alert, mild word-finding difficulty. Right arm power 4 out of 5, walking with a stick. Blood pressure 134 over 82, pulse 76 regular.',
+      assessment:
+        'Recovering left MCA territory ischaemic stroke on secondary prevention. Hypertension controlled.',
+      plan:
+        'Continue clopidogrel and atorvastatin long term. Continue amlodipine for blood pressure. Physiotherapy and speech therapy continue. Review in three months, sooner if any new symptoms.',
+    }],
+    prescriptions: [{
+      status: PrescriptionStatus.Signed,
+      items: [
+        { drug: 'Clopidogrel', dose: 75, unit: 'mg', freq: 'OD', days: 90, indication: 'I63.9',
+          instructions: 'Take one tablet every morning after breakfast, every day. It helps stop new clots forming.' },
+        { drug: 'Atorvastatin', dose: 40, unit: 'mg', freq: 'HS', days: 90, indication: 'I63.9',
+          instructions: 'Take one tablet at night. It lowers cholesterol to protect your blood vessels.' },
+        // ⚠️ A shorter supply on purpose — it runs out within the week, so the
+        // demo shows "supply ends soon" and the refill request flow.
+        { drug: 'Amlodipine', dose: 5, unit: 'mg', freq: 'OD', days: 20, indication: 'I10',
+          instructions: 'Take one tablet every morning for your blood pressure.' },
+      ],
+    }],
+    instructions: [{
+      title: 'Your stroke-prevention medicines',
+      language: 'en',
+      body:
+        'Take clopidogrel every morning and atorvastatin every night, every day, even when you feel well.\n\nIf you notice new weakness, a drooping face or trouble speaking, call 108 at once.\n\nBring all your medicines to your next appointment.',
+    }],
   },
 ];
 
@@ -778,6 +844,9 @@ export async function seedM06Visits(
   const made = { visits: 0, notes: 0, problems: 0, rx: 0, instructions: 0, instructionsBackfilled: 0 };
 
   for (const visit of VISITS) {
+    const leadRef: ClinicianRef = visit.lead ?? 'SD-S-01';
+    const lead = CLINICIANS[leadRef];
+    const leadId = doctorUserIdByRef.get(leadRef) ?? consultant;
     const patientId = visit.patient.startsWith('email:')
       ? (
           await prisma.patientProfile.findFirst({
@@ -806,14 +875,45 @@ export async function seedM06Visits(
      * what makes a re-run converge.
      */
     const startedAt = daysAgo(visit.daysAgo);
-    const existing = await prisma.encounter.findFirst({
-      where: {
-        patientId,
-        type: visit.type,
-        startedAt: { gte: daysAgo(visit.daysAgo + 0.5), lt: daysAgo(visit.daysAgo - 0.5) },
-      },
-      select: { id: true },
-    });
+    /**
+     * ⚠️ A HISTORICAL VISIT IS MATCHED BY WHAT IT WAS, NOT WHEN. The day window
+     * below is relative to "now", so a re-run on a later day slides past the
+     * visit it made last time and writes the whole visit again — notes,
+     * prescriptions and all (a patient's Medicines page then shows the same
+     * course twice). For visits a week or more back, the key is the decrypted
+     * chief complaint (fixed text in this file) within a generous date band —
+     * ±max(7 days, a quarter of how far back the visit is). The band matters:
+     * one patient can have two visits with the same reason months apart
+     * (SD-P-01's "Six-month thyroid review" in June and in today's clinic).
+     * Recent visits keep the day window on purpose: "seen yesterday" should
+     * still read as yesterday on the day of a demo.
+     */
+    const bandDays = Math.max(7, visit.daysAgo / 4);
+    const byComplaint =
+      visit.daysAgo >= 7
+        ? (
+            await prisma.encounter.findMany({
+              where: {
+                patientId,
+                type: visit.type,
+                startedAt: { gte: daysAgo(visit.daysAgo + bandDays), lt: daysAgo(visit.daysAgo - bandDays) },
+              },
+              select: { id: true, chiefComplaint: true },
+              orderBy: { createdAt: 'asc' },
+            })
+          ).find((e) => decryptFieldOptional(e.chiefComplaint) === visit.chiefComplaint)
+        : undefined;
+    const existing =
+      byComplaint !== undefined
+        ? { id: byComplaint.id }
+        : await prisma.encounter.findFirst({
+            where: {
+              patientId,
+              type: visit.type,
+              startedAt: { gte: daysAgo(visit.daysAgo + 0.5), lt: daysAgo(visit.daysAgo - 0.5) },
+            },
+            select: { id: true },
+          });
 
     const encounter =
       existing ??
@@ -831,7 +931,7 @@ export async function seedM06Visits(
                 : null,
             locationName: encryptField(visit.location),
             chiefComplaint: encryptField(visit.chiefComplaint),
-            createdByUserId: consultant,
+            createdByUserId: leadId,
           },
         }),
       ));
@@ -852,7 +952,7 @@ export async function seedM06Visits(
           onsetDate: daysAgo(visit.daysAgo + (spec.onsetBeforeDays ?? 0)),
           resolvedAt: spec.resolvedDaysAgo === undefined ? null : daysAgo(spec.resolvedDaysAgo),
           note: encryptField(spec.note),
-          recordedByUserId: consultant,
+          recordedByUserId: leadId,
         },
       });
       made.problems += 1;
@@ -860,7 +960,7 @@ export async function seedM06Visits(
 
     // ── Notes written at this visit ───────────────────────────────────────
     for (const spec of visit.notes ?? []) {
-      const authorId = spec.author === 'resident' && resident !== undefined ? resident : consultant;
+      const authorId = spec.author === 'resident' && resident !== undefined ? resident : leadId;
       const isResident = spec.author === 'resident';
       const signed = spec.status !== ClinicalNoteStatus.Draft;
       const signedAt =
@@ -893,8 +993,8 @@ export async function seedM06Visits(
           requiresCosign: spec.status === ClinicalNoteStatus.CosignPending,
           signedAt: signed ? signedAt : null,
           signedByUserId: signed ? authorId : null,
-          signerName: signed ? (isResident ? 'Dr. Kavitha Rao' : 'Dr. Ananya Iyer') : null,
-          signerRegistrationNumber: signed ? (isResident ? 'KA-MC-77310' : 'KA-MC-58211') : null,
+          signerName: signed ? (isResident ? 'Dr. Kavitha Rao' : lead.name) : null,
+          signerRegistrationNumber: signed ? (isResident ? 'KA-MC-77310' : lead.registration) : null,
           createdAt: startedAt,
         },
       });
@@ -906,8 +1006,8 @@ export async function seedM06Visits(
             noteId: note.id,
             body: encryptField(spec.addendum),
             authorUserId: authorId,
-            authorName: isResident ? 'Dr. Kavitha Rao' : 'Dr. Ananya Iyer',
-            authorRegistrationNumber: isResident ? 'KA-MC-77310' : 'KA-MC-58211',
+            authorName: isResident ? 'Dr. Kavitha Rao' : lead.name,
+            authorRegistrationNumber: isResident ? 'KA-MC-77310' : lead.registration,
             createdAt: new Date(signedAt.getTime() + 48 * 3_600_000),
           },
         });
@@ -950,12 +1050,12 @@ export async function seedM06Visits(
           encounterId: encounter.id,
           rxNumber: `RX/26-27/${String(rxSeq).padStart(6, '0')}`,
           status: spec.status,
-          authorUserId: consultant,
+          authorUserId: leadId,
           signedAt: isSigned ? new Date(startedAt.getTime() + 30 * 60_000) : null,
-          signedByUserId: isSigned ? consultant : null,
-          signerName: isSigned ? 'Dr. Ananya Iyer' : null,
-          signerRegistrationNumber: isSigned ? 'KA-MC-58211' : null,
-          signerHprId: isSigned ? 'IN-HPR-2291840' : null,
+          signedByUserId: isSigned ? leadId : null,
+          signerName: isSigned ? lead.name : null,
+          signerRegistrationNumber: isSigned ? lead.registration : null,
+          signerHprId: isSigned ? lead.hpr : null,
           createdAt: startedAt,
           items: { create: items },
         },
@@ -1002,8 +1102,8 @@ export async function seedM06Visits(
           titleEnglish: spec.titleEnglish ?? null,
           bodyEnglish: spec.bodyEnglish === undefined ? null : encryptField(spec.bodyEnglish),
           issuedAt: new Date(startedAt.getTime() + 40 * 60_000),
-          issuedByUserId: consultant,
-          issuedByName: 'Dr. Ananya Iyer',
+          issuedByUserId: leadId,
+          issuedByName: lead.name,
         },
       });
       made.instructions += 1;

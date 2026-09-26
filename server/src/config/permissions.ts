@@ -47,6 +47,13 @@ export const Permission = {
   // Patient-GENERATED notes (voice or typed). Create, edit, delete and
   // listen back — all on the patient's own notes only.
   HealthNoteWriteOwn: 'healthnote:write:own',
+  // Patient-reported adherence ("I took it" / "I skipped it") and a request
+  // for more of a medicine. Neither prescribes or dispenses anything.
+  MedicationLogOwn: 'medication:log:own',
+  RefillRequestOwn: 'refill:request:own',
+  // Reports (imaging and lab) and vital signs — read-only to the patient.
+  ReportReadOwn: 'report:read:own',
+  VitalReadOwn: 'vital:read:own',
 
   // ── Clinician access (Phase 6 doctor portal; enforced from today) ───────
   PatientReadAssigned: 'patient:read:assigned',
@@ -164,6 +171,9 @@ export const Permission = {
   // checked against the doctor's published availability. Patients only ever
   // REQUEST; a doctor cannot confirm a request either (scheduling.service).
   HospitalAppointmentManage: 'appointment:manage:hospital-scoped',
+  // Routing patients' refill requests to a doctor (or declining them). The
+  // administrator never prescribes; a doctor does, through the normal path.
+  HospitalRefillManage: 'refill:manage:hospital-scoped',
   HospitalManageOwn: 'hospital:manage:own',
   FeedbackReadHospitalScoped: 'feedback:read:hospital-scoped',
 } as const;
@@ -187,6 +197,10 @@ const PATIENT_PERMISSIONS: PermissionName[] = [
   Permission.InstructionReadOwn,
   Permission.VisitReadOwn,
   Permission.HealthNoteWriteOwn,
+  Permission.MedicationLogOwn,
+  Permission.RefillRequestOwn,
+  Permission.ReportReadOwn,
+  Permission.VitalReadOwn,
 ];
 
 const DOCTOR_PERMISSIONS: PermissionName[] = [
@@ -329,6 +343,7 @@ const HOSPITAL_ADMIN_PERMISSIONS: PermissionName[] = [
   Permission.HospitalPatientRead,
   Permission.HospitalAppointmentRead,
   Permission.HospitalAppointmentManage,
+  Permission.HospitalRefillManage,
   Permission.HospitalManageOwn,
   Permission.FeedbackReadHospitalScoped,
   // Template governance (UI_ATLAS persona P-02, S-06-10). Promoting a

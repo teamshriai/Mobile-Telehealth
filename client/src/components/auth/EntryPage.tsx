@@ -7,7 +7,7 @@ import AuthShell from './AuthShell'
 import { AUDIENCE_COPY, type Audience } from './audience'
 
 /**
- * "Who are you?" — the entry to Indostates Health.
+ * "Who are you?" — the entry to SHRI HEALTH.
  *
  * ⚠️ A DOOR, NOT A ROLE CLAIM. Choosing a card changes which sign-in method
  * and wording follow; it is never sent to the server. The account's own role
@@ -41,7 +41,7 @@ export default function EntryPage() {
       <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-5xl flex-col justify-center px-4 py-10 sm:px-6">
         <div className="mb-8 flex items-center gap-2.5">
           <BrandMark size={18} />
-          <span className="text-sm font-semibold tracking-tight text-ink">Indostates Health</span>
+          <span className="text-sm font-semibold tracking-[0.06em] text-ink">SHRI HEALTH</span>
         </div>
 
         {state?.expired === true && (
@@ -58,10 +58,10 @@ export default function EntryPage() {
         )}
 
         <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          Welcome to Indostates Health
+          Welcome to SHRI HEALTH
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted sm:text-base">
-          Choose how you use Indostates Health to sign in.
+          Choose how you use SHRI HEALTH to sign in.
         </p>
 
         <ul className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-4">
@@ -102,14 +102,10 @@ export default function EntryPage() {
         </ul>
 
         <p className="mt-6 text-sm text-ink-muted">
-          New patient?{' '}
+          New to SHRI HEALTH?{' '}
           <Link to="/register" className="focus-ring rounded font-semibold text-primary-700 hover:underline">
             Create an account
           </Link>
-        </p>
-        <p className="mt-2 max-w-xl text-xs leading-relaxed text-ink-subtle">
-          Clinician and hospital accounts are not created here. Your hospital administrator adds
-          clinicians; hospital administrators are set up by the Indostates Health team.
         </p>
       </div>
     </AuthShell>

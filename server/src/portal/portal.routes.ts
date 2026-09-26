@@ -2,13 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/authorize';
 import { Permission } from '../config/permissions';
-import {
-  getConditions,
-  getInstructions,
-  getMedications,
-  getVisit,
-  getVisits,
-} from './portal.controller';
+import { getConditions, getInstructions, getVisit, getVisits } from './portal.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // /api/v1/me — the patient's own clinical record, read-only.
@@ -21,7 +15,7 @@ import {
 
 const router = Router();
 
-router.get('/medications', authenticate, requirePermission(Permission.RxReadOwn), getMedications);
+// /medications lives in medication/medication.routes.ts (mounted first in app.ts).
 router.get(
   '/conditions',
   authenticate,

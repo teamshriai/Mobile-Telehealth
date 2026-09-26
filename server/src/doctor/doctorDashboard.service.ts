@@ -9,9 +9,10 @@ import { doctorDashboardRepository } from './doctorDashboard.repository';
 // real row. Nothing is scored, predicted or averaged.
 //
 // The reference design for this screen (UI_ATLAS S-06-01) shows a NEWS2
-// deterioration score. This product has no vitals model — there is nowhere a
-// respiratory rate or a blood pressure is stored — so that score cannot be
-// computed and is deliberately NOT faked. What replaces it is a deterministic
+// deterioration score. NEWS2 needs a complete, current set of observations;
+// `vital_signs` holds only occasional readings for a few patients (never a
+// running ward chart), so that score cannot be computed and is deliberately
+// NOT faked. What replaces it is a deterministic
 // ranking over signals that genuinely exist in the schema: an urgent stroke
 // assessment, an open encounter, the recorded symptom count, and appointment
 // timing. Every row returns the exact signals that produced its band, so the

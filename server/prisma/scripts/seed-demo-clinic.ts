@@ -24,6 +24,8 @@
 
 import 'dotenv/config';
 import { seedM06Clinical } from './m06ClinicalSeed';
+import { seedMedicineAdherence } from './medicineAdherenceSeed';
+import { seedReportsDemo } from './reportsDemoSeed';
 import {
   Prisma,
   PrismaClient,
@@ -204,6 +206,14 @@ type PatientSpec = {
 /** §8.2. Ages are as at the atlas's fixed reference moment, 21-Sep-2026.
  *  SD-P-08 (unidentified MLC male) is deliberately absent: an identity-pending
  *  record belongs to the registration flow, not to a consultant's care team. */
+/** SD-S-11 — the §8.3 Medical Superintendent, seeded as HospitalAdmin. */
+const HOSPITAL_ADMIN = {
+  email: 'demo.hadmin.sharma@stroke-ai.invalid',
+  firstName: 'Vivek',
+  lastName: 'Sharma',
+  jobTitle: 'Medical Superintendent',
+} as const;
+
 /** SD-P-01 is the portal's demo patient (see section 3b). */
 const PORTAL_PATIENT = {
   ref: 'SD-P-01',
@@ -489,6 +499,36 @@ async function main(): Promise<void> {
     console.log(`✓ doctor ${spec.ref}: Dr ${spec.firstName} ${spec.lastName} (${spec.email})`);
   }
 
+  // ── 2b. The hospital's administrator ──────────────────────────────────────
+  // SD-S-11 Dr Vivek Sharma, the §8.3 Medical Superintendent at this
+  // facility — the kit's closest persona to the HospitalAdmin role. He
+  // approves appointment requests and routes refill requests. Same password
+  // variable as the demo clinicians.
+  const adminRole = await prisma.role.findUnique({ where: { name: RoleName.HospitalAdmin } });
+  if (adminRole !== null) {
+    const adminUser = await prisma.user.upsert({
+      where: { email: HOSPITAL_ADMIN.email },
+      update: { passwordHash, isActive: true, isVerified: true },
+      create: { email: HOSPITAL_ADMIN.email, passwordHash, roleId: adminRole.id, isVerified: true, isActive: true },
+      select: { id: true },
+    });
+    const staff = {
+      firstName: HOSPITAL_ADMIN.firstName,
+      lastName: HOSPITAL_ADMIN.lastName,
+      jobTitle: HOSPITAL_ADMIN.jobTitle,
+      hospitalId: hospital.id,
+      isVerified: true,
+      verifiedAt: new Date(),
+      onboardingCompletedAt: new Date(),
+    };
+    await prisma.staffProfile.upsert({
+      where: { userId: adminUser.id },
+      update: staff,
+      create: { userId: adminUser.id, ...staff },
+    });
+    console.log(`✓ hospital admin SD-S-11: Dr ${HOSPITAL_ADMIN.firstName} ${HOSPITAL_ADMIN.lastName} (${HOSPITAL_ADMIN.email})`);
+  }
+
   // ── 3. Patients ───────────────────────────────────────────────────────────
   const patientIdByRef = new Map<string, string>();
 
@@ -629,6 +669,8 @@ async function main(): Promise<void> {
   // clinical notes, templates and instructions. Kept in its own module purely
   // because this file is already long; it runs under the same command.
   await seedM06Clinical(prisma, patientIdByRef, doctorUserIdByRef, hospital.id, passwordHash);
+  await seedMedicineAdherence(prisma);
+  await seedReportsDemo(prisma);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

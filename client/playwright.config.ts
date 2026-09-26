@@ -17,6 +17,7 @@ export default defineConfig({
   // Expires the demo break-glass grants so the suite is repeatable — see the
   // file for why the break-glass test cannot clean up after itself.
   globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   // ⚠️ SERIAL, AND NOT NEGOTIABLE BY A FLAG. Two things break under parallel
   // workers, and neither is obvious from a failure message:
   //
@@ -47,7 +48,7 @@ export default defineConfig({
       // ⚠️ `lan.spec.ts` is excluded here and runs only in the `lan` project
       // below. It needs a dev server bound to all interfaces, and every page
       // load costs one of the 60 `/auth/refresh` calls per 15 minutes.
-      testIgnore: /(lan|auth-entry|patient-portal|health-notes)\.spec\.ts/,
+      testIgnore: /(lan|auth-entry|patient-portal|health-notes|medicines|reports-assistant)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // The default session. Specs that need another clinician declare it
@@ -92,7 +93,7 @@ export default defineConfig({
      */
     {
       name: 'patient',
-      testMatch: /(patient-portal|health-notes)\.spec\.ts/,
+      testMatch: /(patient-portal|health-notes|medicines|reports-assistant)\.spec\.ts/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],

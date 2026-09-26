@@ -75,7 +75,7 @@ export default function RecentActivity({ notifications = [] }: { notifications?:
                       {!n.isRead && (
                         // Text, not just a colour dot — status must survive
                         // both colour-blindness and a screen reader.
-                        <span className="rounded bg-white px-1.5 py-0.5 text-[11px] font-semibold text-tile-blue">
+                        <span className="rounded bg-white px-1.5 py-0.5 text-2xs font-semibold text-tile-blue">
                           New
                         </span>
                       )}

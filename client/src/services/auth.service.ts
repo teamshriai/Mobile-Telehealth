@@ -109,8 +109,8 @@ export async function register(formData: RegisterFormData): Promise<{ user: User
  * branch here on "did it actually send" would rebuild the account-enumeration
  * oracle the server works to avoid.
  */
-/** Which way the code was delivered. Chosen by the user, echoed by the server. */
-export type OtpChannel = 'Sms' | 'Email'
+/** How the code is delivered: SMS only (emailed sign-in codes were withdrawn). */
+export type OtpChannel = 'Sms'
 
 export interface OtpChallenge {
   challengeId: string
@@ -119,7 +119,7 @@ export interface OtpChallenge {
   resendAvailableAt: string
   channel: OtpChannel
   /**
-   * `••••• •3210` or `a••••@g••••.com` — for display only. The full identifier
+   * `••••• •3210` — for display only. The full identifier
    * is never echoed back, so a shoulder-surfer learns nothing from the screen.
    */
   maskedIdentifier: string

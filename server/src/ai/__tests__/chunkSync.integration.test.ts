@@ -48,7 +48,9 @@ describe('chunk sync — stale retrieval after a clinical-data update', () => {
       assert.notEqual(before, null);
       await syncPatientChunks(userId, before!);
       const chunksBefore = await listSyncedChunks(userId, profile.id);
-      const medsChunkBefore = chunksBefore.find((c) => c.text.startsWith('Current medicines'));
+      const medsChunkBefore = chunksBefore.find((c) =>
+        c.text.startsWith('Medicines you listed yourself'),
+      );
       assert.ok(medsChunkBefore, 'expected a medicines chunk to exist before the edit');
       assert.ok(
         !medsChunkBefore.text.includes('Rivaroxaban'),
@@ -69,7 +71,9 @@ describe('chunk sync — stale retrieval after a clinical-data update', () => {
       const after = await buildPatientContext(userId);
       await syncPatientChunks(userId, after!);
       const chunksAfter = await listSyncedChunks(userId, profile.id);
-      const medsChunkAfter = chunksAfter.find((c) => c.text.startsWith('Current medicines'));
+      const medsChunkAfter = chunksAfter.find((c) =>
+        c.text.startsWith('Medicines you listed yourself'),
+      );
       assert.ok(medsChunkAfter, 'expected a medicines chunk to exist after the edit');
       assert.ok(
         medsChunkAfter.text.includes('Rivaroxaban'),
@@ -80,7 +84,8 @@ describe('chunk sync — stale retrieval after a clinical-data update', () => {
       //    accumulation of stale duplicates.
       const medsChunks = chunksAfter.filter(
         (c) =>
-          c.sourceType === AiChunkSource.ProfileMedical && c.text.startsWith('Current medicines'),
+          c.sourceType === AiChunkSource.ProfileMedical &&
+          c.text.startsWith('Medicines you listed yourself'),
       );
       assert.equal(medsChunks.length, 1, 'editing a field must update its chunk, not duplicate it');
     } finally {

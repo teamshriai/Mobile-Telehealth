@@ -69,7 +69,7 @@ function ConditionGroup({ title, items, empty }: { title: string; items: Conditi
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-ink">{c.title}</p>
                 {/* ICD-10 only — the code a clinician or insurer will ask for. */}
-                <span className="font-mono text-xs text-ink-subtle">ICD-10 {c.code}</span>
+                <span className="text-xs tabular-nums text-ink-subtle">ICD-10 {c.code}</span>
               </div>
               <p className="mt-1 text-xs text-ink-muted">
                 Recorded {portal.formatDay(c.recordedAt)}

@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Video, MapPin, CalendarPlus, ArrowRight } from 'lucide-react'
 import type { Appointment } from '../../types/domain'
 import MiniCalendar from '../appointments/MiniCalendar'
 import { dayKey } from '../appointments/calendarDays'
+import CalendarDayPanel from './CalendarDayPanel'
 
 /**
  * The next appointment, given real prominence.
@@ -44,6 +46,13 @@ export default function UpcomingAppointment({
   /** Every upcoming visit, for the calendar's markings. */
   appointments?: Appointment[]
 }) {
+  // The day picked in the calendar; its visits show underneath (like the
+  // Appointments page's calendar, without leaving Home).
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const dayPanel = selectedDay !== null && (
+    <CalendarDayPanel day={selectedDay} appointments={appointments} onClear={() => setSelectedDay(null)} />
+  )
+
   if (!appointment) {
     // Deliberately compact. The generic EmptyState is built for a full page
     // column; used here it gave the "nothing to see" case more vertical room
@@ -75,7 +84,8 @@ export default function UpcomingAppointment({
             </Link>
           </div>
           <div className="mt-4 border-t border-border-soft pt-4 sm:max-w-xs">
-            <MiniCalendar compact label="Your upcoming appointments" marks={[]} />
+            <MiniCalendar compact label="Your upcoming appointments" marks={[]} selected={selectedDay} onSelect={setSelectedDay} />
+            {dayPanel}
           </div>
         </div>
       </section>
@@ -112,7 +122,7 @@ export default function UpcomingAppointment({
             aria-hidden="true"
             className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-primary-50"
           >
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary-700">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-primary-700">
               {MONTHS[when.getMonth()]}
             </span>
             <span className="text-2xl font-semibold leading-none text-ink">
@@ -164,7 +174,10 @@ export default function UpcomingAppointment({
             marks={appointments
               .filter((a) => a.status !== 'Cancelled')
               .map((a) => ({ at: a.scheduledAt, confirmed: a.status === 'Confirmed' }))}
+            selected={selectedDay}
+            onSelect={setSelectedDay}
           />
+          {dayPanel}
         </div>
       </div>
     </section>

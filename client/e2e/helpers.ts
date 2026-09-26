@@ -7,11 +7,17 @@ export const SECOND_CONSULTANT = 'demo.doctor.desai@stroke-ai.invalid'
 export const RESIDENT = 'demo.resident.rao@stroke-ai.invalid'
 /** SD-P-01 Meera Krishnan — the patient portal's demo account (§8.2). */
 export const PATIENT = 'demo.patient.krishnan@stroke-ai.invalid'
+/** SD-S-11 Dr Vivek Sharma — Medical Superintendent, the demo hospital administrator. */
+export const HOSPITAL_ADMIN = 'demo.hadmin.sharma@stroke-ai.invalid'
+/** Meenakshi Subramaniam — the pitch demo account (its own password, DEMO_PATIENT_PASSWORD). */
+export const PITCH_PATIENT = 'demouser.strokeai@gmail.com'
 /** SD-P-01's Shri ID in the seeded demo database. */
 export const PATIENT_SHRI_ID = 'SHRI-XMVY30-2'
 
 /** Read from the environment so no credential is committed. */
 export const PASSWORD = process.env.DEMO_CLINIC_PASSWORD ?? ''
+/** Meenakshi's password. Optional: her specs skip themselves without it. */
+export const PITCH_PASSWORD = process.env.DEMO_PATIENT_PASSWORD ?? ''
 
 /**
  * §5.1's breakpoints, including md 1024 — "the breakpoint that matters most".

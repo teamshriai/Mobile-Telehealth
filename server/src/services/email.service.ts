@@ -48,14 +48,14 @@ function passwordResetHtml(resetLink: string): string {
             </tr>
             <tr>
               <td style="padding:32px 32px 8px 32px;">
-                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">Stroke AI</p>
+                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">SHRI HEALTH</p>
               </td>
             </tr>
             <tr>
               <td style="padding:8px 32px 0 32px;">
                 <h1 style="margin:0 0 16px 0;font-size:20px;color:#0f172a;">Reset your password</h1>
                 <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">
-                  We received a request to reset the password for your Stroke AI account.
+                  We received a request to reset the password for your SHRI HEALTH account.
                   Click the button below to choose a new password. This link expires in
                   <strong>15 minutes</strong> and can only be used once.
                 </p>
@@ -80,7 +80,7 @@ function passwordResetHtml(resetLink: string): string {
             <tr>
               <td style="padding:16px 32px;border-top:1px solid #e2e8f0;">
                 <p style="margin:0;font-size:11px;color:#94a3b8;">
-                  This is an automated message from Stroke AI. Please do not reply to this email.
+                  This is an automated message from SHRI HEALTH. Please do not reply to this email.
                 </p>
               </td>
             </tr>
@@ -94,9 +94,9 @@ function passwordResetHtml(resetLink: string): string {
 
 function passwordResetText(resetLink: string): string {
   return [
-    'Reset your Stroke AI password',
+    'Reset your SHRI HEALTH password',
     '',
-    'We received a request to reset the password for your Stroke AI account.',
+    'We received a request to reset the password for your SHRI HEALTH account.',
     'Open the link below to choose a new password. This link expires in 15 minutes',
     'and can only be used once.',
     '',
@@ -125,7 +125,7 @@ function passwordSetupHtml(setupLink: string): string {
             </tr>
             <tr>
               <td style="padding:32px 32px 8px 32px;">
-                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">Indostates Health</p>
+                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">SHRI HEALTH</p>
               </td>
             </tr>
             <tr>
@@ -170,7 +170,7 @@ function passwordSetupHtml(setupLink: string): string {
 
 function passwordSetupText(setupLink: string): string {
   return [
-    'Set your Indostates Health password',
+    'Set your SHRI HEALTH password',
     '',
     'An account has been created for you by your administrator.',
     'Open the link below to choose a password. This link expires in 72 hours',
@@ -236,7 +236,7 @@ function notificationHtml(subject: string, body: string | null, link: string): s
             </tr>
             <tr>
               <td style="padding:32px 32px 8px 32px;">
-                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">Stroke AI</p>
+                <p style="margin:0;font-size:15px;font-weight:bold;color:#1a2e3b;">SHRI HEALTH</p>
               </td>
             </tr>
             <tr>
@@ -244,21 +244,21 @@ function notificationHtml(subject: string, body: string | null, link: string): s
                 <h1 style="margin:0 0 16px 0;font-size:20px;color:#0f172a;">${safeSubject}</h1>
                 ${safeBody === '' ? '' : `<p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">${safeBody}</p>`}
                 <p style="margin:0 0 16px 0;font-size:14px;line-height:1.6;color:#334155;">
-                  Sign in to Stroke AI to see the details.
+                  Sign in to SHRI HEALTH to see the details.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:8px 32px 24px 32px;" align="center">
                 <a href="${link}" style="display:inline-block;background-color:#6366f1;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:12px 28px;border-radius:8px;">
-                  Open Stroke AI
+                  Open SHRI HEALTH
                 </a>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 32px;border-top:1px solid #e2e8f0;">
                 <p style="margin:0;font-size:11px;color:#94a3b8;">
-                  This is an automated message from Stroke AI. Please do not reply to this email.
+                  This is an automated message from SHRI HEALTH. Please do not reply to this email.
                   You can change which notifications you receive in Settings.
                 </p>
               </td>
@@ -276,7 +276,7 @@ function notificationText(subject: string, body: string | null, link: string): s
     subject,
     '',
     ...(body === null ? [] : [body, '']),
-    'Sign in to Stroke AI to see the details:',
+    'Sign in to SHRI HEALTH to see the details:',
     link,
     '',
     'You can change which notifications you receive in Settings.',
@@ -303,7 +303,7 @@ function otpHtml(code: string, minutes: number): string {
 <tr><td align="center">
 <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:480px;background-color:#ffffff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
 <tr><td style="height:4px;background-color:#6366f1;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td style="padding:24px 32px 0 32px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#1a2e3b;">Stroke AI</td></tr>
+<tr><td style="padding:24px 32px 0 32px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#1a2e3b;">SHRI HEALTH</td></tr>
 <tr><td style="padding:16px 32px 0 32px;font-family:Arial,sans-serif;">
   <h1 style="margin:0;font-size:20px;color:#0f172a;">Your sign-in code</h1>
   <p style="margin:12px 0 0 0;font-size:14px;line-height:1.6;color:#334155;">Enter this code to finish signing in. It expires in ${escapeHtml(String(minutes))} minutes.</p>
@@ -315,14 +315,14 @@ function otpHtml(code: string, minutes: number): string {
   If you did not ask to sign in, you can ignore this email. Nobody can use this code without it.
 </td></tr>
 <tr><td style="padding:16px 32px;border-top:1px solid #e2e8f0;font-family:Arial,sans-serif;font-size:11px;color:#94a3b8;">
-  This is an automated message from Stroke AI. Please do not reply to this email.
+  This is an automated message from SHRI HEALTH. Please do not reply to this email.
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
 
 function otpText(code: string, minutes: number): string {
   return [
-    'Your Stroke AI sign-in code',
+    'Your SHRI HEALTH sign-in code',
     '',
     code,
     '',
@@ -366,7 +366,7 @@ export const emailService = {
         to: input.to,
         // ⚠️ The code is NOT in the subject line. Subjects show on lock
         // screens and in notification previews, where a shoulder is enough.
-        subject: 'Your Stroke AI sign-in code',
+        subject: 'Your SHRI HEALTH sign-in code',
         text: otpText(input.code, minutes),
         html: otpHtml(input.code, minutes),
       });
@@ -389,7 +389,7 @@ export const emailService = {
       await getTransporter().sendMail({
         from: env.EMAIL_FROM,
         to,
-        subject: 'Reset your Stroke AI password',
+        subject: 'Reset your SHRI HEALTH password',
         text: passwordResetText(resetLink),
         html: passwordResetHtml(resetLink),
       });
@@ -412,7 +412,7 @@ export const emailService = {
       await getTransporter().sendMail({
         from: env.EMAIL_FROM,
         to,
-        subject: 'Set your Indostates Health password',
+        subject: 'Set your SHRI HEALTH password',
         text: passwordSetupText(setupLink),
         html: passwordSetupHtml(setupLink),
       });

@@ -526,7 +526,7 @@ function PrintSheet({
       })}
 
       <footer className="mt-6 border-t border-black pt-2 text-xs">
-        Indostates Health · Keep this sheet and bring it to your next visit. If you are worried
+        SHRI HEALTH · Keep this sheet and bring it to your next visit. If you are worried
         before then, contact the hospital or go to the nearest emergency department.
       </footer>
     </div>

@@ -10,7 +10,7 @@ import { DOCTOR, PASSWORD, expectNoHorizontalOverflow } from './helpers'
  * The sign-in entry, for every kind of account.
  *
  *   /            "Who are you?" — Patient | Doctor/Clinician | Hospital Administrator
- *   patient      mobile OTP · email OTP · email + password · create account
+ *   patient      mobile number (SMS code) · email + password · create account
  *   clinician    email + password only
  *   hospital     email + password only
  *
@@ -38,21 +38,30 @@ const PATIENT = {
   password: 'Entry#Test2026',
 }
 const MASKED_TAIL = PATIENT.mobile.slice(-4)
+/** A second patient, only for the enumeration check: the first one's number
+ *  is still inside its 30s resend cooldown by then. */
+const PATIENT_2 = {
+  email: `e2e.patient2.${stamp}@example.invalid`,
+  mobile: `8${stamp.padStart(9, '5')}`,
+  password: PATIENT.password,
+}
 
 test.beforeAll(async () => {
   const api = await pwRequest.newContext()
-  const res = await api.post(`${API_ORIGIN}/api/v1/auth/register`, {
-    data: {
-      email: PATIENT.email,
-      password: PATIENT.password,
-      firstName: 'Entry',
-      lastName: 'Tester',
-      dateOfBirth: '1990-01-01',
-      phoneNumber: PATIENT.mobile,
-      agreed: true,
-    },
-  })
-  expect(res.status(), `registering the test patient: ${await res.text()}`).toBe(201)
+  for (const [p, first] of [[PATIENT, 'Entry'], [PATIENT_2, 'Second']] as const) {
+    const res = await api.post(`${API_ORIGIN}/api/v1/auth/register`, {
+      data: {
+        email: p.email,
+        password: p.password,
+        firstName: first,
+        lastName: 'Tester',
+        dateOfBirth: '1990-01-01',
+        phoneNumber: p.mobile,
+        agreed: true,
+      },
+    })
+    expect(res.status(), `registering the test patient: ${await res.text()}`).toBe(201)
+  }
   await api.dispose()
 })
 
@@ -63,17 +72,12 @@ async function openDoor(page: Page, door: 'patient' | 'clinician' | 'hospital'):
 }
 
 /** Request a code through the UI; the challenge id comes off the network. */
-async function requestCode(page: Page, via: 'Sms' | 'Email', identifier: string): Promise<string> {
+async function requestCode(page: Page, mobile: string): Promise<string> {
   const response = page.waitForResponse(
     (r) => r.url().includes('/auth/otp/request') && r.request().method() === 'POST',
   )
-  if (via === 'Sms') {
-    await page.getByRole('radio', { name: 'Mobile OTP' }).click()
-    await page.getByLabel(/mobile number/i).fill(identifier)
-  } else {
-    await page.getByRole('radio', { name: 'Email OTP' }).click()
-    await page.locator('#login-email').fill(identifier)
-  }
+  await page.getByRole('radio', { name: 'Mobile number' }).click()
+  await page.getByLabel(/mobile number/i).fill(mobile)
   await page.getByRole('button', { name: /continue/i }).click()
   const res = await response
   expect(res.status()).toBe(200)
@@ -94,31 +98,35 @@ async function passwordSignIn(page: Page, email: string, password: string): Prom
 
 // ── The entry page ───────────────────────────────────────────────────────────
 
-test('the entry page asks who you are, and offers sign-up to patients only', async ({ page }) => {
+test('the entry page asks who you are, and has one sign-up link for every kind of account', async ({ page }) => {
   for (const width of [1440, 1024, 768, 390, 375]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: /welcome to indostates health/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /welcome to shri health/i })).toBeVisible()
     for (const door of ['patient', 'clinician', 'hospital'] as const) {
       await expect(page.getByTestId(`entry-${door}`)).toBeVisible()
     }
     await expectNoHorizontalOverflow(page)
   }
-  // Exactly one "create account" path, and it is the patient one.
+  // Exactly one "create account" path; /register asks Patient, Doctor or
+  // Hospital Administrator (staff sign-up restored 25 Sep 2026).
   await expect(page.getByRole('link', { name: /create an account/i })).toHaveAttribute('href', '/register')
 })
 
-test('the patient door offers three methods; the staff doors offer password only', async ({ page }) => {
+test('the patient door offers two methods; the staff doors offer password only', async ({ page }) => {
   await openDoor(page, 'patient')
   await expect(page.getByRole('heading', { name: /patient sign in/i })).toBeVisible()
-  for (const m of ['Mobile OTP', 'Email OTP', 'Password']) {
-    await expect(page.getByRole('radio', { name: m })).toBeVisible()
+  // Exactly two: mobile number, and email + password. No emailed code.
+  await expect(page.getByRole('radio')).toHaveCount(2)
+  for (const m of ['Mobile number', 'Email & password']) {
+    await expect(page.getByRole('radio', { name: m, exact: true })).toBeVisible()
   }
+  await expect(page.getByText(/email otp/i)).toHaveCount(0)
   await expect(page.getByRole('link', { name: /create an account/i })).toBeVisible()
 
   for (const door of ['clinician', 'hospital'] as const) {
     await openDoor(page, door)
-    // ⚠️ No OTP and no sign-up for staff — neither exists for them.
+    // ⚠️ No OTP for staff; sign-up is from the welcome page, not these doors.
     await expect(page.getByRole('radiogroup')).toHaveCount(0)
     await expect(page.getByLabel(/mobile number/i)).toHaveCount(0)
     await expect(page.locator('#login-password')).toBeVisible()
@@ -131,7 +139,7 @@ test('the patient door offers three methods; the staff doors offer password only
 
 test('patient: mobile OTP — a wrong code is refused, the right one signs in', async ({ page }) => {
   await openDoor(page, 'patient')
-  const challengeId = await requestCode(page, 'Sms', PATIENT.mobile)
+  const challengeId = await requestCode(page, PATIENT.mobile)
   await expect(page.getByText(new RegExp(`\\+91 ••••• •${MASKED_TAIL}`))).toBeVisible()
 
   const code = await codeForChallenge(challengeId)
@@ -144,16 +152,18 @@ test('patient: mobile OTP — a wrong code is refused, the right one signs in', 
   await page.waitForURL(/\/(onboarding|app)/, { timeout: 30_000 })
 })
 
-test('patient: email OTP signs in', async ({ page }) => {
-  await openDoor(page, 'patient')
-  const challengeId = await requestCode(page, 'Email', PATIENT.email)
-  await enterCode(page, await codeForChallenge(challengeId))
-  await page.waitForURL(/\/(onboarding|app)/, { timeout: 30_000 })
+test('patient: an emailed sign-in code is refused by the server', async () => {
+  const api = await pwRequest.newContext()
+  const res = await api.post(`${API_ORIGIN}/api/v1/auth/otp/request`, {
+    data: { channel: 'Email', identifier: PATIENT.email },
+  })
+  expect(res.status(), 'sign-in codes go by SMS only').toBe(400)
+  await api.dispose()
 })
 
 test('patient: email + password signs in, and the visibility toggle works', async ({ page }) => {
   await openDoor(page, 'patient')
-  await page.getByRole('radio', { name: 'Password' }).click()
+  await page.getByRole('radio', { name: 'Email & password' }).click()
   await page.locator('#login-password').fill('peek')
   await expect(page.locator('#login-password')).toHaveAttribute('type', 'password')
   await page.getByRole('button', { name: /show password/i }).click()
@@ -178,7 +188,7 @@ test('doctor: email + password through the clinician door lands in the Clinician
 
 test('the door is not authority: a doctor who picks "Patient" still lands as a doctor', async ({ page }) => {
   await openDoor(page, 'patient')
-  await page.getByRole('radio', { name: 'Password' }).click()
+  await page.getByRole('radio', { name: 'Email & password' }).click()
   await passwordSignIn(page, DOCTOR, PASSWORD)
   await page.waitForURL(/\/clinician/, { timeout: 30_000 })
 })
@@ -205,14 +215,13 @@ test('staff cannot sign in by OTP — no code is sent, and the demo code does no
 test('the OTP request never returns the code and never says who is registered', async () => {
   const api = await pwRequest.newContext()
   const known = await api.post(`${API_ORIGIN}/api/v1/auth/otp/request`, {
-    data: { channel: 'Email', identifier: PATIENT.email },
+    data: { channel: 'Sms', identifier: PATIENT_2.mobile },
   })
   const unknown = await api.post(`${API_ORIGIN}/api/v1/auth/otp/request`, {
-    data: { channel: 'Email', identifier: `nobody.${stamp}@example.invalid` },
+    data: { channel: 'Sms', identifier: `7${stamp.padStart(9, '1')}` },
   })
-  // The patient may still be inside the 30s resend cooldown from the email
-  // OTP test; that is a 429 for the requester's own behaviour, not a leak.
-  if (known.status() === 200) {
+  expect(known.status()).toBe(200)
+  {
     const a = await known.json()
     const b = await unknown.json()
     expect(unknown.status()).toBe(200)
@@ -232,7 +241,7 @@ test('the OTP request never returns the code and never says who is registered', 
 
 test('forgot password changes the stored password: the old one fails, the new one works', async ({ page }) => {
   await openDoor(page, 'patient')
-  await page.getByRole('radio', { name: 'Password' }).click()
+  await page.getByRole('radio', { name: 'Email & password' }).click()
   await page.getByRole('link', { name: /forgot password/i }).click()
   await page.waitForURL(/\/forgot-password\?as=patient/)
 
@@ -259,7 +268,7 @@ test('forgot password changes the stored password: the old one fails, the new on
   await api.dispose()
 
   await openDoor(page, 'patient')
-  await page.getByRole('radio', { name: 'Password' }).click()
+  await page.getByRole('radio', { name: 'Email & password' }).click()
   await passwordSignIn(page, PATIENT.email, NEW_PASSWORD)
   await page.waitForURL(/\/(onboarding|app)/, { timeout: 30_000 })
 })

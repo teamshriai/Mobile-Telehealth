@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import type { LucideProps } from 'lucide-react'
 import {
   CalendarClock, LayoutDashboard, Stethoscope, Building2,
-  CalendarRange, MessageSquareHeart,
+  CalendarRange, MessageSquareHeart, RefreshCcw,
   FileCheck2,
   Home, Calendar, Pill, FolderHeart, Users, Siren, User, Settings, Sparkles, NotebookPen, FileScan,
   LayoutTemplate, ShieldAlert,
@@ -103,6 +103,7 @@ export const HOSPITAL_ADMIN_NAV: NavItem[] = [
   { label: 'Doctors', path: '/hospital-admin/doctors', icon: Stethoscope, description: 'Roster and verification' },
   { label: 'Patients', path: '/hospital-admin/patients', icon: Users, description: 'Patients seen at your hospital' },
   { label: 'Appointments', path: '/hospital-admin/appointments', icon: CalendarRange, description: 'Operational view' },
+  { label: 'Refills', path: '/hospital-admin/refills', icon: RefreshCcw, description: 'Patients’ refill requests' },
   { label: 'Feedback', path: '/hospital-admin/feedback', icon: MessageSquareHeart, description: 'What patients said' },
   { label: 'Hospital', path: '/hospital-admin/hospital', icon: Building2, description: 'Your hospital profile' },
 ]
@@ -188,7 +189,7 @@ const PORTALS: Partial<Record<RoleName, PortalDescriptor>> = {
 
 /** Portals with no navigation of their own fall back to an empty shell rather
  *  than borrowing another role's menu. */
-const EMPTY_PORTAL: PortalDescriptor = { label: 'Stroke AI', home: '/', items: [], account: [] }
+const EMPTY_PORTAL: PortalDescriptor = { label: 'SHRI HEALTH', home: '/', items: [], account: [] }
 
 export function portalForRole(role: string | null | undefined): PortalDescriptor {
   return (role && PORTALS[role as RoleName]) || EMPTY_PORTAL
@@ -205,6 +206,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   '/app/health': 'My Health',
   '/app/health-notes': 'Health Notes',
   '/app/reports': 'Reports',
+  '/app/reports/imaging': 'Scan report',
   '/app/notifications': 'Notifications',
   '/app/visits': 'Visit summary',
   '/app/ai-insights': 'AI Insights',
@@ -229,6 +231,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   '/hospital-admin/doctors': 'Doctors',
   '/hospital-admin/patients': 'Patients',
   '/hospital-admin/appointments': 'Appointments',
+  '/hospital-admin/refills': 'Refills',
   '/hospital-admin/feedback': 'Feedback',
   '/hospital-admin/hospital': 'Hospital',
 }
@@ -248,5 +251,5 @@ export function titleForPath(pathname: string): string {
     .sort((a, b) => b.length - a.length)
 
   const best = prefixes[0]
-  return (best && ROUTE_TITLES[best]) ?? 'Stroke AI'
+  return (best && ROUTE_TITLES[best]) ?? 'SHRI HEALTH'
 }

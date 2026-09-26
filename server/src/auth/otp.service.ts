@@ -106,9 +106,7 @@ export const otpService = {
       select: { createdAt: true },
     });
     if (newest !== null) {
-      const readyAt = new Date(
-        newest.createdAt.getTime() + env.OTP_RESEND_COOLDOWN_SECONDS * 1000,
-      );
+      const readyAt = new Date(newest.createdAt.getTime() + env.OTP_RESEND_COOLDOWN_SECONDS * 1000);
       if (readyAt > new Date()) return { tooSoon: true, resendAvailableAt: readyAt };
     }
 

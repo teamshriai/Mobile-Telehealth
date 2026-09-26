@@ -8,9 +8,7 @@ import * as authService from '../../services/auth.service'
 import BrandMark from '../common/BrandMark'
 import AuthShell from './AuthShell'
 import MobileNumberField from './MobileNumberField'
-import EmailField from './EmailField'
 import { isValidMobile, mobileDigits } from './mobileFormat'
-import { isValidEmail, normalizeEmail } from './emailFormat'
 import OtpCodeInput from './OtpCodeInput'
 import type { ApiError } from '../../types/api'
 import type { AuthResult } from '../../app/authContextObject'
@@ -21,17 +19,18 @@ import { AUDIENCE_COPY, audienceUsesOtp, parseAudience, type Audience } from './
 /**
  * Sign in, addressed to whoever chose the door on the entry page.
  *
- *  - `?as=patient`   — mobile OTP, email OTP, or email + password; plus
- *                      "Create account".
+ *  - `?as=patient`   — mobile number (a code by SMS) or email + password;
+ *                      plus "Create account". No emailed sign-in code:
+ *                      withdrawn 25 Sep 2026, and the server refuses it.
  *  - `?as=clinician` — email + password only.
  *  - `?as=hospital`  — email + password only.
  *  - no `?as`        — the entry page itself ("Who are you?").
  *
- * ⚠️ NO STAFF SIGN-UP. Clinician and hospital-admin accounts are provisioned
- * (hospital admin → clinicians; the Indostates Health team → hospital
- * admins), and the new staff member sets their own password from an emailed
- * link. Staff cannot use OTP — the server never issues them a code — so the
- * staff doors do not offer it.
+ * Staff accounts are either self-created at /register (Doctor or Hospital
+ * Administrator — restored 25 Sep 2026) or provisioned by a hospital admin,
+ * in which case the new staff member sets a password from an emailed link.
+ * Staff cannot use OTP — the server never issues them a code — so the staff
+ * doors do not offer it.
  *
  * ⚠️ THE AUDIENCE IS NOT A ROLE CLAIM. It is never sent to the server; the
  * account's role decides the portal after sign-in.
@@ -74,12 +73,11 @@ export default function Login() {
 }
 
 /** How a patient chooses to sign in. Staff are always `Password`. */
-type Method = 'Sms' | 'Email' | 'Password'
+type Method = 'Sms' | 'Password'
 
 const METHOD_LABEL: Record<Method, string> = {
-  Sms: 'Mobile OTP',
-  Email: 'Email OTP',
-  Password: 'Password',
+  Sms: 'Mobile number',
+  Password: 'Email & password',
 }
 
 function AudienceLogin({ audience }: { audience: Audience }) {
@@ -96,14 +94,7 @@ function AudienceLogin({ audience }: { audience: Audience }) {
   const [method, setMethod] = useState<Method>(usesOtp ? 'Sms' : 'Password')
 
   const [phase, setPhase] = useState<Phase>('entering_identifier')
-  /**
-   * ⚠️ Which identifier the person is using. NOT a role picker — the login
-   * screen never asks who you are. It asks how to reach you; the server
-   * decides what the account is.
-   */
-  const [channel, setChannel] = useState<authService.OtpChannel>('Sms')
   const [mobile, setMobile] = useState('')
-  const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [challenge, setChallenge] = useState<authService.OtpChallenge | null>(null)
   const [error, setError] = useState('')
@@ -132,12 +123,12 @@ function AudienceLogin({ audience }: { audience: Audience }) {
   const canResend = challenge !== null && now >= resendAt
 
   const sendCode = useCallback(
-    async (target: string, via: authService.OtpChannel) => {
+    async (target: string) => {
       setError('')
       setFieldError(undefined)
       setPhase('requesting_otp')
       try {
-        const next = await authService.requestOtp({ channel: via, identifier: target })
+        const next = await authService.requestOtp({ channel: 'Sms', identifier: target })
         setChallenge(next)
         setCode('')
         setNow(Date.now())
@@ -158,21 +149,13 @@ function AudienceLogin({ audience }: { audience: Audience }) {
     [],
   )
 
-  /** The normalized value actually sent, for the current channel. */
-  const identifierToSend = (): string =>
-    channel === 'Sms' ? mobileDigits(mobile) : normalizeEmail(email)
-
   const onSubmitIdentifier = (e: FormEvent) => {
     e.preventDefault()
-    if (channel === 'Sms' && !isValidMobile(mobile)) {
+    if (!isValidMobile(mobile)) {
       setFieldError('Enter a 10-digit mobile number starting 6, 7, 8 or 9.')
       return
     }
-    if (channel === 'Email' && !isValidEmail(email)) {
-      setFieldError('Enter a valid email address.')
-      return
-    }
-    void sendCode(identifierToSend(), channel)
+    void sendCode(mobileDigits(mobile))
   }
 
   const onSubmitCode = async (e: FormEvent) => {
@@ -214,7 +197,6 @@ function AudienceLogin({ audience }: { audience: Audience }) {
 
   const chooseMethod = (m: Method) => {
     setMethod(m)
-    if (m !== 'Password') setChannel(m)
     setFieldError(undefined)
     setError('')
   }
@@ -226,7 +208,7 @@ function AudienceLogin({ audience }: { audience: Audience }) {
       <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10 sm:px-6">
         <div className="mb-8 flex items-center gap-2.5">
           <BrandMark size={18} />
-          <span className="text-sm font-semibold tracking-tight text-ink">Indostates Health</span>
+          <span className="text-sm font-semibold tracking-[0.06em] text-ink">SHRI HEALTH</span>
         </div>
 
         {sessionExpired && (
@@ -268,8 +250,7 @@ function AudienceLogin({ audience }: { audience: Audience }) {
             <p className="mb-6 mt-1 text-sm text-ink-muted">
               {method === 'Password'
                 ? 'Sign in with your email address and password.'
-                : <>We&rsquo;ll send a 6-digit code to your registered{' '}
-                    {method === 'Sms' ? 'mobile number' : 'email address'}.</>}
+                : 'We\u2019ll send a 6-digit code by SMS to your registered mobile number.'}
             </p>
 
             {/*
@@ -281,9 +262,9 @@ function AudienceLogin({ audience }: { audience: Audience }) {
               <div
                 role="radiogroup"
                 aria-label="How would you like to sign in?"
-                className="mb-4 grid grid-cols-3 gap-1 rounded-xl border border-border-soft bg-surface-2 p-1"
+                className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-border-soft bg-surface-2 p-1"
               >
-                {(['Sms', 'Email', 'Password'] as const).map((m) => (
+                {(['Sms', 'Password'] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -307,25 +288,14 @@ function AudienceLogin({ audience }: { audience: Audience }) {
               <PasswordSignIn audience={audience} onSignedIn={goHome} />
             ) : (
               <form onSubmit={onSubmitIdentifier} noValidate>
-                {channel === 'Sms' ? (
-                  <MobileNumberField
-                    id="login-mobile"
-                    value={mobile}
-                    onChange={(v) => { setMobile(v); setFieldError(undefined); setError('') }}
-                    error={fieldError}
-                    autoFocus
-                    disabled={busy}
-                  />
-                ) : (
-                  <EmailField
-                    id="login-email"
-                    value={email}
-                    onChange={(v) => { setEmail(v); setFieldError(undefined); setError('') }}
-                    error={fieldError}
-                    autoFocus
-                    disabled={busy}
-                  />
-                )}
+                <MobileNumberField
+                  id="login-mobile"
+                  value={mobile}
+                  onChange={(v) => { setMobile(v); setFieldError(undefined); setError('') }}
+                  error={fieldError}
+                  autoFocus
+                  disabled={busy}
+                />
 
                 {error !== '' && (
                   <p role="alert" className="mt-3 flex items-start gap-1.5 text-sm text-critical-fg">
@@ -355,10 +325,10 @@ function AudienceLogin({ audience }: { audience: Audience }) {
             ) : (
               <p className="mt-6 text-xs leading-relaxed text-ink-subtle">
                 {audience === 'clinician'
-                  ? 'Your hospital administrator creates your account and emails you a link to set '
-                    + 'your password. If the link has expired, use “Forgot password?” with your work email.'
-                  : 'Hospital administrator accounts are set up by the Indostates Health team. To '
-                    + 'onboard a new hospital, contact your Indostates Health representative.'}
+                  ? 'New here? Create an account from the welcome page, or use the link your hospital '
+                    + 'administrator emailed you to set your password. If a link has expired, use “Forgot password?”.'
+                  : 'New here? Create an account from the welcome page. To onboard a new hospital, '
+                    + 'you can also contact your SHRI HEALTH representative.'}
               </p>
             )}
           </div>
@@ -372,16 +342,11 @@ function AudienceLogin({ audience }: { audience: Audience }) {
               tabIndex={-1}
               className="text-2xl font-semibold tracking-tight text-ink outline-none"
             >
-              {channel === 'Sms' ? 'Verify your mobile number' : 'Verify your email'}
+              Verify your mobile number
             </h1>
             <p className="mb-6 mt-1 text-sm text-ink-muted">
               We&rsquo;ve sent a 6-digit code to{' '}
-              {/* ⚠️ The `+91` belongs to a phone number only. It used to be
-                  hard-coded in this JSX, OUTSIDE the masked value, so an email
-                  would have rendered as "+91 a••••@g••••.com". */}
-              <span className="font-semibold tabular-nums text-ink">
-                {challenge.channel === 'Sms' ? `+91 ${challenge.maskedIdentifier}` : challenge.maskedIdentifier}
-              </span>
+              <span className="font-semibold tabular-nums text-ink">+91 {challenge.maskedIdentifier}</span>
             </p>
 
             <OtpCodeInput
@@ -418,7 +383,7 @@ function AudienceLogin({ audience }: { audience: Audience }) {
                 {canResend ? (
                   <button
                     type="button"
-                    onClick={() => void sendCode(identifierToSend(), channel)}
+                    onClick={() => void sendCode(mobileDigits(mobile))}
                     disabled={busy}
                     className="focus-ring rounded font-semibold text-primary-700 underline underline-offset-2 disabled:opacity-60"
                   >
@@ -449,7 +414,7 @@ function AudienceLogin({ audience }: { audience: Audience }) {
                 }}
                 className="focus-ring rounded text-ink-muted underline underline-offset-2"
               >
-                {channel === 'Sms' ? 'Change mobile number' : 'Change email address'}
+                Change mobile number
               </button>
             </div>
           </form>

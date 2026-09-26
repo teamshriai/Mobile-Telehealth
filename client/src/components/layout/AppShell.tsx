@@ -18,6 +18,7 @@ import { useAuth } from '../../app/useAuth'
 import { useIdleTimeout } from '../../app/useIdleTimeout'
 import { useDismissable } from '../../app/useDismissable'
 import PatientBottomNav from './PatientBottomNav'
+import ChatLauncher from '../aiChat/ChatLauncher'
 import IconTile from '../common/IconTile'
 import { TONE_HEX } from '../common/iconTones'
 
@@ -130,7 +131,7 @@ function NavDrawer({ open, onClose, portal, role }: NavDrawerProps) {
           >
             <div className="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-border-soft px-4">
               <BrandMark size={16} />
-              <span className="text-[15px] font-bold tracking-tight text-ink">Stroke AI</span>
+              <span className="text-[15px] font-bold tracking-[0.06em] text-ink">SHRI HEALTH</span>
               <button
                 type="button"
                 onClick={onClose}
@@ -245,14 +246,14 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <button
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="focus-ring flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
+        className="focus-ring flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
       >
         <span
           aria-hidden="true"
@@ -260,7 +261,7 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
         >
           {initials}
         </span>
-        <span className="hidden max-w-[160px] truncate text-sm font-medium text-ink sm:block">
+        <span className="hidden min-w-0 max-w-[160px] truncate text-sm font-medium text-ink sm:block">
           {displayName}
         </span>
         <ChevronDown size={15} aria-hidden="true" className="hidden text-ink-subtle sm:block" />
@@ -335,7 +336,7 @@ export default function AppShell(): ReactNode {
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
   useEffect(() => { closeDrawer() }, [location.pathname, closeDrawer])
 
-  useEffect(() => { document.title = `${title} · Stroke AI` }, [title])
+  useEffect(() => { document.title = `${title} · SHRI HEALTH` }, [title])
 
   // The emergency destination stays reachable in one tap at every width. On a
   // stroke product it must not be the item that scrolled off the end of the
@@ -358,7 +359,9 @@ export default function AppShell(): ReactNode {
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
       <header className="sticky top-0 z-30 border-b border-border-soft bg-surface-1/95 backdrop-blur">
-        <div className="flex h-16 items-center gap-2.5 px-4 sm:px-6">
+        {/* Tighter gaps below 360px: at 320 the five controls ran 6px past
+            the edge. The controls keep their 44px targets; only the air goes. */}
+        <div className="flex h-16 items-center gap-1.5 px-4 min-[360px]:gap-2.5 sm:px-6">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
@@ -374,16 +377,18 @@ export default function AppShell(): ReactNode {
               controls all present, keeping it pushed the row to 420px on a
               375px screen — the header, not the page, was the overflow. */}
           <BrandMark size={16} />
-          <span className="hidden whitespace-nowrap text-[15px] font-bold tracking-tight text-ink sm:inline">
-            Stroke AI
+          <span className="hidden whitespace-nowrap text-[15px] font-bold tracking-[0.06em] text-ink sm:inline">
+            SHRI HEALTH
           </span>
           <span aria-hidden="true" className="hidden text-ink-subtle sm:inline">/</span>
           <span className="hidden whitespace-nowrap text-sm font-medium text-ink-subtle sm:inline">
             {portal.label}
           </span>
-          <span className="sr-only">Stroke AI — {portal.label}</span>
+          <span className="sr-only">SHRI HEALTH — {portal.label}</span>
 
-          <div className="ml-auto flex items-center gap-1.5">
+          {/* min-w-0 down this chain lets the account name truncate when the
+              row is tight (large text at 768px) instead of widening the page. */}
+          <div className="ml-auto flex min-w-0 items-center gap-0.5 min-[360px]:gap-1.5">
             {emergencyItem && (
               <NavLink
                 to={emergencyItem.path}
@@ -402,8 +407,13 @@ export default function AppShell(): ReactNode {
         {portal.items.length > 0 && (
           <nav
             aria-label="Main navigation"
-            className="scrollbar-hide hidden overflow-x-auto px-4 pb-2 sm:px-6 lg:block"
+            className="scrollbar-hide relative hidden overflow-x-auto px-4 pb-2 sm:px-6 lg:block"
           >
+            {/* ⚠️ `relative` above: the active item's sr-only "(current page)"
+                is absolutely positioned. Without a positioned ancestor here
+                its containing block was the sticky header, so on a page whose
+                item sits past the edge (Emergency, at 1024px) it pushed the
+                whole page 2px wide instead of being clipped by this scroller. */}
             <ul className="flex gap-1">
               {portal.items.map((item) => (
                 <li key={item.path}>
@@ -472,6 +482,9 @@ export default function AppShell(): ReactNode {
       <AssistantBubble />
 
       {role === 'Patient' && <PatientBottomNav onOpenMenu={() => setDrawerOpen(true)} />}
+
+      {/* The patient's assistant, one tap from any page (hidden on AI Insights). */}
+      {role === 'Patient' && <ChatLauncher />}
 
       {warning && <IdleWarning secondsLeft={secondsLeft} onStayActive={stayActive} />}
     </div>

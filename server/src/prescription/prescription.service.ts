@@ -289,9 +289,11 @@ export const prescriptionService = {
               perKg: band.perKg,
               maxPerDay: band.maxPerDay === null ? null : Number(band.maxPerDay),
             },
-        // No vitals model exists, so there is no recorded weight to pass.
-        // checkDose reports 'unknown' rather than 'ok' for per-kg bands —
-        // see its comment. Inventing a weight here would be fabrication.
+        // No weight is passed. `vital_signs` may hold one, but there is no
+        // agreed rule yet for how recent, or from which source (clinic scale
+        // vs home), a weight must be to dose by. checkDose reports 'unknown'
+        // rather than 'ok' for per-kg bands — see its comment. Guessing a
+        // weight here would be fabrication.
         null,
       );
       if (verdict.status !== 'ok') {

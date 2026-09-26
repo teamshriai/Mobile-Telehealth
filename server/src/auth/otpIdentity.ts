@@ -80,6 +80,8 @@ export function maskIdentifier(channel: OtpChannel, normalized: string): string 
   const name = dot === -1 ? domain : domain.slice(0, dot);
   const tld = dot === -1 ? '' : domain.slice(dot);
   // `arjun@gmail.com` → `a••••@g••••.com`
-  return `${local.slice(0, 1)}${'•'.repeat(Math.max(1, local.length - 1))}`
-    + `@${name.slice(0, 1)}${'•'.repeat(Math.max(1, name.length - 1))}${tld}`;
+  return (
+    `${local.slice(0, 1)}${'•'.repeat(Math.max(1, local.length - 1))}` +
+    `@${name.slice(0, 1)}${'•'.repeat(Math.max(1, name.length - 1))}${tld}`
+  );
 }

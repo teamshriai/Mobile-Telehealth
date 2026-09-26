@@ -36,10 +36,7 @@ export default function SectionTitle({
   return (
     <div className={`flex items-start justify-between gap-4 ${className}`}>
       <div className="space-y-0.5 min-w-0">
-        <h2
-          className={`text-ink tracking-tight ${TITLE_SIZES[size] || TITLE_SIZES.md}`}
-          style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif' }}
-        >
+        <h2 className={`text-ink tracking-tight ${TITLE_SIZES[size] || TITLE_SIZES.md}`}>
           {title}
         </h2>
         {subtitle && (

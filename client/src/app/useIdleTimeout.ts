@@ -3,7 +3,7 @@
  *
  * Signs a user out after a period of no interaction.
  *
- * Why this exists: a Stroke AI session shows health information, and the
+ * Why this exists: a SHRI HEALTH session shows health information, and the
  * devices it is opened on are frequently shared — a family tablet, a ward
  * terminal, a phone handed to a relative. An access token that stays live in
  * an abandoned tab is the realistic exposure here, not a stolen one.

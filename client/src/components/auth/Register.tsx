@@ -14,7 +14,8 @@ import {
   Check,
   Shield,
   HeartPulse,
-
+  Stethoscope,
+  Building2,
 } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import BrandMark from '../common/BrandMark'
@@ -30,19 +31,10 @@ interface RoleOption {
 }
 
 /**
- * ⚠️ PATIENT ONLY. Doctor and Hospital Administrator were removed here.
- *
- * Self-registration as a clinician is not an onboarding convenience, it is an
- * authorization hole: anyone who could reach this page could mint an account
- * that the rest of the product treats as a prescriber. Nothing in a sign-up
- * form establishes a medical registration.
- *
- * Clinician and hospital-admin accounts are now created by a hospital
- * administrator (`POST /hospital-admin/doctors`), which binds a mobile number
- * to a named, registration-numbered profile inside a specific hospital. OTP
- * login then proves control of that handset — and only that.
- *
- * Admin was already absent for the same class of reason and stays absent.
+ * The role-selection step. Presented before the identity form so
+ * registration branches into the right onboarding path from the start,
+ * rather than defaulting everyone to Patient. Admin is deliberately absent
+ * — the global Admin role stays seed/ops-created only, never self-service.
  */
 const ROLE_OPTIONS: RoleOption[] = [
   {
@@ -51,7 +43,26 @@ const ROLE_OPTIONS: RoleOption[] = [
     icon: HeartPulse,
     description: 'Book visits, track your health, and message your care team.',
   },
+  {
+    value: 'Doctor',
+    label: 'Doctor',
+    icon: Stethoscope,
+    description: 'Manage your patients, availability, and clinical schedule.',
+  },
+  {
+    value: 'HospitalAdmin',
+    label: 'Hospital Administrator',
+    icon: Building2,
+    description: "Manage your hospital's doctors, patients and operations.",
+  },
 ]
+
+/** The sign-in door for each kind of account. */
+const SIGN_IN_FOR: Record<string, string> = {
+  Patient: '/login?as=patient',
+  Doctor: '/login?as=clinician',
+  HospitalAdmin: '/login?as=hospital',
+}
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -268,10 +279,10 @@ export default function Register() {
           <div className="px-6 py-8 sm:px-10 sm:py-10">
             <div className="flex items-center gap-2.5 mb-6">
               <BrandMark size={18} />
-              <span className="text-lg font-bold tracking-tight text-ink">Stroke AI</span>
+              <span className="text-lg font-bold tracking-[0.06em] text-ink">SHRI HEALTH</span>
             </div>
 
-            <h1 className="text-2xl md:text-[28px] font-bold tracking-tight text-ink">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
               Which of these describes you?
             </h1>
             <p className="mt-2 text-sm text-ink-muted">
@@ -313,7 +324,7 @@ export default function Register() {
 
             <p className="mt-6 text-center text-xs sm:text-sm text-ink-muted">
               Already have an account?{' '}
-              <Link to="/login?as=patient" className="font-semibold hover:opacity-80 transition-opacity text-primary-700">
+              <Link to="/login" className="font-semibold hover:opacity-80 transition-opacity text-primary-700">
                 Sign in
               </Link>
             </p>
@@ -350,8 +361,8 @@ export default function Register() {
             <div>
               <div className="flex items-center gap-2.5 mb-8">
                 <BrandMark size={18} />
-                <span className="text-lg font-bold tracking-tight text-ink">
-                  Stroke AI
+                <span className="text-lg font-bold tracking-[0.06em] text-ink">
+                  SHRI HEALTH
                 </span>
               </div>
 
@@ -364,7 +375,7 @@ export default function Register() {
                 {selectedRole?.label ?? 'Change account type'}
               </button>
 
-              <h2 className="text-2xl md:text-[28px] font-bold tracking-tight text-ink">
+              <h2 className="text-2xl font-semibold tracking-tight text-ink">
                 Create your account
               </h2>
               <p className="mt-2 text-sm text-ink-muted">
@@ -750,7 +761,7 @@ export default function Register() {
             >
               Already have an account?{' '}
               <Link
-                to="/login?as=patient"
+                to={SIGN_IN_FOR[form.role] ?? '/login'}
                 className="font-semibold hover:opacity-80 transition-opacity text-primary-700"
               >
                 Sign in

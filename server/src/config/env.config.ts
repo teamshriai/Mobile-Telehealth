@@ -10,10 +10,7 @@ import { z } from 'zod';
  * missing one, and it surfaces far from its cause. This validates the string
  * shape first, then range-checks the parsed number.
  */
-const numericEnv = (
-  fallback: string,
-  { min, max }: { min: number; max: number },
-) =>
+const numericEnv = (fallback: string, { min, max }: { min: number; max: number }) =>
   z
     .string()
     .regex(/^\d+$/, 'must be a whole number')
@@ -87,7 +84,9 @@ const envSchema = z
     // ALLOWED_ORIGINS above already does.
     CLIENT_URL: z
       .string()
-      .url('CLIENT_URL must be a full URL, e.g. http://192.168.1.42:3000 or https://app.example.com')
+      .url(
+        'CLIENT_URL must be a full URL, e.g. http://192.168.1.42:3000 or https://app.example.com',
+      )
       .min(1, 'CLIENT_URL is required — it is the origin used in links inside outbound email'),
 
     // ── Transactional email (SMTP) ──────────────────────────────────────────
@@ -102,7 +101,7 @@ const envSchema = z
       .default('false'),
     EMAIL_USER: z.string().min(1).optional(),
     EMAIL_PASSWORD: z.string().min(1).optional(),
-    // Display name + address emails are sent from, e.g. "Stroke AI <no-reply@shri-ai.org>"
+    // Display name + address emails are sent from, e.g. "SHRI HEALTH <no-reply@shri-ai.org>"
     EMAIL_FROM: z.string().min(1).optional(),
 
     // ── Field-level encryption (PatientProfile PII) ─────────────────────────
@@ -254,11 +253,25 @@ const envSchema = z
     // data, and it is the default so a fresh deployment fails closed.
     AI_DATA_POLICY: z.enum(['synthetic-only', 'unrestricted']).default('synthetic-only'),
 
-    // 12s, not 30s: client/src/lib/apiClient.js aborts at 15s, so a longer
-    // server budget means axios gives up first and the patient sees a raw
-    // network error instead of our own copy.
+    // Per provider attempt. The assistant's whole turn is bounded by
+    // AI_OVERALL_DEADLINE_MS, which must stay below the client's 45s timeout
+    // on sending a message (client/src/services/ai.service.ts) so the patient
+    // always sees our own copy, never a raw network error.
     AI_REQUEST_TIMEOUT_MS: numericEnv('12000', { min: 1000, max: 60000 }),
-    AI_MAX_COMPLETION_TOKENS: numericEnv('500', { min: 64, max: 4096 }),
+    AI_OVERALL_DEADLINE_MS: numericEnv('38000', { min: 5000, max: 42000 }),
+    // The reply cap. A reasoning model spends part of it thinking, so 500 cut
+    // answers off; a reply that is still empty or cut off is retried once at
+    // AI_RETRY_COMPLETION_TOKENS, never shown half-written.
+    AI_MAX_COMPLETION_TOKENS: numericEnv('1100', { min: 64, max: 4096 }),
+    AI_RETRY_COMPLETION_TOKENS: numericEnv('1800', { min: 64, max: 8192 }),
+    // How much of the patient's record the assistant may be given per turn.
+    AI_CONTEXT_TOKENS: numericEnv('2400', { min: 300, max: 16000 }),
+    // Signed visit notes' Assessment and Plan sections, quoted to the
+    // assistant (never the history or examination). Off = visits without them.
+    AI_INCLUDE_NOTE_ASSESSMENT_PLAN: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     AI_REASONING_EFFORT: z.enum(['low', 'medium', 'high']).default('low'),
 
     // Provider limits are configuration, not constants — changing tier must
@@ -287,8 +300,8 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['OTP_DEV_FIXED_CODE'],
         message:
-          'OTP_DEV_FIXED_CODE must not be set when NODE_ENV=production. It makes every OTP '
-          + 'predictable. Remove it from the environment.',
+          'OTP_DEV_FIXED_CODE must not be set when NODE_ENV=production. It makes every OTP ' +
+          'predictable. Remove it from the environment.',
       });
     }
 
@@ -327,8 +340,8 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['SMS_PROVIDER'],
         message:
-          'At least one OTP delivery channel must be configured in production: either the '
-          + 'SMS_* keys or the EMAIL_* keys. Without one, no user can sign in.',
+          'At least one OTP delivery channel must be configured in production: either the ' +
+          'SMS_* keys or the EMAIL_* keys. Without one, no user can sign in.',
       });
     }
   });

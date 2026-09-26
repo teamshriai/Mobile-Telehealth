@@ -176,16 +176,36 @@ export const authService = {
     const termsAcceptedAt = dto.agreed ? new Date() : null;
     const termsVersion = dto.agreed ? CURRENT_TERMS_VERSION : null;
 
-    // 4. Create user + patient profile atomically
-    //
-    // ⚠️ The Doctor and HospitalAdmin branches were removed with the role
-    // enum above. The repository methods they called
-    // (`createUserWithDoctorProfile`, `createUserWithStaffProfile`) are KEPT —
-    // they are how a hospital admin provisions a clinician, and deleting a
-    // working provisioning primitive because its only *public* caller went
-    // away would have been the wrong cleanup.
+    // 4. Create user + the role-appropriate profile atomically
     let user: UserWithRole;
-    {
+    if (dto.role === 'Doctor') {
+      user = await authRepository.createUserWithDoctorProfile({
+        email: dto.email,
+        passwordHash,
+        roleId: role.id,
+        termsAcceptedAt,
+        termsVersion,
+        profile: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          gender: dto.gender,
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+    } else if (dto.role === 'HospitalAdmin') {
+      user = await authRepository.createUserWithStaffProfile({
+        email: dto.email,
+        passwordHash,
+        roleId: role.id,
+        termsAcceptedAt,
+        termsVersion,
+        profile: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          phoneNumber: dto.phoneNumber,
+        },
+      });
+    } else {
       user = await authRepository.createUserWithProfile({
         email: dto.email,
         passwordHash,
@@ -223,11 +243,15 @@ export const authService = {
       metadata: { email: user.email, role: user.role.name },
     });
 
-    // ⚠️ The HospitalAdminRegistered branch was removed with the role enum —
-    // a hospital admin can no longer self-register, so this could never fire.
-    // The AuditAction value itself stays (the enum comment in schema.prisma is
-    // explicit that values are never removed), and historical rows keep their
-    // meaning.
+    if (dto.role === 'HospitalAdmin') {
+      auditService.log({
+        action: AuditAction.HospitalAdminRegistered,
+        userId: user.id,
+        severity: AuditSeverity.Info,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+    }
 
     return { token, refreshToken: refresh.token, user: sanitize(user) };
   },
@@ -681,8 +705,8 @@ export const authService = {
     // feature; inventing it inside a delete handler is not.
     if (user.passwordHash === null) {
       throw new AppError(
-        'This account signs in with a mobile number and OTP. Deleting it needs to be done by '
-          + 'your hospital administrator, so the request can be confirmed with you directly.',
+        'This account signs in with a mobile number and OTP. Deleting it needs to be done by ' +
+          'your hospital administrator, so the request can be confirmed with you directly.',
         400,
       );
     }

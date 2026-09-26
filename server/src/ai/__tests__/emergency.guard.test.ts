@@ -58,6 +58,35 @@ const MUST_FIRE: [string, string][] = [
   ['I want to kill myself', 'selfHarm'],
   ['I feel suicidal', 'selfHarm'],
   ['there is no point in living', 'selfHarm'],
+
+  // ── v2 (emergency-2026-09-25) ─────────────────────────────────────────────
+  // A negated clause must not hide the next one.
+  ["I don't have chest pain but my face is drooping right now", 'stroke'],
+  // History or recovery framing, overridden by an acute marker.
+  ['since my stroke my arm is weak and today it went numb again', 'stroke'],
+  ['my face is drooping again after physio', 'stroke'],
+  ['I had chest pain yesterday and it started again', 'medical'],
+  // Recovery framing never quiets the medical rules.
+  ['during my exercises I got chest pain', 'medical'],
+  ['I cannot walk', 'stroke'],
+  // Active bleeding, newly caught.
+  ['I am bleeding heavily', 'medical'],
+  ['he is vomiting blood', 'medical'],
+  ["the bleeding still won't stop", 'medical'],
+  // Self-harm stays unsuppressed; "end my" fires on anything not administrative.
+  ['I want to end my life', 'selfHarm'],
+  ['I just want to end my suffering', 'selfHarm'],
+  ['since my stroke I want to die', 'selfHarm'],
+  ['I feel like ending my life', 'selfHarm'],
+  ['I want to take my own life', 'selfHarm'],
+  ["I don't want to live anymore", 'selfHarm'],
+  ['I don\u2019t want to wake up tomorrow', 'selfHarm'],
+  ['everyone would be better off dead without me', 'selfHarm'],
+  ['I just want to end it', 'selfHarm'],
+  ['life is not worth living', 'selfHarm'],
+  ['there is no reason to live', 'selfHarm'],
+  // Curly apostrophes, as phones type them.
+  ['I can\u2019t lift my arm', 'stroke'],
 ];
 
 const MUST_NOT_FIRE: string[] = [
@@ -94,6 +123,26 @@ const MUST_NOT_FIRE: string[] = [
   'when is my next physiotherapy session',
   'how much walking should I do each day',
   'what is my blood group',
+
+  // ── v2 (emergency-2026-09-25) ─────────────────────────────────────────────
+  // Where a recovering patient is, not a new event.
+  "since my stroke I can't walk far",
+  "I can't walk far without a stick",
+  'my physiotherapist says my arm weakness is improving',
+  'my arm has been weak for months',
+  // Side-effect questions.
+  'can clopidogrel cause heavy bleeding?',
+  'is chest pain a side effect of amlodipine',
+  // Recent history, no acute marker.
+  '3 days ago I had chest pain for a few minutes',
+  'yesterday my speech was slurred for a while',
+  // Administrative "end my …".
+  'I need to end my course of antibiotics',
+  'can I end my physiotherapy sessions early',
+  // Ordinary questions a patient asks about their record.
+  'What was my LDL cholesterol in September?',
+  'When is my next appointment?',
+  'Show me my CT scan report',
 ];
 
 describe('detectEmergency — must fire', () => {

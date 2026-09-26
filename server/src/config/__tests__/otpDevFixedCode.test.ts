@@ -28,7 +28,10 @@ const SERVER_ROOT = path.resolve(__dirname, '..', '..', '..');
  * COPY of `.env` with every key under test stripped, and gets those keys only
  * from `extra`. The result no longer depends on what is in anyone's `.env`.
  */
-function boot(extra: Record<string, string | undefined>): { status: number | null; output: string } {
+function boot(extra: Record<string, string | undefined>): {
+  status: number | null;
+  output: string;
+} {
   const source = path.join(SERVER_ROOT, '.env');
   const lines = fs.existsSync(source) ? fs.readFileSync(source, 'utf8').split('\n') : [];
   const stripped = lines.filter((l) => !Object.keys(extra).some((k) => l.startsWith(`${k}=`)));

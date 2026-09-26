@@ -227,7 +227,7 @@ export default function AssistantBubble() {
                   <ul className="mt-2 space-y-1 border-t border-ai/20 pt-2">
                     {t.answer.citations.map((c, n) => (
                       <li key={c.label} className="text-2xs text-ink-muted">
-                        <span className="font-mono text-ink-subtle">[{n + 1}]</span>{' '}
+                        <span className="tabular-nums text-ink-subtle">[{n + 1}]</span>{' '}
                         <span className="font-medium text-ink">{c.label}</span> — {c.detail}
                       </li>
                     ))}

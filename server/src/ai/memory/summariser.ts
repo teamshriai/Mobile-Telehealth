@@ -1,4 +1,5 @@
 import { callModel } from '../provider/groqClient';
+import { estimateTokens, reserveBudget } from '../budget/aiBudget';
 import { PROMPT_VERSION } from '../prompt/systemPrompt';
 import type { MessageRow } from '../ai.repository';
 
@@ -10,10 +11,11 @@ import type { MessageRow } from '../ai.repository';
 // just means the next turn carries a slightly stale summary, which is a far
 // smaller problem than a slower reply.
 //
-// It is also the first thing sacrificed under budget pressure: the caller
-// skips invoking this entirely once the daily ledger is past 80% used (see
-// aiService), because a summary is a convenience and every token it spends
-// competes with a real patient question for the same shared quota.
+// It is also the first thing sacrificed under budget pressure: it reserves
+// from the SHARED limits only (scope 'system' — never the patient's own daily
+// allowance), and when the shared window is full it simply does not run. A
+// summary is a convenience; every token it spends competes with a real
+// patient question for the same quota.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SUMMARISE_EVERY_N_MESSAGES = 12;
@@ -46,6 +48,7 @@ function renderTurnsForSummarising(turns: MessageRow[]): string {
  * summary rather than losing memory to a failed model call.
  */
 export async function summariseConversation(
+  ownerUserId: string,
   priorSummary: string | null,
   turnsToFold: MessageRow[],
 ): Promise<{ summary: string; tokenCount: number } | null> {
@@ -59,12 +62,27 @@ export async function summariseConversation(
   const priorPart = priorSummary !== null ? `Prior summary: ${priorSummary}\n\n` : '';
   const userContent = `${priorPart}New turns to fold in:\n${renderTurnsForSummarising(turnsToFold)}`;
 
-  const outcome = await callModel([
-    { role: 'system', content: instructions },
-    { role: 'user', content: userContent },
-  ]);
+  const messages = [
+    { role: 'system' as const, content: instructions },
+    { role: 'user' as const, content: userContent },
+  ];
+  const chars = instructions.length + userContent.length;
+  const reservation = await reserveBudget({
+    userId: ownerUserId,
+    estimatedTokens: estimateTokens(chars, messages.length) + MAX_SUMMARY_TOKENS * 3,
+    scope: 'system',
+  });
+  if (!reservation.ok) return null;
 
-  if (outcome.kind !== 'ok') return null;
+  const outcome = await callModel(messages, { maxTokens: MAX_SUMMARY_TOKENS * 3 });
+  if (outcome.kind !== 'ok') {
+    reservation.release();
+    return null;
+  }
+  await reservation.commit({
+    promptTokens: outcome.promptTokens,
+    completionTokens: outcome.completionTokens,
+  });
   const summary = outcome.content.trim();
   if (summary === '') return null;
 

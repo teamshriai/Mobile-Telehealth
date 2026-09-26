@@ -136,7 +136,7 @@ export default function PatientOnboarding() {
 
   return (
     <OnboardingShell
-      title="Welcome to Stroke AI"
+      title="Welcome to SHRI HEALTH"
       subtitle="A few details to get you started — the rest can wait."
       activeTier={tier}
       unlockedTiers={unlocked}

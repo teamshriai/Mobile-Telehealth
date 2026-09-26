@@ -19,6 +19,9 @@ import {
   listHospitalAppointments,
   approveHospitalAppointment,
   declineHospitalAppointment,
+  listRefillRequests,
+  forwardRefillRequest,
+  declineRefillRequest,
   getHospitalAnalytics,
   listHospitalFeedback,
   listPatientCareTeam,
@@ -172,6 +175,9 @@ router.post(
   requirePermission(Permission.HospitalAppointmentManage),
   declineHospitalAppointment,
 );
+router.get('/refills', authenticate, requirePermission(Permission.HospitalRefillManage), listRefillRequests);
+router.post('/refills/:id/forward', authenticate, requirePermission(Permission.HospitalRefillManage), forwardRefillRequest);
+router.post('/refills/:id/decline', authenticate, requirePermission(Permission.HospitalRefillManage), declineRefillRequest);
 router.get(
   '/analytics',
   authenticate,

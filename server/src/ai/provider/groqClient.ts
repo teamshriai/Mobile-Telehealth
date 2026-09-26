@@ -89,7 +89,11 @@ function parseRateLimitHeaders(headers: Headers): void {
  * every failure mode is a variant of `ProviderOutcome` so the caller cannot
  * forget to handle one.
  */
-async function attemptOnce(messages: ChatMessage[], signal: AbortSignal): Promise<ProviderOutcome> {
+async function attemptOnce(
+  messages: ChatMessage[],
+  maxTokens: number,
+  signal: AbortSignal,
+): Promise<ProviderOutcome> {
   let response: Response;
   try {
     response = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
@@ -104,7 +108,7 @@ async function attemptOnce(messages: ChatMessage[], signal: AbortSignal): Promis
         messages,
         temperature: 0.2,
         top_p: 1,
-        max_completion_tokens: env.AI_MAX_COMPLETION_TOKENS,
+        max_completion_tokens: maxTokens,
         stream: false,
         // §0.2: settled parameters for openai/gpt-oss-20b specifically.
         // Do NOT send `reasoning_format` for this model — that parameter
@@ -149,11 +153,13 @@ async function attemptOnce(messages: ChatMessage[], signal: AbortSignal): Promis
   const parsed = responseSchema.safeParse(json);
   if (!parsed.success) return { kind: 'bad_response' };
 
+  // ⚠️ An EMPTY reply is still 'ok', with its finish reason. A reasoning
+  // model that spends its whole cap thinking returns no content and
+  // finish_reason "length"; the caller retries that once with more room
+  // (ai/pipeline.ts). It used to be reported as a provider failure, which the
+  // patient saw as "the assistant is busy".
   const choice = parsed.data.choices[0];
   const rawContent = choice.message.content ?? '';
-  if (rawContent.trim() === '' && (choice.message.reasoning ?? '').trim() === '') {
-    return { kind: 'bad_response' };
-  }
 
   return {
     kind: 'ok',
@@ -168,25 +174,34 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export interface CallOptions {
+  /** Reply cap; defaults to AI_MAX_COMPLETION_TOKENS. */
+  maxTokens?: number;
+  /** Absolute time (ms) by which to give up. Defaults to 13s from now, under
+   *  the 15s axios timeout of callers that use the shared client default. */
+  deadlineAt?: number;
+  signal?: AbortSignal;
+}
+
 /**
  * Reserve → call → reconcile is the caller's job (`aiBudget`). This function
- * only owns the HTTP conversation: timeout, retry, and never leaking the key
- * or upstream body text.
+ * only owns the HTTP conversation: timeout, retry on 429/5xx, and never
+ * leaking the key or upstream body text.
  *
- * A 13s overall deadline against a 15s client-side axios timeout
- * (`client/src/lib/apiClient.js`) — the server must give up first, or the
- * patient sees a raw network error instead of our own copy.
+ * The server must give up before the client does, or the patient sees a raw
+ * network error instead of our own copy — hence the deadline.
  */
 export async function callModel(
   messages: ChatMessage[],
-  externalSignal?: AbortSignal,
+  options: CallOptions = {},
 ): Promise<ProviderOutcome> {
-  const overallDeadlineMs = 13_000;
-  const startedAt = Date.now();
+  const deadlineAt = options.deadlineAt ?? Date.now() + 13_000;
+  const maxTokens = options.maxTokens ?? env.AI_MAX_COMPLETION_TOKENS;
+  const externalSignal = options.signal;
   const maxAttempts = 2;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const remaining = overallDeadlineMs - (Date.now() - startedAt);
+    const remaining = deadlineAt - Date.now();
     if (remaining <= 0) return { kind: 'timeout' };
 
     const attemptTimeoutMs = Math.min(env.AI_REQUEST_TIMEOUT_MS, remaining);
@@ -196,14 +211,14 @@ export async function callModel(
         ? AbortSignal.any([timeoutSignal, externalSignal])
         : timeoutSignal;
 
-    const outcome = await attemptOnce(messages, signal);
+    const outcome = await attemptOnce(messages, maxTokens, signal);
     if (outcome.kind !== 'retryable_error') return outcome;
 
     if (attempt === maxAttempts) return outcome;
 
     const backoffMs =
       outcome.retryAfterMs ?? Math.min(2000, 250 * 2 ** attempt) * (0.5 + Math.random());
-    if (Date.now() - startedAt + backoffMs >= overallDeadlineMs) return outcome;
+    if (Date.now() + backoffMs >= deadlineAt) return outcome;
     await sleep(backoffMs);
   }
 

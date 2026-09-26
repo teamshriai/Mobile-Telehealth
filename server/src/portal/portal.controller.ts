@@ -8,15 +8,6 @@ import { portalService } from './portal.service';
 // junk out of the query — the ownership check is in the service.
 const visitIdParam = z.object({ visitId: z.string().trim().min(3).max(64) });
 
-export const getMedications = asyncHandler(async (req: Request, res: Response) => {
-  res.json(
-    ApiResponseBuilder.success(
-      'Medications retrieved.',
-      await portalService.medications(req.user!.id),
-    ),
-  );
-});
-
 export const getConditions = asyncHandler(async (req: Request, res: Response) => {
   res.json(
     ApiResponseBuilder.success('Conditions retrieved.', {
