@@ -24,6 +24,8 @@ export interface Medication {
   instructions: string | null
   prescribedBy: string | null
   prescriberRegistration: string | null
+  /** The prescriber's portrait — a self-hosted URL the server has vetted, or null. */
+  prescribedByPhotoUrl?: string | null
   startedAt: string
   /** Last day the prescription covers; null when no duration was set. */
   endsAt: string | null
@@ -52,6 +54,7 @@ export interface IssuedInstruction {
   bodyEnglish: string | null
   issuedAt: string
   issuedByName: string
+  issuedByPhotoUrl?: string | null
 }
 
 export interface VisitSummaryListItem {
@@ -61,6 +64,7 @@ export interface VisitSummaryListItem {
   endedAt: string | null
   location: string | null
   clinician: string | null
+  clinicianPhotoUrl?: string | null
   signedAt: string | null
   counts: { diagnoses: number; prescriptions: number; instructions: number }
 }
@@ -72,7 +76,7 @@ export interface VisitSummary {
   endedAt: string | null
   location: string | null
   reasonForVisit: string | null
-  seenBy: Array<{ name: string | null; registrationNumber: string | null; signedAt: string | null }>
+  seenBy: Array<{ name: string | null; registrationNumber: string | null; signedAt: string | null; photoUrl?: string | null }>
   diagnoses: Condition[]
   medications: Medication[]
   instructions: IssuedInstruction[]
@@ -104,6 +108,7 @@ export interface Refill {
   status: RefillStatus
   requestedAt: string
   forwardedToName: string | null
+  forwardedToPhotoUrl?: string | null
   declineReason: string | null
   resolvedAt: string | null
 }
@@ -111,7 +116,7 @@ export interface Refill {
 export interface Medicine extends Medication {
   drugClass: string | null
   indication: { code: string; title: string } | null
-  prescriber: { name: string | null; specialty: string | null; hospital: string | null }
+  prescriber: { name: string | null; specialty: string | null; hospital: string | null; photoUrl?: string | null }
   schedule: 'scheduled' | 'weekly' | 'as_needed' | 'unknown'
   /** Days of supply left on a current course (0 on its last day). */
   supplyDaysLeft: number | null
@@ -138,6 +143,8 @@ export interface MedicinesSummary {
   currentCount: number
   pastCount: number
   doctors: string[]
+  /** The same doctors, with their portraits. */
+  prescribers?: Array<{ name: string; photoUrl: string | null }>
   /** `remaining`: still ahead or due now. `notMarked`: its time has passed and
    *  it was not tapped — it can still be marked for two days. */
   today: { taken: number; skipped: number; total: number; remaining: number; notMarked: number }

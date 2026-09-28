@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, Pill, FolderHeart, Users, Siren, ArrowRight, Phone, NotebookPen, Mic } from 'lucide-react'
+import { Calendar, Pill, FolderHeart, Users, Siren, ArrowRight, Phone, NotebookPen, Mic, LayoutGrid } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import * as profileService from '../../services/profile.service'
 import * as appointmentService from '../../services/appointment.service'
@@ -14,6 +14,11 @@ import RecentActivity from '../../components/home/RecentActivity'
 import CareTeamPreview from '../../components/home/CareTeamPreview'
 import MedsAndAllergies from '../../components/home/MedsAndAllergies'
 import type { PatientProfile, Appointment, CareTeamMember, Notification } from '../../types/domain'
+import HealthTrends from '../../components/home/HealthTrends'
+import SectionHeading from '../../components/home/SectionHeading'
+import SoftIconTile from '../../components/common/SoftIconTile'
+import { TONE_HEX, tintedSurface, type IconTone } from '../../components/common/iconTones'
+import type { LucideProps } from 'lucide-react'
 
 /**
  * Patient portal Home — a bento grid.
@@ -31,30 +36,28 @@ import type { PatientProfile, Appointment, CareTeamMember, Notification } from '
  * decouple the two and break both keyboard and screen-reader navigation, which
  * is not a trade a bento layout is worth.
  *
- * On the breakpoints: PatientLayout is `lg:pl-[248px]` inside a 1280px cap, so
- * usable width is 720px at md and 728px at lg — the sidebar eats the entire lg
- * gain. The grid therefore steps at `md` and `xl` and ignores `lg` entirely.
+ * On the breakpoints: the grid steps at `md` and `xl` and ignores `lg` (it was
+ * laid out beside a 248px sidebar, which ate the whole lg gain). They are the
+ * `main-md` / `main-xl` variants (index.css): the screen breakpoints normally,
+ * and the width the page actually has while the AI chat is docked beside it.
  */
 
-/* One pastel accent per tile (see `accent-*` in index.css) — matte, not
-   saturated, per the brief. Mirrors the stat-tile colour meanings above
-   (logistics/medication/attention/people) so the two sections read as one
-   consistent system rather than two unrelated palettes. */
+/* Each tile in its destination's own hue — the one it has in the navigation
+   (PATIENT_NAV) — kept quiet: a faint wash of it on the card and a softly
+   tinted icon, so a place looks the same on Home as it does in the menu. */
 interface ModuleLink {
   to: string
-  icon: ComponentType<{ size?: number; className?: string }>
+  icon: ComponentType<LucideProps>
   label: string
-  bg: string
-  fg: string
-  hoverBorder: string
+  hue: IconTone
 }
 
 const MODULES: ModuleLink[] = [
-  { to: '/app/appointments', icon: Calendar,    label: 'Appointments', bg: 'bg-accent-sky',  fg: 'text-accent-sky-fg',  hoverBorder: 'hover:border-accent-sky-fg/40' },
-  { to: '/app/medicines',    icon: Pill,        label: 'Medicines',    bg: 'bg-accent-teal', fg: 'text-accent-teal-fg', hoverBorder: 'hover:border-accent-teal-fg/40' },
-  { to: '/app/health',       icon: FolderHeart, label: 'My Health',    bg: 'bg-accent-clay', fg: 'text-accent-clay-fg', hoverBorder: 'hover:border-accent-clay-fg/40' },
-  { to: '/app/my-doctors',   icon: Users,       label: 'My doctors', bg: 'bg-accent-sage', fg: 'text-accent-sage-fg', hoverBorder: 'hover:border-accent-sage-fg/40' },
-  { to: '/app/health-notes', icon: NotebookPen, label: 'Health Notes', bg: 'bg-accent-sand', fg: 'text-accent-sand-fg', hoverBorder: 'hover:border-accent-sand-fg/40' },
+  { to: '/app/appointments', icon: Calendar,    label: 'Appointments', hue: 'orange' },
+  { to: '/app/medicines',    icon: Pill,        label: 'Medicines',    hue: 'teal' },
+  { to: '/app/health',       icon: FolderHeart, label: 'My Health',    hue: 'pink' },
+  { to: '/app/my-doctors',   icon: Users,       label: 'My doctors',   hue: 'green' },
+  { to: '/app/health-notes', icon: NotebookPen, label: 'Health Notes', hue: 'amber' },
 ]
 
 /**
@@ -63,16 +66,17 @@ const MODULES: ModuleLink[] = [
  * content and cause a layout jump when the requests resolve.
  */
 const CELLS = [
-  { key: 'appointment', span: 'sm:col-span-2 md:col-span-4 xl:col-span-4 xl:row-span-2', skeleton: 'h-56' },
-  { key: 'snapshot',    span: 'sm:col-span-2 md:col-span-4 xl:col-span-2 xl:row-span-2', skeleton: 'h-56' },
-  { key: 'activity',    span: 'sm:col-span-2 md:col-span-2 md:row-span-2 xl:col-span-4 xl:row-span-2', skeleton: 'h-64' },
-  { key: 'careteam',    span: 'sm:col-span-1 md:col-span-2 xl:col-span-2', skeleton: 'h-40' },
-  { key: 'meds',        span: 'sm:col-span-1 md:col-span-2 xl:col-span-2', skeleton: 'h-40' },
-  { key: 'links',       span: 'sm:col-span-2 md:col-span-4 xl:col-span-4', skeleton: 'h-28' },
-  { key: 'emergency',   span: 'sm:col-span-2 md:col-span-4 xl:col-span-2', skeleton: 'h-28' },
+  { key: 'snapshot',    span: 'sm:col-span-2 main-md:col-span-4 main-xl:col-span-2 main-xl:row-span-2', skeleton: 'h-56' },
+  { key: 'appointment', span: 'sm:col-span-2 main-md:col-span-4 main-xl:col-span-4 main-xl:row-span-2', skeleton: 'h-56' },
+  { key: 'trends',      span: 'sm:col-span-2 main-md:col-span-4 main-xl:col-span-6', skeleton: 'h-80' },
+  { key: 'activity',    span: 'sm:col-span-2 main-md:col-span-2 main-md:row-span-2 main-xl:col-span-4 main-xl:row-span-2', skeleton: 'h-64' },
+  { key: 'careteam',    span: 'sm:col-span-1 main-md:col-span-2 main-xl:col-span-2', skeleton: 'h-40' },
+  { key: 'meds',        span: 'sm:col-span-1 main-md:col-span-2 main-xl:col-span-2', skeleton: 'h-40' },
+  { key: 'links',       span: 'sm:col-span-2 main-md:col-span-4 main-xl:col-span-4', skeleton: 'h-28' },
+  { key: 'emergency',   span: 'sm:col-span-2 main-md:col-span-4 main-xl:col-span-2', skeleton: 'h-28' },
 ] as const
 
-const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-4 xl:grid-cols-6 xl:auto-rows-[minmax(8rem,auto)]'
+const GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 main-md:grid-cols-4 main-xl:grid-cols-6 main-xl:auto-rows-[minmax(8rem,auto)]'
 
 const spanFor = (key: string) => CELLS.find((c) => c.key === key)?.span ?? ''
 
@@ -100,7 +104,7 @@ function nextAppointment(appointments: Appointment[]): Appointment | null {
 function CellError({ label, onRetry }: { label: string; onRetry: () => void }): ReactNode {
   return (
     <section className="flex h-full flex-col">
-      <h2 className="text-sm font-semibold text-ink">{label}</h2>
+      <h2 className="flex min-h-11 items-center text-sm font-semibold text-ink">{label}</h2>
       <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card">
         <Banner tone="error" title={`We could not load ${label.toLowerCase()}`}>
           <button
@@ -234,11 +238,12 @@ export default function PatientHome() {
             Here is your care, your records and what is coming up.
           </p>
           {/* Symptoms are easiest to describe while they are happening. */}
+          {/* Its icon in Health Notes' hue (amber), where the note will live. */}
           <Link
             to="/app/health-notes?new=voice"
-            className="focus-ring tap-target inline-flex items-center gap-1.5 rounded-lg border border-border-soft bg-surface-1 px-3 text-sm font-medium text-ink hover:bg-surface-2"
+            className="focus-ring tap-target inline-flex items-center gap-2 rounded-lg border border-border-soft bg-surface-1 pl-1.5 pr-3 text-sm font-medium text-ink hover:bg-surface-2"
           >
-            <Mic size={15} aria-hidden="true" /> Add a health note
+            <SoftIconTile icon={Mic} tone="amber" size="sm" /> Add a health note
           </Link>
         </div>
       </section>
@@ -250,16 +255,23 @@ export default function PatientHome() {
       )}
 
       <div className={GRID}>
+        {/* The counts first, then the next visit with its calendar. */}
+        <div className={spanFor('snapshot')}>
+          {failed.profile
+            ? <CellError label="Your snapshot" onRetry={loadProfile} />
+            : <HealthSnapshot profile={profile} appointments={appointments} careTeam={careTeam} />}
+        </div>
+
         <div className={spanFor('appointment')}>
           {failed.appointments
             ? <CellError label="Next appointment" onRetry={loadAppointments} />
             : <UpcomingAppointment appointment={upcoming} appointments={appointments} />}
         </div>
 
-        <div className={spanFor('snapshot')}>
-          {failed.profile
-            ? <CellError label="Your snapshot" onRetry={loadProfile} />
-            : <HealthSnapshot profile={profile} appointments={appointments} careTeam={careTeam} />}
+        {/* Loads on its own (one request) with its own retry, so a slow or
+            failed chart never holds up or rearranges the rest of Home. */}
+        <div className={spanFor('trends')}>
+          <HealthTrends />
         </div>
 
         <div className={spanFor('activity')}>
@@ -283,25 +295,24 @@ export default function PatientHome() {
         {/* Plain navigation, styled as such — it sits low in the grid because
             real content carries the hierarchy now. */}
         <section aria-labelledby="modules-heading" className={`flex h-full flex-col ${spanFor('links')}`}>
-          <h2 id="modules-heading" className="text-sm font-semibold text-ink">Go to</h2>
-          <ul className="mt-3.5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            {MODULES.map(({ to, icon: Icon, label, bg, fg, hoverBorder }) => (
+          <SectionHeading id="modules-heading" icon={LayoutGrid} tone="violet">Go to</SectionHeading>
+          <ul className="mt-3.5 grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 main-md:grid-cols-5">
+            {MODULES.map(({ to, icon, label, hue }) => (
               <li key={to} className="aspect-square">
                 <Link
                   to={to}
-                  className={`focus-ring group flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border border-transparent bg-surface-1 p-3 text-center shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-md ${hoverBorder}`}
+                  className="focus-ring group flex h-full w-full flex-col items-center justify-center gap-2 rounded-xl border bg-surface-1 p-3 text-center shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-md"
+                  style={tintedSurface(hue, 0.045)}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${bg} transition-transform group-hover:scale-105`}
-                  >
-                    <Icon size={20} className={fg} />
+                  <span className="transition-transform group-hover:scale-105">
+                    <SoftIconTile icon={icon} tone={hue} size="lg" />
                   </span>
                   <span className="min-w-0 text-sm font-semibold text-ink">{label}</span>
                   <ArrowRight
                     size={13}
                     aria-hidden="true"
-                    className={`hidden -translate-y-0.5 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100 sm:block ${fg}`}
+                    style={{ color: TONE_HEX[hue] }}
+                    className="hidden -translate-y-0.5 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100 sm:block"
                   />
                 </Link>
               </li>
@@ -316,10 +327,9 @@ export default function PatientHome() {
             in the thumb zone on a phone, and the sidebar carries a second
             permanent route to it. Never sticky, never animated. */}
         <section aria-labelledby="emergency-heading" className={`flex h-full flex-col ${spanFor('emergency')}`}>
-          <h2 id="emergency-heading" className="flex items-center gap-1.5 text-sm font-semibold text-critical-fg">
-            <Siren size={15} aria-hidden="true" />
+          <SectionHeading id="emergency-heading" icon={Siren} tone="red" className="text-critical-fg">
             Think you are having a stroke?
-          </h2>
+          </SectionHeading>
           <div className="mt-3.5 flex flex-1 flex-col justify-center gap-3 rounded-xl border border-critical-fg/30 bg-critical-bg p-4">
             <p className="text-sm leading-relaxed text-critical-fg">
               Every minute counts. Call <strong>108</strong> immediately.

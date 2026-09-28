@@ -74,6 +74,8 @@ export interface PatientProfile {
   physicalActivity: string | null
   occupation: string | null
   preferences: PreferencesDto
+  /** The patient's own portrait — a self-hosted URL the server has vetted, or null. */
+  photoUrl?: string | null
   onboardingCompletedAt: string | null
   updatedAt: string
 }
@@ -116,6 +118,8 @@ export interface AppointmentDoctorSummary {
   name: string
   specialty: string | null
   hospitalName: string | null
+  /** A self-hosted portrait URL the server has vetted, or null. */
+  photoUrl?: string | null
 }
 
 /** The patient-facing appointment shape — GET /appointments. */
@@ -148,6 +152,7 @@ export interface BookableDoctor {
   qualifications: string | null
   hospitalName: string | null
   yearsExperience: number | null
+  photoUrl?: string | null
 }
 
 /** A doctor's own active care-team panel — GET /doctor/patients. */
@@ -252,6 +257,7 @@ export interface CareTeamMember {
     qualifications: string | null
     hospitalName: string | null
     isVerified: boolean
+    photoUrl?: string | null
   }
 }
 
@@ -374,6 +380,21 @@ export type AiMessageKind =
   | 'BudgetDeferred'
   | 'PolicyBlocked'
   | 'ProviderUnavailable'
+
+/**
+ * A short reminder from the patient's own record, shown beside the AI chat
+ * button. Written by a template on the server, not by the model, and only
+ * about logistics: a visit, today's dose times, a report that is ready, a
+ * refill, an instruction.
+ */
+export interface AiInsight {
+  /** Opaque; the same while the fact is the same. */
+  id: string
+  kind: 'appointment' | 'doses' | 'report' | 'refill' | 'instruction'
+  text: string
+  /** Put in the chat box, not sent, when the patient taps the insight. */
+  question: string
+}
 
 export interface AiMessage {
   id: string

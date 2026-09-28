@@ -6,6 +6,7 @@ import type { Condition, IssuedInstruction, VisitSummaryListItem } from '../../.
 import { EmptyState, ErrorState, LoadingState } from '../../../components/feedback/States'
 import SourceBadge from '../../../components/common/SourceBadge'
 import type { ApiError } from '../../../types/api'
+import Avatar from '../../../components/common/Avatar'
 
 /**
  * The CLINICIAN-authored half of My Health — read-only, signed, attributed.
@@ -119,6 +120,7 @@ function VisitRow({ v }: { v: VisitSummaryListItem }) {
         to={`/app/visits/${encodeURIComponent(v.visitId)}`}
         className="focus-ring flex items-center gap-3 rounded-xl border border-border-soft bg-surface-1 p-4 transition-colors hover:border-primary-600/40"
       >
+        <Avatar name={v.clinician ?? 'Your doctor'} src={v.clinicianPhotoUrl} size="md" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink">
             {portal.VISIT_TYPE_LABEL[v.type] ?? v.type} · {portal.formatDay(v.startedAt)}
@@ -196,7 +198,7 @@ function InstructionCard({ i, onPrint }: { i: IssuedInstruction; onPrint: () => 
       </div>
 
       {/* A6 — the patient's language beside its English counterpart. */}
-      <div className={`mt-3 grid gap-4 ${bilingual ? 'md:grid-cols-2' : ''}`}>
+      <div className={`mt-3 grid gap-4 ${bilingual ? 'main-md:grid-cols-2' : ''}`}>
         <div>
           {bilingual && (
             <p className="mb-1 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
@@ -214,6 +216,7 @@ function InstructionCard({ i, onPrint }: { i: IssuedInstruction; onPrint: () => 
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Avatar name={i.issuedByName} src={i.issuedByPhotoUrl} size="xs" />
         <SourceBadge kind="clinician" by={i.issuedByName} detail={portal.formatDay(i.issuedAt)} />
         {i.visitId !== null && (
           <Link

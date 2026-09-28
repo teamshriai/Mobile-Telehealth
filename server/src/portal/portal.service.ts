@@ -12,6 +12,7 @@ import {
   type SignedLine,
 } from './medicationPeriod';
 import { frequencyInWords, routeInWords } from './plainLanguage';
+import { clinicianPhotosByUserId } from './clinicianPhotos';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Patient portal — read-only windows onto clinician-authored records.
@@ -52,6 +53,8 @@ export interface MedicationView extends MedicationPeriod {
   instructions: string | null | undefined;
   prescribedBy: string | null;
   prescriberRegistration: string | null;
+  /** The prescriber's portrait, when they have one (utils/avatarUrl). */
+  prescribedByPhotoUrl: string | null;
 }
 
 export interface ConditionView {
@@ -74,6 +77,7 @@ export interface InstructionView {
   bodyEnglish: string | null;
   issuedAt: Date;
   issuedByName: string;
+  issuedByPhotoUrl: string | null;
 }
 
 const SIGNED_RX = { status: 'Signed' as const };
@@ -108,8 +112,15 @@ export function signedLines(rx: RxRow[]): SignedLine[] {
 /**
  * `all` is every signed prescription of the patient — pass it when `rx` is a
  * subset (one visit), so a later renewal elsewhere still ends these courses.
+ * `photos` (from clinicianPhotosByUserId) adds each prescriber's portrait;
+ * without it the portrait is simply absent.
  */
-export function toMedications(rx: RxRow[], now = new Date(), all: RxRow[] = rx): MedicationView[] {
+export function toMedications(
+  rx: RxRow[],
+  now = new Date(),
+  all: RxRow[] = rx,
+  photos: ReadonlyMap<string, string | null> = new Map(),
+): MedicationView[] {
   const lines = signedLines(all);
   return rx.flatMap((p) =>
     p.items.map((i) => {
@@ -133,6 +144,8 @@ export function toMedications(rx: RxRow[], now = new Date(), all: RxRow[] = rx):
         instructions: decryptFieldOptional(i.instructions),
         prescribedBy: p.signerName,
         prescriberRegistration: p.signerRegistrationNumber,
+        prescribedByPhotoUrl:
+          p.signedByUserId !== null ? (photos.get(p.signedByUserId) ?? null) : null,
         ...medicationPeriod(signedAt, i.durationDays, now, replaced),
       };
     }),
@@ -161,6 +174,7 @@ function toCondition(p: {
 
 function toInstruction(
   row: Parameters<typeof decryptInstruction>[0] & { encounter?: { visitId: string } | null },
+  photos: ReadonlyMap<string, string | null> = new Map(),
 ): InstructionView {
   const d = decryptInstruction(row);
   return {
@@ -173,6 +187,7 @@ function toInstruction(
     bodyEnglish: d.bodyEnglish,
     issuedAt: d.issuedAt,
     issuedByName: d.issuedByName,
+    issuedByPhotoUrl: photos.get(row.issuedByUserId) ?? null,
   };
 }
 
@@ -198,7 +213,8 @@ export const portalService = {
       orderBy: { issuedAt: 'desc' },
       take: 100,
     });
-    return rows.map(toInstruction);
+    const photos = await clinicianPhotosByUserId(rows.map((r) => r.issuedByUserId));
+    return rows.map((r) => toInstruction(r, photos));
   },
 
   async visits(userId: string) {
@@ -212,7 +228,7 @@ export const portalService = {
           where: { status: 'Signed' },
           orderBy: { signedAt: 'desc' },
           take: 1,
-          select: { signerName: true, signedAt: true },
+          select: { signerName: true, signedAt: true, signedByUserId: true },
         },
         _count: {
           select: {
@@ -223,16 +239,23 @@ export const portalService = {
         },
       },
     });
+    const photos = await clinicianPhotosByUserId(
+      rows.map((r) => r.clinicalNotes[0]?.signedByUserId),
+    );
     return rows.map((raw) => {
       const e = decryptEncounter(raw);
+      const signer = raw.clinicalNotes[0];
       return {
         visitId: e.visitId,
         type: e.type,
         startedAt: e.startedAt,
         endedAt: e.endedAt,
         location: e.locationName,
-        clinician: raw.clinicalNotes[0]?.signerName ?? null,
-        signedAt: raw.clinicalNotes[0]?.signedAt ?? null,
+        clinician: signer?.signerName ?? null,
+        clinicianPhotoUrl: signer?.signedByUserId
+          ? (photos.get(signer.signedByUserId) ?? null)
+          : null,
+        signedAt: signer?.signedAt ?? null,
         counts: {
           diagnoses: raw._count.problems,
           prescriptions: raw._count.prescriptions,
@@ -252,7 +275,12 @@ export const portalService = {
         clinicalNotes: {
           where: { status: 'Signed' },
           orderBy: { signedAt: 'desc' },
-          select: { signerName: true, signerRegistrationNumber: true, signedAt: true },
+          select: {
+            signerName: true,
+            signerRegistrationNumber: true,
+            signedAt: true,
+            signedByUserId: true,
+          },
         },
       },
     });
@@ -273,6 +301,11 @@ export const portalService = {
         orderBy: { issuedAt: 'asc' },
       }),
     ]);
+    const photos = await clinicianPhotosByUserId([
+      ...raw.clinicalNotes.map((n) => n.signedByUserId),
+      ...rx.map((p) => p.signedByUserId),
+      ...instructions.map((i) => i.issuedByUserId),
+    ]);
 
     return {
       visitId: e.visitId,
@@ -285,10 +318,11 @@ export const portalService = {
         name: n.signerName,
         registrationNumber: n.signerRegistrationNumber,
         signedAt: n.signedAt,
+        photoUrl: n.signedByUserId ? (photos.get(n.signedByUserId) ?? null) : null,
       })),
       diagnoses: problems.map(toCondition),
-      medications: toMedications(rx, new Date(), allRx),
-      instructions: instructions.map(toInstruction),
+      medications: toMedications(rx, new Date(), allRx, photos),
+      instructions: instructions.map((i) => toInstruction(i, photos)),
     };
   },
 };

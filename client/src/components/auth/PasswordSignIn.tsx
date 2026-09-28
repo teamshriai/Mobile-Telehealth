@@ -1,11 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, AlertTriangle, Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import EmailField from './EmailField'
 import { isValidEmail, normalizeEmail } from './emailFormat'
 import type { AuthResult } from '../../app/authContextObject'
-import type { Audience } from './audience'
+import type { Audience, HospitalRoleId } from './audience'
 
 /**
  * Email + password sign-in.
@@ -19,9 +19,21 @@ import type { Audience } from './audience'
 interface PasswordSignInProps {
   audience: Audience
   onSignedIn: (result: AuthResult) => void
+  /** Carried into "Forgot password?" so "Back to sign in" returns to the same role. */
+  hospitalRole?: HospitalRoleId | null
+  /**
+   * Off by default — each screen decides where focus starts: the Hospital
+   * screen starts on its role question, and the Patient screen's password
+   * form must not snatch focus while someone arrows across the method radios.
+   */
+  autoFocus?: boolean
+  /** Told when a sign-in request starts and ends, so the screen can hold its other controls still. */
+  onBusyChange?: (busy: boolean) => void
 }
 
-export default function PasswordSignIn({ audience, onSignedIn }: PasswordSignInProps) {
+export default function PasswordSignIn({
+  audience, onSignedIn, hospitalRole = null, autoFocus = false, onBusyChange,
+}: PasswordSignInProps) {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,6 +41,10 @@ export default function PasswordSignIn({ audience, onSignedIn }: PasswordSignInP
   const [busy, setBusy] = useState(false)
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    onBusyChange?.(busy)
+  }, [busy, onBusyChange])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -62,7 +78,7 @@ export default function PasswordSignIn({ audience, onSignedIn }: PasswordSignInP
         onChange={(v) => { setEmail(v); setEmailError(undefined); setError('') }}
         error={emailError}
         hint={audience === 'patient' ? 'The email address you registered with' : 'Your work email address'}
-        autoFocus
+        autoFocus={autoFocus}
         disabled={busy}
       />
 
@@ -72,8 +88,9 @@ export default function PasswordSignIn({ audience, onSignedIn }: PasswordSignInP
             Password
           </label>
           <Link
-            to={`/forgot-password?as=${audience}`}
-            className="focus-ring rounded text-xs font-semibold text-primary-700 hover:underline"
+            to={`/forgot-password?as=${audience}${audience === 'hospital' && hospitalRole !== null ? `&role=${hospitalRole}` : ''}`}
+            // 44px tall for a finger; the negative margins keep the row's height.
+            className="focus-ring -my-3.5 inline-flex min-h-11 items-center rounded text-xs font-semibold text-primary-700 hover:underline"
           >
             Forgot password?
           </Link>
@@ -100,7 +117,7 @@ export default function PasswordSignIn({ audience, onSignedIn }: PasswordSignInP
             onClick={() => setShow((s) => !s)}
             aria-label={show ? 'Hide password' : 'Show password'}
             aria-pressed={show}
-            className="focus-ring absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink"
+            className="focus-ring absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink"
           >
             {show ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
           </button>

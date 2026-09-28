@@ -63,7 +63,7 @@ export default function StudyPage() {
             </p>
           </header>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[400px_minmax(0,1fr)] xl:items-start">
+          <div className="grid grid-cols-1 gap-5 main-xl:grid-cols-[400px_minmax(0,1fr)] main-xl:items-start">
             <article aria-labelledby="report-heading" className="space-y-4 rounded-2xl border border-border-soft bg-surface-1 p-4 shadow-card sm:p-5" data-testid="radiology-report">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <h2 id="report-heading" className="text-base font-semibold text-ink">Radiology report</h2>

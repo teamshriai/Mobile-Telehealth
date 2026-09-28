@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { Pill, ShieldAlert, ArrowRight } from 'lucide-react'
+import { tintedSurface } from '../common/iconTones'
 import type { PatientProfile } from '../../types/domain'
+import SectionHeading from './SectionHeading'
 
 /**
  * Medications and allergies as chips.
@@ -85,23 +87,23 @@ export default function MedsAndAllergies({
   return (
     <section aria-labelledby="meds-heading" className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="meds-heading" className="text-sm font-semibold text-ink">
+        <SectionHeading id="meds-heading" icon={Pill} tone="teal">
           Medicines &amp; allergies
-        </h2>
+        </SectionHeading>
         <Link
           to="/app/medicines"
-          className="focus-ring group inline-flex items-center gap-1 rounded text-xs font-semibold text-primary-700"
+          className="focus-ring group inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-primary-700 hover:underline"
         >
           View all
           <ArrowRight
-            size={12}
+            size={14}
             aria-hidden="true"
             className="transition-transform group-hover:translate-x-0.5"
           />
         </Link>
       </div>
 
-      <div className="mt-3.5 flex-1 space-y-4 rounded-xl border border-border bg-surface-1 p-4 shadow-card">
+      <div className="mt-3.5 flex-1 space-y-4 rounded-xl border bg-surface-1 p-4 shadow-card" style={tintedSurface('teal', 0.045)}>
         <div>
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
             <Pill size={13} aria-hidden="true" className="text-accent-teal-fg" />

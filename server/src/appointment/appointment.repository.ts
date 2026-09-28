@@ -30,6 +30,8 @@ const DOCTOR_SELECT = {
   lastName: true,
   specialty: true,
   hospitalName: true,
+  // A KEY, not a URL — turned into one (or null) by utils/avatarUrl.
+  profilePhoto: true,
 } satisfies Prisma.DoctorProfileSelect;
 
 export type AppointmentWithDoctor = Appointment & {

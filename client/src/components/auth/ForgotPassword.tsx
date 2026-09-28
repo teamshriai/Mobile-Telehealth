@@ -6,7 +6,7 @@ import apiClient from '../../lib/apiClient'
 import type { ApiError } from '../../types/api'
 import BrandMark from '../common/BrandMark'
 import AuthShell from './AuthShell'
-import { parseAudience } from './audience'
+import { parseAudience, parseHospitalRole } from './audience'
 
 const fadeIn = {
   initial: { opacity: 0, y: 8 },
@@ -34,11 +34,16 @@ function Spinner() {
 }
 
 export default function ForgotPassword() {
-  // Which door they came through, so "Back to sign in" returns them to it.
-  // Presentation only; the reset itself is identical for every role.
+  // Which door (and hospital role) they came from, so "Back to sign in"
+  // returns them to it. Presentation only; the reset itself is identical for
+  // every role. The role is echoed back only after it is checked against the
+  // known list — never raw from the address bar.
   const [params] = useSearchParams()
   const audience = parseAudience(params.get('as'))
-  const backTo = audience === null ? '/login' : `/login?as=${audience}`
+  const hospitalRole = audience === 'hospital' ? parseHospitalRole(params.get('role')) : null
+  const backTo = audience === null
+    ? '/login'
+    : hospitalRole !== null ? `/login?as=hospital&role=${hospitalRole}` : `/login?as=${audience}`
   const [email, setEmail]           = useState('')
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
@@ -229,7 +234,7 @@ export default function ForgotPassword() {
                     </button>
                     <Link
                       to={backTo}
-                      className="flex items-center justify-center gap-2 w-full text-sm
+                      className="flex min-h-11 items-center justify-center gap-2 w-full text-sm
                                  text-ink-subtle hover:text-ink-muted transition-colors"
                     >
                       <ArrowLeft size={15} strokeWidth={2} />
@@ -360,7 +365,7 @@ export default function ForgotPassword() {
                     <Link
                       to={backTo}
                       id="back-to-login"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-ink-subtle
+                      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink-subtle
                                  hover:text-primary-700 transition-colors"
                     >
                       <ArrowLeft size={15} strokeWidth={2} />
@@ -368,9 +373,11 @@ export default function ForgotPassword() {
                     </Link>
                   </motion.div>
 
-                  {/* ⚠️ Staff cannot self-register, so the link is offered to
-                      patients (and to anyone who arrived without choosing). */}
-                  {audience !== 'clinician' && audience !== 'hospital' && (
+                  {/* ⚠️ Offered to patients (and to anyone who arrived without
+                      choosing a door). Hospital staff are added by their hospital
+                      administrator, and an administrator registers from the
+                      Hospital sign-in — neither needs this link. */}
+                  {audience !== 'hospital' && (
                   <motion.p
                     custom={3}
                     variants={fadeIn}
@@ -380,7 +387,7 @@ export default function ForgotPassword() {
                   >
                     Don&apos;t have an account?{' '}
                     <Link
-                      to="/register"
+                      to={audience === 'patient' ? '/register?as=patient' : '/register'}
                       className="font-semibold text-primary-700 hover:text-primary-800 transition-colors"
                     >
                       Create account

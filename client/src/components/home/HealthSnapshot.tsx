@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
-import { Pill, Users, CalendarCheck, ShieldAlert } from 'lucide-react'
+import { Pill, Users, CalendarCheck, ShieldAlert, HeartPulse } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { countMedications, countAllergies } from './healthCounters'
 import type { PatientProfile, Appointment, CareTeamMember } from '../../types/domain'
+import SectionHeading from './SectionHeading'
 
 /**
  * Health Snapshot — the page's data anchor.
@@ -88,14 +89,10 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
 
   return (
     <section aria-labelledby="snapshot-heading" className="flex h-full flex-col">
-      <h2 id="snapshot-heading" className="text-sm font-semibold text-ink">
+      <SectionHeading id="snapshot-heading" icon={HeartPulse} tone="pink">
         Your health at a glance
-      </h2>
-      <p className="mt-1 text-sm text-ink-subtle">
-        Counted from your records. Tap any item to see the detail.
-      </p>
-
-      <div className="mt-3.5 grid flex-1 grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-2">
+      </SectionHeading>
+      <div className="mt-3.5 grid flex-1 grid-cols-2 gap-3 main-md:grid-cols-4 main-xl:grid-cols-2">
         <Tile
           to="/app/medicines"
           icon={Pill}
@@ -129,6 +126,12 @@ export default function HealthSnapshot({ profile, appointments = [], careTeam = 
           hint={allergies > 0 ? 'Recorded — tell any new clinician' : 'None recorded'}
         />
       </div>
+      {/* Under the tiles, as their caption: above them it made this heading
+          taller than the appointment's beside it, and the two cells no longer
+          started level. */}
+      <p className="mt-2 text-sm text-ink-subtle">
+        Counted from your records. Tap any item to see the detail.
+      </p>
     </section>
   )
 }

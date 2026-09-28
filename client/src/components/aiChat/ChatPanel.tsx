@@ -1,39 +1,79 @@
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactElement } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactElement,
+} from 'react'
 import { Link } from 'react-router-dom'
-import { Maximize2, Plus, Send, Sparkles, X } from 'lucide-react'
+import { Maximize2, Plus, Send, X } from 'lucide-react'
+import AssistantMark from './AssistantMark'
 import { Spinner } from '../feedback/States'
 import MessageBubble from './MessageBubble'
 import type { AiChat } from './useAiChat'
 import { CHAT_SUGGESTIONS } from './suggestions'
 
 /**
- * The floating assistant panel, opened from the corner button.
+ * The assistant panel, opened from the corner button.
  *
  * NON-MODAL on purpose: a patient asks about the page they are reading
- * ("what does this lab result mean?"), so the page stays visible and usable
- * beside the panel from 640px up. On a phone there is no room beside it, so
- * it covers the screen. Either way Esc closes it and focus returns to the
- * button that opened it.
+ * ("what does this lab result mean?"), so the page stays usable.
+ *
+ * - DOCKED (1024px and up): a full-height column on the right, below the
+ *   header, with the page narrowed beside it. A complementary landmark, not
+ *   a dialog. Esc closes it only while focus is inside it, so Esc on the page
+ *   still belongs to the page. A source link keeps it open: the page changes
+ *   beside it.
+ * - Narrower: there is no room beside it, so it covers the page below the
+ *   header (the header, with Emergency, stays reachable): the whole width on
+ *   a phone, a sheet over a dimmed page on a tablet. A source link closes it,
+ *   since the page it opens would be underneath.
+ *
+ * Either way, closing hands focus back to the corner button.
  */
-
-
-export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: () => void }): ReactElement {
-  const [draft, setDraft] = useState('')
+export default function ChatPanel({
+  chat,
+  docked,
+  initialDraft = '',
+  onClose,
+}: {
+  chat: AiChat
+  docked: boolean
+  /** A question to start from (an insight bubble's) — in the box, not sent. */
+  initialDraft?: string
+  onClose: () => void
+}): ReactElement {
+  const [draft, setDraft] = useState(initialDraft)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  // Typed as the narrower element so the same ref fits the <aside> and the <div>.
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
+    const el = inputRef.current
+    el?.focus()
+    // A pre-filled question: the caret after it, ready to send or change.
+    el?.setSelectionRange(el.value.length, el.value.length)
+  }, [])
+
+  useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const active = document.activeElement
+      const inside = active !== null && panelRef.current?.contains(active) === true
+      // Covering the page, the panel is all there is to dismiss — unless focus
+      // is up in the header, whose menus close on Esc themselves.
+      const covering = !docked && (active === null || active === document.body)
+      if (inside || covering) {
         e.stopPropagation()
         onClose()
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [docked, onClose])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -61,18 +101,16 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
     }
   }
 
-  return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-modal="false"
-      aria-labelledby="ai-chat-title"
-      data-testid="ai-chat-panel"
-      className="fixed inset-0 z-50 flex flex-col bg-surface-1 sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[min(640px,calc(100dvh-7rem))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-border-soft sm:shadow-card-lg"
-    >
-      <header className="flex flex-shrink-0 items-center gap-2.5 border-b border-border-soft px-4 py-3">
+  // Below the header in every layout; z-20 keeps the header's own menus
+  // (z-30) opening over it, and page overlays (z-50) above both.
+  const place = 'fixed bottom-0 right-0 top-[var(--app-header-h)] z-20 flex flex-col bg-surface-1'
+  const body = (
+    <>
+      {/* A div, not <header>: outside a sectioning element <header> is a page
+          banner, and the page already has one. */}
+      <div className="flex flex-shrink-0 items-center gap-2.5 border-b border-border-soft px-4 py-3">
         <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-accent-sky text-accent-sky-fg">
-          <Sparkles size={15} />
+          <AssistantMark size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <h2 id="ai-chat-title" className="truncate text-sm font-semibold text-ink">
@@ -108,9 +146,14 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
         >
           <X size={18} aria-hidden="true" />
         </button>
-      </header>
+      </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" aria-live="polite">
+      <div
+        role="log"
+        aria-live="polite"
+        aria-label="Conversation"
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4"
+      >
         {chat.loading && (
           <div className="flex justify-center py-8"><Spinner /></div>
         )}
@@ -126,7 +169,7 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
                   <button
                     type="button"
                     onClick={() => void submit(s)}
-                    className="focus-ring w-full rounded-lg border border-border-soft bg-surface-2 px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
+                    className="focus-ring min-h-11 w-full rounded-lg border border-border-soft bg-surface-2 px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
                   >
                     {s}
                   </button>
@@ -135,7 +178,10 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
             </ul>
           </div>
         )}
-        {!chat.loading && chat.messages.map((m) => <MessageBubble key={m.id} m={m} onNavigate={onClose} compact />)}
+        {!chat.loading &&
+          chat.messages.map((m) => (
+            <MessageBubble key={m.id} m={m} onNavigate={docked ? undefined : onClose} compact />
+          ))}
         {chat.sending && (
           <p className="flex items-center gap-2 text-xs text-ink-subtle" role="status">
             <Spinner size={12} /> Looking through your record…
@@ -163,13 +209,13 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Ask a question…"
-            className="max-h-32 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-ink-subtle"
+            className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm text-ink outline-none placeholder:text-ink-subtle"
           />
           <button
             type="submit"
             disabled={draft.trim() === '' || chat.sending}
             aria-label="Send question"
-            className="focus-ring flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary-600 text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="focus-ring flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-primary-600 text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chat.sending ? <Spinner size={14} /> : <Send size={15} aria-hidden="true" />}
           </button>
@@ -178,6 +224,47 @@ export default function ChatPanel({ chat, onClose }: { chat: AiChat; onClose: ()
           It never diagnoses or changes a medicine. For anything urgent, call 108.
         </p>
       </form>
-    </div>
+    </>
+  )
+
+  if (docked) {
+    return (
+      <aside
+        ref={panelRef}
+        aria-labelledby="ai-chat-title"
+        data-testid="ai-chat-panel"
+        data-docked="true"
+        data-print="hide"
+        className={`${place} w-[var(--chat-dock-w)] border-l border-border-soft motion-safe:animate-[dockIn_200ms_var(--ease-premium)]`}
+      >
+        {body}
+      </aside>
+    )
+  }
+
+  return (
+    <>
+      {/* Tablet: the page is dimmed, not hidden; a tap on it closes the sheet. */}
+      <button
+        type="button"
+        aria-label="Close AI chat"
+        tabIndex={-1}
+        onClick={onClose}
+        data-print="hide"
+        className="fixed inset-x-0 bottom-0 top-[var(--app-header-h)] z-20 hidden cursor-default bg-scrim motion-safe:animate-[fadeIn_150ms_ease-out] sm:block"
+      />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="ai-chat-title"
+        data-testid="ai-chat-panel"
+        data-docked="false"
+        data-print="hide"
+        className={`${place} w-full sm:w-[26.25rem] sm:border-l sm:border-border-soft sm:shadow-card-lg motion-safe:sm:animate-[dockIn_200ms_var(--ease-premium)]`}
+      >
+        {body}
+      </div>
+    </>
   )
 }

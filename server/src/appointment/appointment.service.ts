@@ -1,5 +1,6 @@
 import { AppointmentMode, AppointmentStatus, NotificationType, Prisma } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
+import { avatarUrl } from '../utils/avatarUrl';
 import { schedulingService } from '../scheduling/scheduling.service';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { notificationService } from '../notification/notification.service';
@@ -65,6 +66,7 @@ function toResponseShape(a: AppointmentWithDoctor) {
           name: `Dr. ${a.doctor.firstName} ${a.doctor.lastName}`.trim(),
           specialty: a.doctor.specialty,
           hospitalName: a.doctor.hospitalName,
+          photoUrl: avatarUrl(a.doctor.profilePhoto),
         }
       : null,
 

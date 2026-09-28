@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 
@@ -83,7 +84,11 @@ export default function Drawer({
     }
   }, [open, onClose])
 
-  return (
+  // ⚠️ Portalled to <body>. Rendered in place, an overlay inside <main>
+  // becomes subject to anything that contains the page — the docked AI chat
+  // turns the content column into a container, which would re-anchor a
+  // `fixed` scrim to that column instead of the screen.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex" style={{ justifyContent: side === 'right' ? 'flex-end' : 'flex-start' }}>
@@ -133,6 +138,7 @@ export default function Drawer({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

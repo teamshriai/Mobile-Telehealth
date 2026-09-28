@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
-import { MessageCircleQuestion, Stethoscope, UserRound } from 'lucide-react'
+import { MessageCircleQuestion, UserRound } from 'lucide-react'
 import IconTile from '../common/IconTile'
 import { formatDay, formatDoseTime, type Medicine } from '../../services/portal.service'
 import RefillButton from './RefillButton'
 import { askAboutUrl, formVisual, prescriberLine } from './medicineVisuals'
+import Avatar from '../common/Avatar'
 
 /**
  * One current prescription, with everything a patient asks about it.
@@ -119,8 +120,8 @@ export default function MedicineCard({
       )}
 
       <div className="mt-4 space-y-2 text-xs">
-        <p className="flex items-start gap-2 text-ink-muted">
-          <Stethoscope size={14} aria-hidden="true" className="mt-px flex-shrink-0" />
+        <p className="flex items-center gap-2 text-ink-muted">
+          <Avatar name={m.prescriber.name ?? 'Your doctor'} src={m.prescriber.photoUrl} size="xs" />
           <span className="min-w-0">
             Prescribed by <span className="font-semibold text-ink">{prescriberLine(m.prescriber)}</span>
             {m.prescriber.hospital !== null && <> · {m.prescriber.hospital}</>}

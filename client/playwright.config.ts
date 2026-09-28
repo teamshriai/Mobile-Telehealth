@@ -48,7 +48,7 @@ export default defineConfig({
       // ⚠️ `lan.spec.ts` is excluded here and runs only in the `lan` project
       // below. It needs a dev server bound to all interfaces, and every page
       // load costs one of the 60 `/auth/refresh` calls per 15 minutes.
-      testIgnore: /(lan|auth-entry|patient-portal|health-notes|medicines|reports-assistant)\.spec\.ts/,
+      testIgnore: /(lan|auth-entry|patient-portal|patient-visuals|health-notes|medicines|reports-assistant)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // The default session. Specs that need another clinician declare it
@@ -70,13 +70,18 @@ export default defineConfig({
      * spec skips itself, loudly, when there is no non-internal interface.
      */
     /**
-     * ⚠️ OPT-IN: `npm run test:e2e:auth`. The sign-in entry for every role —
-     * patient OTP (mobile + email) and password, staff password, forgot
-     * password, the staff invitation. Signs in for real, so it has no
-     * `storageState` and no `dependencies: ['setup']` — reusing a minted
-     * session would assume away the thing under test. Kept out of the default
-     * run because it spends the OTP, forgot-password and reset limiters
-     * (5 per 15 minutes each).
+     * `npm run test:e2e:auth` — run it ON ITS OWN. The sign-in page for every
+     * role: the entry page's two doors; Patient (SMS code, email + password,
+     * sign-up); Hospital (role dropdown, staff password sign-in, hospital-admin
+     * sign-up), forgot password, and a staff invitation set up through the
+     * real hospital-admin API. Signs in for real, so it has no `storageState`
+     * and no `dependencies: ['setup']` — reusing a minted session would assume
+     * away the thing under test.
+     *
+     * ⚠️ NOT actually opt-in: a plain `playwright test` runs every project,
+     * this one included, and it spends the per-IP limiters the rest of the
+     * suite needs (refresh 60, reset 5, forgot 5, register 10 per 15 min).
+     * Run projects separately — see the spec header for the per-run budget.
      */
     {
       name: 'auth',
@@ -93,7 +98,7 @@ export default defineConfig({
      */
     {
       name: 'patient',
-      testMatch: /(patient-portal|health-notes|medicines|reports-assistant)\.spec\.ts/,
+      testMatch: /(patient-portal|patient-visuals|health-notes|medicines|reports-assistant)\.spec\.ts/,
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Chrome'],

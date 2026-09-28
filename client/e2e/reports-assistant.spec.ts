@@ -198,11 +198,20 @@ test('AI chat: opens from the corner, shows a reply with its source, the 108 int
   await expect(panel).toBeHidden()
   await expect(launcher).toBeFocused()
 
-  // A source chip opens where the fact came from, and the panel gets out of the way.
+  // A source chip opens where the fact came from. Docked (1024px and up), the
+  // chat stays open beside the page it opened…
   await launcher.click()
-  await page.getByTestId('ai-chat-panel').getByTestId('source-chip').first().click()
+  const chatPanel = page.getByTestId('ai-chat-panel')
+  await expect(chatPanel).toHaveAttribute('data-docked', 'true')
+  await chatPanel.getByTestId('source-chip').first().click()
   await page.waitForURL(/\/app\/reports\?tab=labs/)
-  await expect(page.getByTestId('ai-chat-panel')).toBeHidden()
+  await expect(chatPanel).toBeVisible()
+  // …and where it covers the page (a phone), it gets out of the way.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(chatPanel).toHaveAttribute('data-docked', 'false')
+  await chatPanel.getByTestId('source-chip').first().click()
+  await expect(chatPanel).toBeHidden()
+  await page.setViewportSize({ width: 1280, height: 720 })
 
   // Not on AI Insights itself — the full view is already there.
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'AI Insights' }).click()

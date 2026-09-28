@@ -1,4 +1,5 @@
 import { AppError } from '../middleware/errorHandler';
+import { avatarUrl } from '../utils/avatarUrl';
 import { careTeamRepository, type CareTeamMemberWithDoctor } from './careteam.repository';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ function toResponseShape(m: CareTeamMemberWithDoctor) {
       qualifications: m.doctor.qualifications,
       hospitalName: m.doctor.hospitalName,
       isVerified: m.doctor.isVerified,
+      photoUrl: avatarUrl(m.doctor.profilePhoto),
     },
   };
 }

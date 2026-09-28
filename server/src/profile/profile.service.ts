@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { profileRepository } from './profile.repository';
 import type { UpdateProfileDto, UpdateHealthHistoryDto, PreferencesDto } from './profile.validator';
+import { avatarUrl } from '../utils/avatarUrl';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile Service
@@ -80,6 +81,9 @@ function toResponseShape(profile: PatientProfile) {
     occupation: profile.occupation,
 
     preferences: (profile.preferences as PreferencesDto | null) ?? {},
+
+    /** The patient's own portrait (a self-hosted URL, or null) — utils/avatarUrl. */
+    photoUrl: avatarUrl(profile.profilePhoto),
 
     // Bug fix: this was missing from the shape entirely, so GET /profile and
     // GET /auth/me (which reuses this exact shaper — see toProfileResponseShape

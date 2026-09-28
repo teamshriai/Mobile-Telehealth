@@ -25,6 +25,7 @@
     "db:demo:doses": "tsx prisma/scripts/topup-demo-doses.ts",
     "db:demo:reports": "tsx prisma/scripts/seed-reports-demo.ts",
     "db:demo:imaging": "tsx prisma/scripts/imaging/imagingDemoSeed.ts",
+    "db:demo:avatars": "tsx prisma/scripts/demo-avatars.ts",
     "db:encrypt:cancel-reasons": "tsx prisma/scripts/encrypt-cancel-reasons.ts",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",

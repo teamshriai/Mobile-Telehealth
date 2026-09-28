@@ -16,6 +16,7 @@ import MedicineCard from '../../components/medicines/MedicineCard'
 import MedicineListPrint from '../../components/medicines/MedicineListPrint'
 import { formVisual, prescriberLine } from '../../components/medicines/medicineVisuals'
 import type { ApiError } from '../../types/api'
+import Avatar from '../../components/common/Avatar'
 
 /**
  * Medicines — what the patient's doctors PRESCRIBED, and what the patient
@@ -91,9 +92,13 @@ function PastRow({ g }: { g: PastGroup }) {
           {m.frequencyInWords} · {m.routeInWords}
           {m.indication !== null && <> · for {m.indication.title}</>}
         </p>
-        <p className="mt-0.5 text-xs text-ink-subtle">
-          {ended} · {prescriberLine(m.prescriber)}
-          {g.count > 1 && <> · {g.count} courses since {portal.formatDay(g.firstStarted)}</>}
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-ink-subtle">
+          <span>{ended} ·</span>
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <Avatar name={m.prescriber.name ?? 'Your doctor'} src={m.prescriber.photoUrl} size="xs" />
+            {prescriberLine(m.prescriber)}
+          </span>
+          {g.count > 1 && <span>· {g.count} courses since {portal.formatDay(g.firstStarted)}</span>}
         </p>
       </div>
     </li>
@@ -202,8 +207,8 @@ export default function MedicinesPage() {
           <SummaryBar summary={data.summary} />
           <AiMedicineSummary hasCurrent={data.current.length > 0} />
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-            <div className="min-w-0 xl:col-start-2 xl:row-start-1">
+          <div className="grid grid-cols-1 gap-5 main-xl:grid-cols-[minmax(0,1fr)_360px] main-xl:items-start">
+            <div className="min-w-0 main-xl:col-start-2 main-xl:row-start-1">
               <TodaySchedule
                 doses={data.today}
                 asNeeded={data.current.filter((m) => m.schedule === 'as_needed')}
@@ -213,7 +218,7 @@ export default function MedicinesPage() {
               />
             </div>
 
-            <section id="current" aria-labelledby="meds-current" className="min-w-0 scroll-mt-24 space-y-3 xl:col-start-1 xl:row-start-1">
+            <section id="current" aria-labelledby="meds-current" className="min-w-0 scroll-mt-24 space-y-3 main-xl:col-start-1 main-xl:row-start-1">
               <h2 id="meds-current" className="text-lg font-semibold tracking-tight text-ink">
                 Current medicines <span className="font-normal text-ink-subtle">({data.current.length})</span>
               </h2>
@@ -222,7 +227,7 @@ export default function MedicinesPage() {
                   No current prescriptions. Your past medicines are below.
                 </p>
               ) : (
-                <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-1">
+                <ul className="grid grid-cols-1 gap-4 main-lg:grid-cols-2 main-xl:grid-cols-1">
                   {data.current.map((m) => (
                     <li key={m.id} className="min-w-0">
                       <MedicineCard medicine={m} times={timesByItem.get(m.id) ?? []} onChanged={() => void load(true)} />

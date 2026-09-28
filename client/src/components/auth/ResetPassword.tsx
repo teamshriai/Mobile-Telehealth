@@ -149,11 +149,15 @@ export default function ResetPassword() {
       await authService.resetPassword({ token, password: form.password })
       setDone(true)
       setTimeout(() => {
-        navigate('/login', {
+        // ⚠️ Set-password links go only to STAFF (an administrator created
+        // the account), so an invitation lands on the Hospital sign-in — with no
+        // role preselected: the device's remembered role may belong to
+        // whoever used this terminal last.
+        navigate(isSetup ? '/login?as=hospital' : '/login', {
           replace: true,
           state: {
             message: isSetup
-              ? 'Password set. Choose your account type and sign in with your email and new password.'
+              ? 'Password set. Choose your role and sign in with your work email and new password.'
               : 'Password reset successfully. Please sign in with your new password.',
           },
         })
@@ -235,7 +239,7 @@ export default function ResetPassword() {
                   </p>
                 </div>
                 <Link
-                  to="/forgot-password"
+                  to={isSetup ? '/forgot-password?as=hospital' : '/forgot-password'}
                   className="inline-flex items-center justify-center gap-2 w-full text-on-primary px-4 py-3 text-sm font-semibold rounded-xl shadow-md transition-all"
                   style={{ background: 'linear-gradient(90deg, var(--color-primary-600) 0%, var(--color-accent-sky-fg) 100%)' }}
                 >
@@ -243,8 +247,8 @@ export default function ResetPassword() {
                   <ArrowRight size={16} strokeWidth={2.5} />
                 </Link>
                 <Link
-                  to="/login"
-                  className="flex items-center justify-center gap-2 w-full text-sm text-ink-subtle hover:text-ink-muted transition-colors"
+                  to={isSetup ? '/login?as=hospital' : '/login'}
+                  className="flex min-h-11 items-center justify-center gap-2 w-full text-sm text-ink-subtle hover:text-ink-muted transition-colors"
                 >
                   <ArrowLeft size={15} strokeWidth={2} />
                   Back to sign in
@@ -320,7 +324,7 @@ export default function ResetPassword() {
                         onChange={handleChange}
                         placeholder="Min. 8 characters"
                         autoComplete="new-password"
-                        className={`w-full border bg-surface-1 rounded-lg pl-10 pr-10 py-2.5 text-sm text-ink placeholder:text-ink-subtle
+                        className={`w-full border bg-surface-1 rounded-lg pl-10 pr-12 py-2.5 text-sm text-ink placeholder:text-ink-subtle
                                    focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 hover:border-border
                                    ${errors.password ? 'border-critical-fg/40 focus:ring-critical-fg/40' : 'border-border-soft focus:ring-primary-600/40'}`}
                       />
@@ -328,7 +332,8 @@ export default function ResetPassword() {
                         type="button"
                         onClick={() => setShowPassword((p) => !p)}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
+                        aria-pressed={showPassword}
+                        className="focus-ring absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink-muted transition-colors"
                       >
                         {showPassword ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                       </button>
@@ -368,7 +373,7 @@ export default function ResetPassword() {
                         onChange={handleChange}
                         placeholder="Repeat your password"
                         autoComplete="new-password"
-                        className={`w-full border bg-surface-1 rounded-lg pl-10 pr-10 py-2.5 text-sm text-ink placeholder:text-ink-subtle
+                        className={`w-full border bg-surface-1 rounded-lg pl-10 pr-12 py-2.5 text-sm text-ink placeholder:text-ink-subtle
                                    focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 hover:border-border
                                    ${errors.confirmPassword ? 'border-critical-fg/40 focus:ring-critical-fg/40' : 'border-border-soft focus:ring-primary-600/40'}`}
                       />
@@ -376,7 +381,8 @@ export default function ResetPassword() {
                         type="button"
                         onClick={() => setShowConfirmPassword((p) => !p)}
                         aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
+                        aria-pressed={showConfirmPassword}
+                        className="focus-ring absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink-muted transition-colors"
                       >
                         {showConfirmPassword ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
                       </button>

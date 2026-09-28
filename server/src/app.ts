@@ -32,6 +32,7 @@ import { hospitalAdminRouter } from './hospitalAdmin/hospitalAdmin.routes';
 import { adminRouter } from './admin/admin.routes';
 import { feedbackRouter } from './feedback/feedback.routes';
 import { portalRouter } from './portal/portal.routes';
+import { trendsRouter } from './portal/trends.routes';
 import { healthNoteRouter } from './healthNote/healthNote.routes';
 import { medicationRouter } from './medication/medication.routes';
 import { imagingRouter, labsRouter, vitalsRouter } from './reports/reports.routes';
@@ -161,6 +162,7 @@ export function createApp(): Application {
   app.use('/api/v1/me/medications', medicationRouter);
   app.use('/api/v1/me/labs', labsRouter);
   app.use('/api/v1/me/vitals', vitalsRouter);
+  app.use('/api/v1/me/trends', trendsRouter);
   app.use('/api/v1/me/imaging', imagingRouter);
   app.use('/api/v1/me', portalRouter);
 

@@ -18,6 +18,8 @@ const DOCTOR_SELECT = {
   qualifications: true,
   hospitalName: true,
   isVerified: true,
+  // A KEY, not a URL — turned into one (or null) by utils/avatarUrl.
+  profilePhoto: true,
 } satisfies Prisma.DoctorProfileSelect;
 
 const MEMBER_INCLUDE = { doctor: { select: DOCTOR_SELECT } } satisfies Prisma.CareTeamMemberInclude;

@@ -144,10 +144,10 @@ export default function Settings() {
         />
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col main-lg:flex-row gap-6">
 
         {/* ── Left sidebar nav ── */}
-        <div className="lg:w-64 flex-shrink-0">
+        <div className="main-lg:w-64 flex-shrink-0">
           <Card variant="default" padding="sm">
             <nav className="space-y-1 p-2" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
               {SECTIONS.map((section) => (
@@ -382,7 +382,7 @@ function ProfileSection({ storedUser, profile }: { storedUser: DomainUser | null
 
       <Card variant="default" padding="lg">
         <div className="flex items-center gap-5">
-          <Avatar name={fullName || 'Patient'} size="xl" rounded="xl" />
+          <Avatar name={fullName || 'Patient'} src={profile?.photoUrl} size="xl" rounded="xl" />
           <div className="flex-1 min-w-0">
             <p className="text-base font-bold text-ink truncate">{fullName || 'Patient'}</p>
             <div className="mt-2 space-y-1">
@@ -409,6 +409,23 @@ function ProfileSection({ storedUser, profile }: { storedUser: DomainUser | null
         </button>{' '}
         page — everything you enter there is stored encrypted.
       </p>
+
+      {/* Said plainly, so no one mistakes a demo face for a real person. The
+          demo accounts' portraits are AI-generated — see public/avatars/CREDITS.md. */}
+      {profile?.photoUrl && (
+        <p className="text-xs text-ink-subtle" data-testid="portrait-credit">
+          Demo portraits are AI-generated images of people who do not exist, made with{' '}
+          <a
+            href="https://huggingface.co/black-forest-labs/FLUX.1-schnell"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="font-medium text-primary-700 hover:underline"
+          >
+            FLUX.1 [schnell]
+          </a>{' '}
+          (Apache 2.0).
+        </p>
+      )}
     </div>
   )
 }
@@ -592,7 +609,7 @@ function NotificationsSection({ storedUser, profile, onSave }: PreferenceSection
         <SettingsRow icon={Bell} label="Lab Results Available" sub="When new results are ready to view"
           tone="success"
           control={<ToggleSwitch enabled={settings.labResults} onToggle={() => toggle('labResults')} />} />
-        <SettingsRow icon={Bell} label="AI Insights Generated" sub="When new AI recommendations are ready"
+        <SettingsRow icon={Bell} label="Assistant insights" sub="Short reminders from your record beside the AI chat button"
           tone="primary"
           control={<ToggleSwitch enabled={settings.aiInsights} onToggle={() => toggle('aiInsights')} />} />
         <SettingsRow icon={Bell} label="Report Reviews" sub="When a physician reviews your report"

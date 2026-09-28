@@ -7,6 +7,7 @@ import { useToast } from '../common/useToast'
 import * as portal from '../../services/portal.service'
 import type { Medicine } from '../../services/portal.service'
 import type { ApiError } from '../../types/api'
+import Avatar from '../common/Avatar'
 
 /**
  * Refill — a REQUEST, never a prescription.
@@ -70,8 +71,13 @@ export default function RefillButton({ medicine: m, onChanged }: { medicine: Med
 
   if (r?.status === 'Forwarded') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-info-bg px-2.5 py-1 text-xs font-semibold text-info-fg">
-        <Send size={13} aria-hidden="true" /> Refill request sent to {r.forwardedToName ?? 'your doctor'}
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-info-bg py-1 pl-1 pr-2.5 text-xs font-semibold text-info-fg">
+        {r.forwardedToName !== null ? (
+          <Avatar name={r.forwardedToName} src={r.forwardedToPhotoUrl} size="xs" />
+        ) : (
+          <Send size={13} aria-hidden="true" className="ml-1.5" />
+        )}
+        Refill request sent to {r.forwardedToName ?? 'your doctor'}
       </span>
     )
   }

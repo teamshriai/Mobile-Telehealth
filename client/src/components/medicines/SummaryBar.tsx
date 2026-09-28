@@ -4,6 +4,7 @@ import { Activity, ListChecks, Pill, RefreshCcw, ShieldAlert } from 'lucide-reac
 import IconTile from '../common/IconTile'
 import type { IconTone } from '../common/iconTones'
 import { formatDoseTime, type MedicinesSummary } from '../../services/portal.service'
+import Avatar from '../common/Avatar'
 
 /**
  * The four numbers a patient checks first, and the allergy they reported.
@@ -51,16 +52,26 @@ function Meter({ value, max, tone }: { value: number; max: number; tone: 'green'
 
 export default function SummaryBar({ summary }: { summary: MedicinesSummary }) {
   const { today, adherence30: a } = summary
+  const prescribers = summary.prescribers ?? summary.doctors.map((name) => ({ name, photoUrl: null }))
   const doctors =
-    summary.doctors.length === 0
-      ? 'No current prescriptions'
-      : summary.doctors.length === 1
-        ? `Prescribed by ${summary.doctors[0]}`
-        : `From ${summary.doctors.length} doctors`
+    prescribers.length === 0 ? (
+      'No current prescriptions'
+    ) : (
+      <span className="flex items-center gap-1.5">
+        <span className="flex flex-shrink-0 -space-x-1.5">
+          {prescribers.slice(0, 3).map((p) => (
+            <Avatar key={p.name} name={p.name} src={p.photoUrl} size="xs" className="rounded-full ring-2 ring-surface-1" />
+          ))}
+        </span>
+        <span className="min-w-0">
+          {prescribers.length === 1 ? `Prescribed by ${prescribers[0].name}` : `From ${prescribers.length} doctors`}
+        </span>
+      </span>
+    )
 
   return (
     <section aria-label="Your medicines at a glance" className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 main-lg:grid-cols-4">
         <Tile
           icon={Pill}
           tone="blue"

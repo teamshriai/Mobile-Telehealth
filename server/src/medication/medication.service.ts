@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { auditService, AuditAction, AuditSeverity } from '../services/audit.service';
 import { decryptFieldOptional } from '../utils/encryption';
+import { avatarUrl } from '../utils/avatarUrl';
 import { requireOwnPatientId } from '../portal/ownPatient';
 import {
   loadSignedPrescriptions,
@@ -61,7 +62,12 @@ export interface MedicineView extends MedicationView {
   drugClass: string | null;
   /** What it was prescribed for, from the linked diagnosis. */
   indication: { code: string; title: string } | null;
-  prescriber: { name: string | null; specialty: string | null; hospital: string | null };
+  prescriber: {
+    name: string | null;
+    specialty: string | null;
+    hospital: string | null;
+    photoUrl: string | null;
+  };
   schedule: ScheduleKind;
   /** Days of supply left on a current course (0 on its last day). */
   supplyDaysLeft: number | null;
@@ -89,6 +95,8 @@ export interface MedicinesSummary {
   currentCount: number;
   pastCount: number;
   doctors: string[];
+  /** The same doctors, with their portraits — for "Prescribed by …" lines. */
+  prescribers: Array<{ name: string; photoUrl: string | null }>;
   /** `remaining`: still ahead or due now. `notMarked`: past its window, not yet
    *  tapped — it can still be marked for two days. */
   today: { taken: number; skipped: number; total: number; remaining: number; notMarked: number };
@@ -134,7 +142,6 @@ async function load(
   await refillService.autoFulfil(patientId);
 
   const rx = await loadSignedPrescriptions(patientId);
-  const views = toMedications(rx, now);
 
   const signerIds = [
     ...new Set(rx.map((p) => p.signedByUserId).filter((v): v is string => v !== null)),
@@ -146,9 +153,13 @@ async function load(
       specialty: true,
       hospitalName: true,
       hospital: { select: { name: true } },
+      // A KEY, not a URL — turned into one (or null) by utils/avatarUrl.
+      profilePhoto: true,
     },
   });
   const doctorByUser = new Map(doctors.map((d) => [d.userId, d]));
+  const photos = new Map(doctors.map((d) => [d.userId, avatarUrl(d.profilePhoto)]));
+  const views = toMedications(rx, now, rx, photos);
 
   const codes = [
     ...new Set(
@@ -201,6 +212,7 @@ async function load(
         name: v.prescribedBy,
         specialty: doctor?.specialty ?? null,
         hospital: doctor?.hospital?.name ?? doctor?.hospitalName ?? null,
+        photoUrl: v.prescribedByPhotoUrl,
       },
       schedule: kind,
       // Calendar days after today (India time) to the last day covered; 0 on it.
@@ -250,7 +262,108 @@ function todayDoses(medicines: MedicineView[], logs: LogIndex, now: Date): Today
   return out.sort((a, b) => a.at.getTime() - b.at.getTime() || a.name.localeCompare(b.name));
 }
 
+/** One India-time day of the dose log, for the Home chart. */
+export interface DayDoses {
+  /** YYYY-MM-DD, India time. */
+  date: string;
+  due: number;
+  taken: number;
+  skipped: number;
+  /** Due, but not marked either way — "not marked", never "missed". */
+  notMarked: number;
+}
+
+/**
+ * Per-day "doses you marked as taken", for the Home chart.
+ *
+ * Same rules as the 30-day figure: India days, today left out (a dose not yet
+ * tapped this morning is not a missed dose), scheduled and weekly courses only
+ * (an as-needed medicine has no "due").
+ *
+ * ⚠️ READ-ONLY. It deliberately does not go through load(), which also closes
+ * refill requests a newer prescription has answered — a chart must never write.
+ */
+async function dosesByDay(patientId: string, now: Date, days: number): Promise<DayDoses[]> {
+  const rx = await loadSignedPrescriptions(patientId);
+  const views = toMedications(rx, now);
+  const { start } = istDayBounds(now);
+  const from = new Date(start.getTime() - days * DAY);
+  const logs = await loadLogs(patientId, new Date(from.getTime() - 2 * DAY));
+
+  const byDay = new Map<number, { due: number; taken: number; skipped: number }>();
+  for (const v of views) {
+    const kind = scheduleKind(v.frequency);
+    if (kind !== 'scheduled' && kind !== 'weekly') continue;
+    const course = {
+      frequency: v.frequency,
+      startedAt: v.startedAt,
+      durationDays: v.durationDays,
+      replacedAt: v.replacedAt,
+    };
+    const map = statusMap(logs.get(v.id));
+    for (const at of doseSlots(course, from, start)) {
+      const state = slotState(at, map.get(at.getTime()) ?? null, now);
+      const day = istDayNumber(at);
+      const b = byDay.get(day) ?? { due: 0, taken: 0, skipped: 0 };
+      b.due += 1;
+      if (state === 'taken') b.taken += 1;
+      else if (state === 'skipped') b.skipped += 1;
+      byDay.set(day, b);
+    }
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([day, b]) => ({
+      // A day number is a count of India-time days, so day × 24 h is that
+      // day's midnight on a UTC clock — its ISO date is the India date.
+      date: new Date(day * DAY).toISOString().slice(0, 10),
+      due: b.due,
+      taken: b.taken,
+      skipped: b.skipped,
+      notMarked: b.due - b.taken - b.skipped,
+    }));
+}
+
+/**
+ * Today's doses of the patient's current medicines — when each is, and how it
+ * stands — for the short reminders beside the AI chat button.
+ *
+ * ⚠️ READ-ONLY, like dosesByDay: not through load(), which writes.
+ */
+export async function todaysDoseTimes(
+  patientId: string,
+  now: Date,
+): Promise<Array<{ at: Date; state: SlotState }>> {
+  const rx = await loadSignedPrescriptions(patientId);
+  const { start, end } = istDayBounds(now);
+  const logs = await loadLogs(patientId, start);
+  const out: Array<{ at: Date; state: SlotState }> = [];
+  for (const v of toMedications(rx, now)) {
+    if (v.status !== 'current') continue;
+    const course = {
+      frequency: v.frequency,
+      startedAt: v.startedAt,
+      durationDays: v.durationDays,
+      replacedAt: v.replacedAt,
+    };
+    const map = statusMap(logs.get(v.id));
+    for (const at of doseSlots(course, start, end))
+      out.push({ at, state: slotState(at, map.get(at.getTime()) ?? null, now) });
+  }
+  return out.sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
 export const medicationService = {
+  /** See dosesByDay — the patient's own, resolved from the session. */
+  async dosesByDay(
+    userId: string,
+    now = new Date(),
+    days = ADHERENCE_WINDOW_DAYS,
+  ): Promise<DayDoses[]> {
+    const patientId = await requireOwnPatientId(userId);
+    return dosesByDay(patientId, now, Math.min(Math.max(Math.trunc(days), 1), 90));
+  },
+
   async overview(userId: string, now = new Date()) {
     const patientId = await requireOwnPatientId(userId);
     const [{ medicines, logs }, profile] = await Promise.all([
@@ -298,6 +411,16 @@ export const medicationService = {
       currentCount: current.length,
       pastCount: past.length,
       doctors: [...new Set(current.map((m) => m.prescriber.name).filter((n): n is string => !!n))],
+      prescribers: [
+        ...new Map(
+          current
+            .filter((m) => !!m.prescriber.name)
+            .map((m) => [
+              m.prescriber.name as string,
+              { name: m.prescriber.name as string, photoUrl: m.prescriber.photoUrl },
+            ]),
+        ).values(),
+      ],
       today: {
         taken: today.filter((d) => d.state === 'taken').length,
         skipped: today.filter((d) => d.state === 'skipped').length,

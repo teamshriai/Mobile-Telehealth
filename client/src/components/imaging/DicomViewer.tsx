@@ -476,6 +476,7 @@ export default function DicomViewer({
       aria-label={`Image viewer — ${title}. Press question mark for keyboard shortcuts.`}
       data-testid="dicom-viewer"
       data-state={status}
+      data-fullscreen={fullscreen}
       className={`focus-ring @container flex min-w-0 flex-col overflow-hidden bg-[#0A0D12] text-neutral-200 outline-none ${
         fullscreen ? 'fixed inset-0 z-50 rounded-none' : 'rounded-2xl'
       }`}

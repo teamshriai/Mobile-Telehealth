@@ -26,7 +26,7 @@ export default function PatientBottomNav({ onOpenMenu }: { onOpenMenu: () => voi
   return (
     <nav
       aria-label="Quick navigation"
-      className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-border-soft bg-surface-1/95 backdrop-blur md:hidden"
+      className="patient-bottom-nav safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-border-soft bg-surface-1/95 backdrop-blur md:hidden"
     >
       <ul className="mx-auto flex max-w-md items-stretch gap-1 px-2 pt-1">
         <li className="flex flex-1">

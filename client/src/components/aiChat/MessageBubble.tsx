@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
-import { Phone, Sparkles } from 'lucide-react'
+import { Phone } from 'lucide-react'
+import AssistantMark from './AssistantMark'
 import type { AiMessage } from '../../types/domain'
 import ReplyText from './ReplyText'
 import { MODEL_WRAP, TURN_STYLE } from './turnStyles'
@@ -38,7 +39,7 @@ export default function MessageBubble({
             special ? special.iconClass : 'bg-accent-sky text-accent-sky-fg'
           }`}
         >
-          {special ? <special.icon size={13} /> : <Sparkles size={13} />}
+          {special ? <special.icon size={13} /> : <AssistantMark size={18} />}
         </span>
       )}
 

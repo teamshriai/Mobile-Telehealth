@@ -64,8 +64,13 @@ export interface MeResponse {
 }
 
 /**
- * Register a new account for one of the three self-registering roles
- * (Patient / Doctor / HospitalAdmin — Admin stays seed/ops-created only).
+ * Register a new account. The sign-up screen offers two kinds: Patient and
+ * HospitalAdmin (26 Sep 2026) — doctors and other staff are added by their
+ * hospital administrator, and Admin stays seed/ops-created only.
+ *
+ * ⚠️ The server's schema still accepts `role: 'Doctor'`: the product owner
+ * chose a frontend-only change, and that open risk is recorded. The screen is
+ * not the gate; do not rely on it as one.
  *
  * The form carries `confirmPassword`, which is client-only and rejected by
  * the backend schema — stripped here rather than in the component.

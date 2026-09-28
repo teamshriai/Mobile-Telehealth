@@ -47,7 +47,7 @@ function ResultRow({ r, history }: { r: LabResult; history: History[] }) {
       <td className="py-2.5 pr-3 text-sm text-ink-muted">{r.unit ?? ''}</td>
       <td className="py-2.5 pr-3 text-sm text-ink-muted tabular-nums">{r.referenceRange ?? '—'}</td>
       <td className="py-2.5 pr-3"><FlagChip flag={r.flag} /></td>
-      <td className="hidden py-2 lg:table-cell">
+      <td className="hidden py-2 main-lg:table-cell">
         {history.length > 1 && (
           <span className="flex items-center gap-2">
             <Sparkline series={[history.map((h) => h.value)]} band={{ low: r.referenceLow, high: r.referenceHigh }} width={72} height={22} />
@@ -131,7 +131,7 @@ export default function LabResultsPanel({ reports }: { reports: LabReport[] }) {
                 </header>
 
                 {/* Desktop: a table, as printed. */}
-                <div className="hidden px-5 pb-2 md:block">
+                <div className="hidden px-5 pb-2 main-md:block">
                   <table className="w-full table-fixed">
                     <colgroup>
                       <col className="w-[30%]" />
@@ -139,7 +139,7 @@ export default function LabResultsPanel({ reports }: { reports: LabReport[] }) {
                       <col className="w-[11%]" />
                       <col className="w-[20%]" />
                       <col className="w-[10%]" />
-                      <col className="hidden w-[18%] lg:table-column" />
+                      <col className="hidden w-[18%] main-lg:table-column" />
                     </colgroup>
                     <thead>
                       <tr className="text-left text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
@@ -148,7 +148,7 @@ export default function LabResultsPanel({ reports }: { reports: LabReport[] }) {
                         <th scope="col" className="py-2 pr-3">Unit</th>
                         <th scope="col" className="py-2 pr-3">Reference range</th>
                         <th scope="col" className="py-2 pr-3">Flag</th>
-                        <th scope="col" className="hidden py-2 lg:table-cell"><span className="sr-only">Trend</span></th>
+                        <th scope="col" className="hidden py-2 main-lg:table-cell"><span className="sr-only">Trend</span></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -157,7 +157,7 @@ export default function LabResultsPanel({ reports }: { reports: LabReport[] }) {
                   </table>
                 </div>
                 {/* Phones: one result per row. */}
-                <ul className="divide-y divide-border-soft px-4 md:hidden">
+                <ul className="divide-y divide-border-soft px-4 main-md:hidden">
                   {rep.results.map((r) => <ResultCard key={r.id} r={r} history={historyUpTo(r.analyteCode, rep.collectedAt)} />)}
                 </ul>
 

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Video, MapPin, CalendarPlus, ArrowRight } from 'lucide-react'
+import { Video, MapPin, CalendarPlus, ArrowRight, Calendar } from 'lucide-react'
 import type { Appointment } from '../../types/domain'
 import MiniCalendar from '../appointments/MiniCalendar'
 import { dayKey } from '../appointments/calendarDays'
 import CalendarDayPanel from './CalendarDayPanel'
+import Avatar from '../common/Avatar'
+import SectionHeading from './SectionHeading'
 
 /**
  * The next appointment, given real prominence.
@@ -59,9 +61,9 @@ export default function UpcomingAppointment({
     // than a real appointment gets, which reads as a broken layout.
     return (
       <section aria-labelledby="next-heading" className="flex h-full flex-col">
-        <h2 id="next-heading" className="text-sm font-semibold text-ink">
+        <SectionHeading id="next-heading" icon={Calendar} tone="orange">
           Your next appointment
-        </h2>
+        </SectionHeading>
         <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <span
@@ -104,9 +106,9 @@ export default function UpcomingAppointment({
   return (
     <section aria-labelledby="next-heading" className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="next-heading" className="text-sm font-semibold text-ink">
+        <SectionHeading id="next-heading" icon={Calendar} tone="orange">
           Your next appointment
-        </h2>
+        </SectionHeading>
         <Link
           to="/app/appointments"
           className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-primary-700 hover:underline"
@@ -115,36 +117,42 @@ export default function UpcomingAppointment({
         </Link>
       </div>
 
-      <div className="mt-3.5 flex flex-1 flex-col gap-5 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5 lg:flex-row lg:items-start">
+      <div className="mt-3.5 flex flex-1 flex-col gap-5 rounded-xl border border-border bg-surface-1 p-4 shadow-card sm:p-5 main-lg:flex-row main-lg:items-start">
         <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-center">
           {/* Calendar block — a date is read as a date faster than as prose. */}
           <div
             aria-hidden="true"
-            className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-primary-50"
+            className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-tile-blue shadow-card"
           >
-            <span className="text-2xs font-semibold uppercase tracking-wide text-primary-700">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-tile-blue-fg/85">
               {MONTHS[when.getMonth()]}
             </span>
-            <span className="text-2xl font-semibold leading-none text-ink">
+            <span className="text-2xl font-semibold leading-none text-tile-blue-fg">
               {when.getDate()}
             </span>
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-base font-semibold text-ink">
-                {appointment.doctor?.name ?? 'Your clinician'}
-              </p>
-              {relative && (
-                <span className="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
-                  {relative}
-                </span>
+            <div className="flex items-center gap-3">
+              {appointment.doctor && (
+                <Avatar name={appointment.doctor.name} src={appointment.doctor.photoUrl} size="lg" />
               )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold text-ink">
+                    {appointment.doctor?.name ?? 'Your clinician'}
+                  </p>
+                  {relative && (
+                    <span className="rounded-md bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
+                      {relative}
+                    </span>
+                  )}
+                </div>
+                {appointment.doctor?.specialty && (
+                  <p className="mt-0.5 text-sm text-ink-subtle">{appointment.doctor.specialty}</p>
+                )}
+              </div>
             </div>
-
-            {appointment.doctor?.specialty && (
-              <p className="mt-0.5 text-sm text-ink-subtle">{appointment.doctor.specialty}</p>
-            )}
 
             {/* Date and time spelled out for screen readers, since the
                 calendar block above is aria-hidden. */}
@@ -166,7 +174,7 @@ export default function UpcomingAppointment({
 
         {/* The month at a glance, every upcoming visit marked. Opens on the
             month of the next appointment. */}
-        <div className="border-t border-border-soft pt-4 lg:w-64 lg:flex-shrink-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+        <div className="border-t border-border-soft pt-4 main-lg:w-64 main-lg:flex-shrink-0 main-lg:border-l main-lg:border-t-0 main-lg:pl-5 main-lg:pt-0">
           <MiniCalendar
             compact
             label="Your upcoming appointments"

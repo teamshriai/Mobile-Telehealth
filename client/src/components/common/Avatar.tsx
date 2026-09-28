@@ -1,52 +1,77 @@
+import { useState } from 'react'
+
 /**
- * Avatar component
- * Supports initials, gradient backgrounds, sizes, status indicators
+ * A person's portrait, or their initials when there is no photo.
+ *
+ * ⚠️ DECORATIVE BY DEFAULT. An avatar almost always sits beside the person's
+ * visible name, so the image has `alt=""` and the initials are hidden from
+ * assistive technology — otherwise every name is read out twice. Pass
+ * `labelled` only where the avatar stands alone.
+ *
+ * Initials skip honorifics: "Dr. Anitha Selvam" is "AS", not "DA" (before, the
+ * "D" of "Dr." was the first letter of every doctor). The fill is one of the
+ * fixed tile colours with white text, chosen from the WHOLE name, so it keeps
+ * its contrast in dark mode and different people get different colours.
+ *
+ * `src` is a URL the server has already vetted (utils/avatarUrl). If it fails
+ * to load, the initials take its place rather than a broken image.
  */
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
 export type AvatarStatus = 'online' | 'away' | 'busy' | 'offline'
 
-const SIZES: Record<AvatarSize, { container: string; text: string }> = {
-  xs:  { container: 'w-6 h-6',   text: 'text-[9px]' },
-  sm:  { container: 'w-8 h-8',   text: 'text-[10px]' },
-  md:  { container: 'w-10 h-10', text: 'text-xs' },
-  lg:  { container: 'w-12 h-12', text: 'text-sm' },
-  xl:  { container: 'w-16 h-16', text: 'text-base' },
-  '2xl':{ container: 'w-20 h-20', text: 'text-xl' },
-  '3xl':{ container: 'w-24 h-24', text: 'text-2xl' },
+const SIZES: Record<AvatarSize, { box: string; px: number; text: string }> = {
+  xs: { box: 'h-6 w-6', px: 24, text: 'text-[10px]' },
+  sm: { box: 'h-8 w-8', px: 32, text: 'text-[11px]' },
+  md: { box: 'h-10 w-10', px: 40, text: 'text-xs' },
+  lg: { box: 'h-12 w-12', px: 48, text: 'text-sm' },
+  xl: { box: 'h-16 w-16', px: 64, text: 'text-base' },
+  '2xl': { box: 'h-20 w-20', px: 80, text: 'text-xl' },
+  '3xl': { box: 'h-24 w-24', px: 96, text: 'text-2xl' },
 }
 
 const STATUS_COLORS: Record<AvatarStatus, string> = {
-  online:  'bg-success-fg',
-  away:    'bg-warning-fg',
-  busy:    'bg-danger',
+  online: 'bg-success-fg',
+  away: 'bg-warning-fg',
+  busy: 'bg-danger',
   offline: 'bg-border-strong',
 }
 
-/* Generate a consistent gradient from a string */
-const getGradient = (name = ''): string => {
-  const gradients = [
-    'linear-gradient(135deg, var(--color-accent-sky-fg), var(--color-primary-500))',
-    'linear-gradient(135deg, var(--color-therapy-fg), var(--color-accent-clay-fg))',
-    'linear-gradient(135deg, var(--color-accent-teal-fg), var(--color-success-fg))',
-    'linear-gradient(135deg, var(--color-accent-sand-fg), var(--color-warning-fg))',
-    'linear-gradient(135deg, var(--color-accent-clay-fg), var(--color-critical-fg))',
-    'linear-gradient(135deg, var(--color-info-fg), var(--color-accent-sky-fg))',
-  ]
-  // '' .charCodeAt(0) is NaN, so an empty/falsy name (the default prop value)
-  // previously indexed gradients[NaN] -> undefined -> no background at all.
-  // Falling back to a fixed gradient keeps every avatar visually valid.
-  const code = name ? name.charCodeAt(0) : 0
-  const index = code % gradients.length
-  return gradients[index] as string
+/** Fixed fills that hold white text in both themes. Amber is left out: Home
+ *  uses it for allergies. */
+const FILLS = ['bg-tile-blue', 'bg-tile-teal', 'bg-tile-violet'] as const
+
+const HONORIFIC = /^(dr|prof|mr|mrs|ms|miss|smt|shri|sri)\.?$/i
+
+function firstGrapheme(word: string): string {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    const first = new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(word)[Symbol.iterator]().next()
+    if (!first.done) return first.value.segment
+  }
+  return Array.from(word)[0] ?? ''
+}
+
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => w !== '' && !HONORIFIC.test(w))
+  if (words.length === 0) return '?'
+  const picked = words.length === 1 ? [words[0]] : [words[0], words[words.length - 1]]
+  return picked.map(firstGrapheme).join('').toUpperCase()
+}
+
+function fillFor(name: string): string {
+  let hash = 0
+  for (const ch of name.trim().toLowerCase()) hash = (hash * 31 + ch.codePointAt(0)!) >>> 0
+  return FILLS[hash % FILLS.length]
 }
 
 export interface AvatarProps {
   name?: string
-  src?: string
+  src?: string | null
   size?: AvatarSize
   status?: AvatarStatus
   rounded?: 'full' | 'xl'
+  /** Announce the name — only where no visible name sits beside the avatar. */
+  labelled?: boolean
   className?: string
 }
 
@@ -56,51 +81,47 @@ export default function Avatar({
   size = 'md',
   status,
   rounded = 'full',
+  labelled = false,
   className = '',
 }: AvatarProps) {
-  const initials = name
-    ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : '?'
-
-  const { container, text } = SIZES[size] || SIZES.md
-
-  const radiusClass = rounded === 'full' ? 'rounded-full' : 'rounded-xl'
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const { box, px, text } = SIZES[size] ?? SIZES.md
+  const radius = rounded === 'full' ? 'rounded-full' : 'rounded-xl'
+  const showImage = typeof src === 'string' && src !== '' && failedSrc !== src
 
   return (
-    <div className={`relative inline-flex flex-shrink-0 ${className}`}>
-      {src ? (
-        /* Image avatar */
+    <span
+      data-print="hide"
+      className={`relative inline-flex flex-shrink-0 ${className}`}
+      role={labelled && !showImage ? 'img' : undefined}
+      aria-label={labelled && !showImage ? name : undefined}
+    >
+      {showImage ? (
         <img
           src={src}
-          alt={name}
-          className={`${container} ${radiusClass} object-cover`}
+          alt={labelled ? name : ''}
+          width={px}
+          height={px}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailedSrc(src)}
+          className={`${box} ${radius} bg-surface-2 object-cover ring-1 ring-border-soft`}
         />
       ) : (
-        /* Initials avatar */
-        <div
-          className={`
-            ${container} ${radiusClass}
-            flex items-center justify-center
-            text-on-primary font-bold select-none
-            ${text}
-          `}
-          style={{ background: getGradient(name) }}
+        <span
+          aria-hidden="true"
+          className={`${box} ${radius} ${fillFor(name)} ${text} flex select-none items-center justify-center font-bold text-white`}
         >
-          {initials}
-        </div>
+          {initialsOf(name)}
+        </span>
       )}
 
-      {/* Status indicator */}
       {status && (
         <span
-          className={`
-            absolute bottom-0 right-0
-            w-2.5 h-2.5 rounded-full
-            border-2 border-surface-1
-            ${STATUS_COLORS[status] || STATUS_COLORS.offline}
-          `}
+          aria-hidden="true"
+          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-surface-1 ${STATUS_COLORS[status] || STATUS_COLORS.offline}`}
         />
       )}
-    </div>
+    </span>
   )
 }

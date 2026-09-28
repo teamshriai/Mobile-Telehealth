@@ -44,11 +44,11 @@ test.describe('anonymous', () => {
     // clinician lands where they were going after signing in.
     await page.waitForURL(/\/login/, { timeout: 30_000 })
     // ⚠️ `/login` with no `?as=` is the entry page ("Who are you?"), so the
-    // guard's redirect lands on the three doors — not on a form that would
-    // assume which kind of account the person has.
+    // guard's redirect lands on the two doors — Patient and Hospital — not on
+    // a form that would assume which kind of account the person has.
     await expect(page.getByTestId('entry-patient')).toBeVisible()
-    await expect(page.getByTestId('entry-clinician')).toBeVisible()
     await expect(page.getByTestId('entry-hospital')).toBeVisible()
+    await expect(page.locator('[data-testid^="entry-"]')).toHaveCount(2)
 
     // ⚠️ And no clinical surface leaked on the way past. A guard that redirects
     // *after* painting the shell has still shown a patient banner to someone

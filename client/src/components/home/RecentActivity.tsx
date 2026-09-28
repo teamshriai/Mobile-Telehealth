@@ -1,6 +1,7 @@
 import { Calendar, FileText, Users, Pill, Bell } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { Notification, NotificationType } from '../../types/domain'
+import SectionHeading from './SectionHeading'
 
 /**
  * Recent activity — a real timeline, built from real notification records.
@@ -38,9 +39,9 @@ export default function RecentActivity({ notifications = [] }: { notifications?:
 
   return (
     <section aria-labelledby="activity-heading" className="flex h-full flex-col">
-      <h2 id="activity-heading" className="text-sm font-semibold text-ink">
+      <SectionHeading id="activity-heading" icon={Bell} tone="blue">
         Recent activity
-      </h2>
+      </SectionHeading>
 
       {/* Solid blue panel — the same "logistics/updates" meaning as the
           appointments stat tile, so this reads as one system rather than a

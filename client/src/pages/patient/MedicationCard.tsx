@@ -1,6 +1,7 @@
 import { Pill } from 'lucide-react'
 import SourceBadge from '../../components/common/SourceBadge'
 import { formatDay, type Medication } from '../../services/portal.service'
+import Avatar from '../../components/common/Avatar'
 
 /**
  * One signed prescription item, in words a patient reads.
@@ -47,6 +48,7 @@ export default function MedicationCard({ m }: { m: Medication }) {
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Avatar name={m.prescribedBy ?? 'Your doctor'} src={m.prescribedByPhotoUrl} size="xs" />
             <SourceBadge kind="clinician" by={m.prescribedBy} detail={m.rxNumber} />
           </div>
         </div>

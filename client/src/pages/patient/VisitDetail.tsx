@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from '../../components/feedback/States'
 import SourceBadge from '../../components/common/SourceBadge'
 import MedicationCard from './MedicationCard'
 import type { ApiError } from '../../types/api'
+import Avatar from '../../components/common/Avatar'
 
 /**
  * A signed visit, as the patient sees it: who, when, where, what was decided.
@@ -69,12 +70,15 @@ export default function VisitDetail() {
             <h2 id="visit-who" className="flex items-center gap-1.5 text-sm font-semibold text-ink">
               <Stethoscope size={15} aria-hidden="true" /> Seen by
             </h2>
-            <ul className="mt-2 space-y-1">
+            <ul className="mt-2 space-y-2">
               {visit.seenBy.map((s, idx) => (
-                <li key={idx} className="text-sm text-ink">
-                  {s.name ?? 'Your clinician'}
-                  {s.registrationNumber !== null && <span className="text-ink-subtle"> · Reg. {s.registrationNumber}</span>}
-                  {s.signedAt !== null && <span className="text-ink-subtle"> · signed {portal.formatDay(s.signedAt)}</span>}
+                <li key={idx} className="flex items-center gap-2.5 text-sm text-ink">
+                  <Avatar name={s.name ?? 'Your clinician'} src={s.photoUrl} size="md" />
+                  <span className="min-w-0">
+                    {s.name ?? 'Your clinician'}
+                    {s.registrationNumber !== null && <span className="text-ink-subtle"> · Reg. {s.registrationNumber}</span>}
+                    {s.signedAt !== null && <span className="text-ink-subtle"> · signed {portal.formatDay(s.signedAt)}</span>}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -104,7 +108,7 @@ export default function VisitDetail() {
             {visit.medications.length === 0 ? (
               <p className="text-sm text-ink-muted">No medicines were prescribed at this visit.</p>
             ) : (
-              <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 main-lg:grid-cols-2">
                 {visit.medications.map((m) => <li key={m.id}><MedicationCard m={m} /></li>)}
               </ul>
             )}
@@ -121,6 +125,7 @@ export default function VisitDetail() {
                     <p className="text-sm font-semibold text-ink" lang={i.language}>{i.title}</p>
                     <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm text-ink-muted" lang={i.language}>{i.body}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Avatar name={i.issuedByName} src={i.issuedByPhotoUrl} size="xs" />
                       <SourceBadge kind="clinician" by={i.issuedByName} />
                       <Link to="/app/health?tab=instructions" className="focus-ring rounded text-xs font-medium text-primary-700 hover:underline">
                         Read in full

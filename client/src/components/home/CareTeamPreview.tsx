@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, UserPlus } from 'lucide-react'
+import { ArrowRight, UserPlus, Users } from 'lucide-react'
+import { tintedSurface } from '../common/iconTones'
 import Avatar from '../common/Avatar'
 import type { CareTeamMember } from '../../types/domain'
+import SectionHeading from './SectionHeading'
 
 /**
  * A compact view of who is actually looking after this patient.
@@ -18,9 +20,9 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
   return (
     <section aria-labelledby="careteam-heading" className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="careteam-heading" className="text-sm font-semibold text-ink">
+        <SectionHeading id="careteam-heading" icon={Users} tone="green">
           My doctors
-        </h2>
+        </SectionHeading>
         {careTeam.length > 0 && (
           <Link
             to="/app/my-doctors"
@@ -31,7 +33,7 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
         )}
       </div>
 
-      <div className="mt-3.5 flex-1 rounded-xl border border-border bg-surface-1 p-4 shadow-card">
+      <div className="mt-3.5 flex-1 rounded-xl border bg-surface-1 p-4 shadow-card" style={tintedSurface('green', 0.045)}>
         {members.length === 0 ? (
           <div className="flex flex-col items-center py-6 text-center">
             <span
@@ -48,7 +50,7 @@ export default function CareTeamPreview({ careTeam = [] }: { careTeam?: CareTeam
           <ul className="space-y-3">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-3">
-                <Avatar name={m.doctor?.name ?? '?'} size="sm" />
+                <Avatar name={m.doctor?.name ?? '?'} src={m.doctor?.photoUrl} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <p className="truncate text-sm font-semibold text-ink">

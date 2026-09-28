@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, LogOut, ChevronDown, Siren } from 'lucide-react'
@@ -21,6 +21,7 @@ import PatientBottomNav from './PatientBottomNav'
 import ChatLauncher from '../aiChat/ChatLauncher'
 import IconTile from '../common/IconTile'
 import { TONE_HEX } from '../common/iconTones'
+import Avatar from '../common/Avatar'
 
 /**
  * The one authenticated shell, for every portal.
@@ -221,7 +222,7 @@ function NavDrawer({ open, onClose, portal, role }: NavDrawerProps) {
 }
 
 function AccountMenu({ portal }: { portal: PortalDescriptor }) {
-  const { user, logout } = useAuth()
+  const { user, logout, profile } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -232,6 +233,9 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
   useDismissable({ open, onClose: close, triggerRef, panelRef })
 
   const displayName = user?.name ?? user?.email ?? 'Your account'
+  // Only the PATIENT profile carries a vetted `photoUrl` (server: utils/avatarUrl);
+  // a clinician's raw `profilePhoto` is never rendered.
+  const photoUrl = profile !== null && 'photoUrl' in profile ? (profile.photoUrl ?? null) : null
   const initials = (user?.name ?? user?.email ?? '?')
     .split(/[\s@.]+/)
     .filter(Boolean)
@@ -253,14 +257,19 @@ function AccountMenu({ portal }: { portal: PortalDescriptor }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={`Account menu, ${displayName}`}
         className="focus-ring flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-2"
       >
-        <span
-          aria-hidden="true"
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-bold text-primary-700"
-        >
-          {initials}
-        </span>
+        {photoUrl !== null ? (
+          <Avatar name={displayName} src={photoUrl} size="sm" />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-bold text-primary-700"
+          >
+            {initials}
+          </span>
+        )}
         <span className="hidden min-w-0 max-w-[160px] truncate text-sm font-medium text-ink sm:block">
           {displayName}
         </span>
@@ -336,6 +345,38 @@ export default function AppShell(): ReactNode {
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
   useEffect(() => { closeDrawer() }, [location.pathname, closeDrawer])
 
+  // The patient's docked AI chat starts where this header ends (index.css,
+  // DOCKED AI CHAT). The header grows with the offline strip, the banners and
+  // the text size, so its height is measured rather than assumed.
+  const headerRef = useRef<HTMLElement>(null)
+  const isPatient = role === 'Patient'
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!isPatient || el === null) return undefined
+    const root = document.documentElement
+    const write = (): void => {
+      root.style.setProperty('--app-header-h', `${el.getBoundingClientRect().height}px`)
+    }
+    write()
+    const observer = new ResizeObserver(write)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty('--app-header-h')
+    }
+  }, [isPatient])
+
+  // A patient page opens at its top. The router keeps the window's scroll
+  // position otherwise, so the end of a long Home opened Medicines halfway
+  // down — and with the chat docked, its links change the page beside it. A
+  // link to an anchor (#…) is left to scroll to that anchor.
+  const lastPath = useRef(location.pathname)
+  useEffect(() => {
+    if (lastPath.current === location.pathname) return
+    lastPath.current = location.pathname
+    if (isPatient && location.hash === '') window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [location.pathname, location.hash, isPatient])
+
   useEffect(() => { document.title = `${title} · SHRI HEALTH` }, [title])
 
   // The emergency destination stays reachable in one tap at every width. On a
@@ -358,7 +399,7 @@ export default function AppShell(): ReactNode {
     >
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      <header className="sticky top-0 z-30 border-b border-border-soft bg-surface-1/95 backdrop-blur">
+      <header ref={headerRef} className="sticky top-0 z-30 border-b border-border-soft bg-surface-1/95 backdrop-blur">
         {/* Tighter gaps below 360px: at 320 the five controls ran 6px past
             the edge. The controls keep their 44px targets; only the air goes. */}
         <div className="flex h-16 items-center gap-1.5 px-4 min-[360px]:gap-2.5 sm:px-6">
@@ -460,9 +501,11 @@ export default function AppShell(): ReactNode {
       <NavDrawer open={drawerOpen} onClose={closeDrawer} portal={portal} role={role} />
 
       <main id="main-content" tabIndex={-1} className="overflow-x-hidden">
-        {/* Bottom padding clears the patient phone bar, which is fixed. */}
+        {/* Bottom padding clears the patient phone bar, which is fixed.
+            `app-content` becomes the `main` size container while the AI chat
+            is docked, so pages lay out for the width they actually have. */}
         <div
-          className={`mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 ${
+          className={`app-content mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 ${
             role === 'Patient' ? 'pb-28 md:pb-6' : ''
           }`}
         >

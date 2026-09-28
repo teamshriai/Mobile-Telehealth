@@ -18,3 +18,20 @@ export const TONE_HEX: Record<IconTone, string> = {
   indigo: '#5856D6',
   gray: '#8E8E93',
 }
+
+/** A tone at low strength, for a surface tinted in a destination's colour. */
+export function toneTint(tone: IconTone, alpha: number): string {
+  const hex = TONE_HEX[tone]
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+/**
+ * Inline style for a card tinted in a tone: the tint is LAYERED over the
+ * element's own surface colour (keep a `bg-surface-*` class on it), so it is
+ * an opaque, theme-aware tint rather than see-through to the page behind.
+ */
+export function tintedSurface(tone: IconTone, alpha = 0.08): { backgroundImage: string; borderColor: string } {
+  const tint = toneTint(tone, alpha)
+  return { backgroundImage: `linear-gradient(${tint}, ${tint})`, borderColor: toneTint(tone, Math.min(alpha * 3.5, 0.45)) }
+}

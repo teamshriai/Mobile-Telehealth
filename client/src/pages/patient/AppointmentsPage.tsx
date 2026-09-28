@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calendar, Video, Phone, MapPin, Clock, X, Plus, Stethoscope, CalendarClock, Camera } from 'lucide-react'
+import { Calendar, Video, Phone, MapPin, Clock, X, Plus, CalendarClock, Camera } from 'lucide-react'
 import Modal from '../../components/common/Modal'
 import ConfirmDialog from '../../components/common/ConfirmDialog'
 import SlotPicker from '../../components/appointments/SlotPicker'
+import DoctorPicker from '../../components/appointments/DoctorPicker'
+import BookingConfirmation from '../../components/appointments/BookingConfirmation'
+import Avatar from '../../components/common/Avatar'
 import DeviceCheck from '../../components/appointments/DeviceCheck'
 import MiniCalendar from '../../components/appointments/MiniCalendar'
 import { dayKey } from '../../components/appointments/calendarDays'
@@ -77,10 +80,12 @@ function AppointmentCard({ appointment, onCancel, onReschedule, onCheckDevices, 
           </p>
 
           {appointment.doctor && (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-muted">
-              <Stethoscope size={14} aria-hidden="true" />
-              {appointment.doctor.name}
-              {appointment.doctor.specialty && ` — ${appointment.doctor.specialty}`}
+            <p className="mt-2 flex items-center gap-2 text-sm text-ink-muted">
+              <Avatar name={appointment.doctor.name} src={appointment.doctor.photoUrl} size="sm" />
+              <span className="min-w-0">
+                {appointment.doctor.name}
+                {appointment.doctor.specialty && ` — ${appointment.doctor.specialty}`}
+              </span>
             </p>
           )}
 
@@ -225,21 +230,12 @@ function BookingForm({ doctors, initialDoctorId, onSubmit, onClose, submitting, 
       )}
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="appt-doctor" className="mb-1.5 block text-sm font-medium text-ink">
-            Clinician <span className="font-normal text-ink-subtle">(optional)</span>
-          </label>
-          <select
-            id="appt-doctor"
+        <div className="sm:col-span-2">
+          <DoctorPicker
+            doctors={doctors}
             value={doctorId}
-            onChange={(e) => { setDoctorId(e.target.value); setSlot(null) }}
-            className="focus-ring w-full rounded-lg border border-border bg-surface-1 px-3 py-2.5 text-sm text-ink"
-          >
-            <option value="">No preference — the hospital will assign a doctor</option>
-            {doctors.map((d) => (
-              <option key={d.id} value={d.id}>{d.name} — {d.specialty}</option>
-            ))}
-          </select>
+            onChange={(id) => { setDoctorId(id); setSlot(null) }}
+          />
         </div>
 
         <div>
@@ -365,6 +361,8 @@ export default function AppointmentsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  // The request the patient just sent — shown as "Request sent" until closed.
+  const [justBooked, setJustBooked] = useState<Appointment | null>(null)
 
   const load = useCallback((nextScope: AppointmentScope) => {
     setLoading(true)
@@ -403,8 +401,9 @@ export default function AppointmentsPage() {
     setSubmitting(true)
     setFormError(null)
     try {
-      await appointmentService.requestAppointment(payload)
+      const booked = await appointmentService.requestAppointment(payload)
       setShowForm(false)
+      setJustBooked(booked)
       await load(scope === 'upcoming' ? 'upcoming' : scope)
       if (scope !== 'upcoming') setScope('upcoming')
     } catch (err) {
@@ -473,7 +472,7 @@ export default function AppointmentsPage() {
         </div>
         <button
           type="button"
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => { setJustBooked(null); setShowForm((v) => !v) }}
           className="focus-ring tap-target inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-on-primary hover:bg-primary-700"
         >
           <Plus size={16} aria-hidden="true" />
@@ -482,6 +481,10 @@ export default function AppointmentsPage() {
       </div>
 
       {notice !== null && <Banner tone="success">{notice}</Banner>}
+
+      {justBooked !== null && !showForm && (
+        <BookingConfirmation appointment={justBooked} onDone={() => setJustBooked(null)} />
+      )}
 
       {showForm && (
         <BookingForm
@@ -512,10 +515,10 @@ export default function AppointmentsPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[18rem_1fr]">
+      <div className="grid grid-cols-1 items-start gap-5 main-lg:grid-cols-[18rem_1fr]">
         {/* The calendar reflects the tab you are on; tap a day to show only
             that day's visits, tap it again to show them all. */}
-        <div className="rounded-xl border border-border-soft bg-surface-1 p-4 lg:sticky lg:top-36">
+        <div className="rounded-xl border border-border-soft bg-surface-1 p-4 main-lg:sticky main-lg:top-36">
           <MiniCalendar
             label={scope === 'upcoming' ? 'Upcoming appointments' : 'Past appointments'}
             marks={appointments
@@ -609,12 +612,17 @@ export default function AppointmentsPage() {
       >
         {toMove !== null && (
           <div className="space-y-4">
-            <p className="text-sm text-ink-muted">
-              {toMove.doctor !== null
-                ? `Choose a new time with ${toMove.doctor.name}.`
-                : 'Choose a new preferred time.'}{' '}
-              This sends a reschedule request; the hospital confirms it after checking the doctor’s availability.
-            </p>
+            <div className="flex items-start gap-3">
+              {toMove.doctor !== null && (
+                <Avatar name={toMove.doctor.name} src={toMove.doctor.photoUrl} size="md" />
+              )}
+              <p className="text-sm text-ink-muted">
+                {toMove.doctor !== null
+                  ? `Choose a new time with ${toMove.doctor.name}.`
+                  : 'Choose a new preferred time.'}{' '}
+                This sends a reschedule request; the hospital confirms it after checking the doctor’s availability.
+              </p>
+            </div>
             {toMove.doctor !== null ? (
               <SlotPicker doctorId={toMove.doctor.id} value={newSlot} onChange={setNewSlot} excludeInstant={toMove.scheduledAt} />
             ) : (

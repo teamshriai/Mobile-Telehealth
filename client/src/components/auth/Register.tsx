@@ -1,5 +1,5 @@
-import { useState, type ChangeEvent, type ComponentType, type FormEvent, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -14,17 +14,19 @@ import {
   Check,
   Shield,
   HeartPulse,
-  Stethoscope,
   Building2,
+  Info,
 } from 'lucide-react'
 import { useAuth } from '../../app/useAuth'
 import BrandMark from '../common/BrandMark'
 import AuthShell from './AuthShell'
-import type { RoleName } from '../../types/domain'
 import type { ApiError } from '../../types/api'
 
+/** The only kinds of account that can be created here. */
+type SelfSignUpRole = 'Patient' | 'HospitalAdmin'
+
 interface RoleOption {
-  value: RoleName
+  value: SelfSignUpRole
   label: string
   icon: ComponentType<{ size?: number; strokeWidth?: number }>
   description: string
@@ -32,9 +34,17 @@ interface RoleOption {
 
 /**
  * The role-selection step. Presented before the identity form so
- * registration branches into the right onboarding path from the start,
- * rather than defaulting everyone to Patient. Admin is deliberately absent
- * — the global Admin role stays seed/ops-created only, never self-service.
+ * registration branches into the right onboarding path from the start.
+ *
+ * ⚠️ PATIENTS AND HOSPITAL ADMINISTRATORS ONLY (26 Sep 2026). Doctors,
+ * residents, nurses and lab staff do not create their own accounts: their
+ * hospital administrator adds them (Add team member) and they set a password
+ * from the emailed link. The global Admin role stays seed/ops-created only.
+ *
+ * ⚠️ THIS SCREEN IS NOT THE GATE. The server's /auth/register still accepts
+ * `role: 'Doctor'` — the product owner chose a frontend-only change on 26 Sep
+ * 2026, and that open risk is recorded with the decision. Do not describe
+ * Doctor sign-up as "impossible" anywhere until the server refuses it.
  */
 const ROLE_OPTIONS: RoleOption[] = [
   {
@@ -44,24 +54,28 @@ const ROLE_OPTIONS: RoleOption[] = [
     description: 'Book visits, track your health, and message your care team.',
   },
   {
-    value: 'Doctor',
-    label: 'Doctor',
-    icon: Stethoscope,
-    description: 'Manage your patients, availability, and clinical schedule.',
-  },
-  {
     value: 'HospitalAdmin',
     label: 'Hospital Administrator',
     icon: Building2,
-    description: "Manage your hospital's doctors, patients and operations.",
+    description: 'Register your hospital, then add your doctors and staff.',
   },
 ]
 
-/** The sign-in door for each kind of account. */
-const SIGN_IN_FOR: Record<string, string> = {
+/** The sign-in screen for each kind of account. */
+const SIGN_IN_FOR: Record<SelfSignUpRole, string> = {
   Patient: '/login?as=patient',
-  Doctor: '/login?as=clinician',
-  HospitalAdmin: '/login?as=hospital',
+  HospitalAdmin: '/login?as=hospital&role=hospital-admin',
+}
+
+/**
+ * `?as=patient` / `?as=hospital` — sent from the sign-in screens — open the form
+ * with that kind of account already chosen. Exactly these two values: the old
+ * `clinician` door must NOT land on the hospital-administrator form.
+ */
+function presetRole(raw: string | null): SelfSignUpRole | null {
+  if (raw === 'patient') return 'Patient'
+  if (raw === 'hospital') return 'HospitalAdmin'
+  return null
 }
 
 const fadeIn = {
@@ -99,7 +113,7 @@ const getPasswordStrength = (password: string): PasswordStrength => {
 }
 
 interface RegisterForm {
-  role: RoleName | ''
+  role: SelfSignUpRole | ''
   firstName: string
   lastName: string
   email: string
@@ -124,10 +138,12 @@ interface RegisterErrors {
 
 export default function Register() {
   const navigate = useNavigate()
-  const { register, loading, error: authError } = useAuth()
-  const [step, setStep] = useState<'role' | 'form'>('role')
+  const [params] = useSearchParams()
+  const { register, loading, error: authError, clearError } = useAuth()
+  const [preset] = useState(() => presetRole(params.get('as')))
+  const [step, setStep] = useState<'role' | 'form'>(preset === null ? 'role' : 'form')
   const [form, setForm] = useState<RegisterForm>({
-    role: '',
+    role: preset ?? '',
     firstName: '',
     lastName: '',
     email: '',
@@ -142,9 +158,24 @@ export default function Register() {
   const [errors, setErrors] = useState<RegisterErrors>({})
   const [successBanner, setSuccessBanner] = useState('')
 
+  // A sign-in error left on the shared auth context (a wrong password a
+  // moment ago) must not greet the sign-up form; once, on arrival.
+  const clearErrorOnArrival = useRef(clearError)
+  useEffect(() => {
+    clearErrorOnArrival.current()
+    document.title = 'Create an account · SHRI HEALTH'
+  }, [])
+
+  // ⚠️ Cancelled on unmount. RequireAnonymous usually moves a newly
+  // registered user on before this fires; left running, the timer would
+  // later yank them to /onboarding from wherever they had gone — found when
+  // a sign-out within the second landed back on the wrong screen.
+  const onboardingRedirect = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(onboardingRedirect.current), [])
+
   const selectedRole = ROLE_OPTIONS.find((r) => r.value === form.role)
 
-  const chooseRole = (value: RoleName) => {
+  const chooseRole = (value: SelfSignUpRole) => {
     setForm((prev) => ({ ...prev, role: value }))
     setStep('form')
   }
@@ -232,7 +263,7 @@ export default function Register() {
         dateOfBirth: form.dateOfBirth,
         phoneNumber: form.phoneNumber,
         password: form.password,
-        role: form.role as RoleName,
+        role: form.role === '' ? 'Patient' : form.role,
         agreed: form.agreed,
       })
       if (result.success) {
@@ -246,7 +277,7 @@ export default function Register() {
         setSuccessBanner("Account created. Let's finish setting up your profile…")
         window.scrollTo({ top: 0, behavior: 'smooth' })
 
-        setTimeout(() => {
+        onboardingRedirect.current = window.setTimeout(() => {
           navigate('/onboarding', { replace: true })
         }, 900)
         return
@@ -289,15 +320,16 @@ export default function Register() {
               We'll set up the right kind of account and onboarding for you.
             </p>
 
-            <div role="radiogroup" aria-label="Account type" className="mt-6 space-y-3">
+            {/* ⚠️ Buttons, not radios: choosing one moves straight on to the
+                form, and a radio that changes the screen when selected breaks
+                what a keyboard or screen-reader user expects of a radio. */}
+            <ul aria-label="Account type" className="mt-6 space-y-3">
               {ROLE_OPTIONS.map((option, index) => {
                 const Icon = option.icon
                 return (
+                  <li key={option.value}>
                   <motion.button
-                    key={option.value}
                     type="button"
-                    role="radio"
-                    aria-checked={form.role === option.value}
                     custom={index}
                     variants={fadeIn}
                     initial="initial"
@@ -315,11 +347,27 @@ export default function Register() {
                     <ArrowRight
                       size={16}
                       strokeWidth={2}
+                      aria-hidden="true"
                       className="text-ink-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-primary-700"
                     />
                   </motion.button>
+                  </li>
                 )
               })}
+            </ul>
+
+            <div
+              data-testid="staff-signup-note"
+              className="mt-4 flex items-start gap-2.5 rounded-lg border border-border-soft bg-surface-2 px-4 py-3 text-xs leading-relaxed text-ink-muted"
+            >
+              <Info size={15} strokeWidth={2} aria-hidden="true" className="mt-px flex-shrink-0 text-primary-700" />
+              <p>
+                Doctor, nurse or other hospital staff? You don&rsquo;t sign up here &mdash; your hospital
+                administrator creates your account and emails you a link to set your password.{' '}
+                <Link to="/login?as=hospital" className="focus-ring rounded font-semibold text-primary-700 hover:underline">
+                  Hospital sign in
+                </Link>
+              </p>
             </div>
 
             <p className="mt-6 text-center text-xs sm:text-sm text-ink-muted">
@@ -369,21 +417,19 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setStep('role')}
-                className="focus-ring mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-2xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                className="focus-ring tap-reach mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-2xs font-medium text-primary-700 transition-colors hover:bg-primary-100"
               >
                 <ArrowLeft size={11} strokeWidth={2.5} />
                 {selectedRole?.label ?? 'Change account type'}
               </button>
 
-              <h2 className="text-2xl font-semibold tracking-tight text-ink">
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">
                 Create your account
-              </h2>
+              </h1>
               <p className="mt-2 text-sm text-ink-muted">
-                {form.role === 'Doctor'
-                  ? 'Set up your clinician profile'
-                  : form.role === 'HospitalAdmin'
-                    ? "Set up your hospital's account"
-                    : 'Get started with your healthcare journey'}
+                {form.role === 'HospitalAdmin'
+                  ? "Set up your hospital's account"
+                  : 'Get started with your healthcare journey'}
               </p>
             </div>
 
@@ -516,7 +562,7 @@ export default function Register() {
                     autoComplete="tel-national"
                     aria-invalid={errors.phoneNumber ? 'true' : undefined}
                     aria-describedby="register-phoneNumber-hint"
-                    className={`w-full border bg-surface-1 rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
+                    className={`min-h-11 w-full border bg-surface-1 rounded-lg pl-24 sm:pl-28 pr-4 py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-surface-1 transition-all duration-200 hover:border-border
@@ -560,7 +606,7 @@ export default function Register() {
                     autoComplete="new-password"
                     aria-invalid={errors.password ? 'true' : undefined}
                     aria-describedby={errors.password ? 'register-password-error' : undefined}
-                    className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
+                    className={`min-h-11 w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-12 py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-surface-1 transition-all duration-200 hover:border-border
@@ -573,7 +619,8 @@ export default function Register() {
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
+                    aria-pressed={showPassword}
+                    className="focus-ring absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink-muted transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -632,7 +679,7 @@ export default function Register() {
                     autoComplete="new-password"
                     aria-invalid={errors.confirmPassword ? 'true' : undefined}
                     aria-describedby={errors.confirmPassword ? 'register-confirmPassword-error' : undefined}
-                    className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-10 py-2 sm:py-2.5
+                    className={`min-h-11 w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-[4.5rem] py-2 sm:py-2.5
                                text-sm text-ink placeholder:text-ink-subtle
                                focus:outline-none focus:ring-2 focus:border-transparent
                                focus:bg-surface-1 transition-all duration-200 hover:border-border
@@ -645,7 +692,8 @@ export default function Register() {
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink-muted transition-colors"
+                    aria-pressed={showConfirmPassword}
+                    className="focus-ring absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink-muted transition-colors"
                   >
                     {showConfirmPassword ? (
                       <EyeOff size={16} strokeWidth={2} />
@@ -657,7 +705,7 @@ export default function Register() {
                   {form.confirmPassword &&
                     form.password === form.confirmPassword &&
                     !errors.confirmPassword && (
-                      <div className="absolute right-11 top-1/2 -translate-y-1/2">
+                      <div className="pointer-events-none absolute right-12 top-1/2 -translate-y-1/2">
                         <Check size={16} className="text-success-fg" strokeWidth={2.5} />
                       </div>
                     )}
@@ -731,7 +779,7 @@ export default function Register() {
                 disabled={loading}
                 whileHover={{ scale: loading ? 1 : 1.01 }}
                 whileTap={{ scale: loading ? 1 : 0.99 }}
-                className="group relative w-full text-on-primary px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-full
+                className="group relative min-h-11 w-full text-on-primary px-4 py-2.5 sm:py-2.5 lg:py-3 text-sm font-semibold rounded-full
                            transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed
                            flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:opacity-90 mt-1"
                 style={{ background: loading ? 'var(--color-ink-subtle)' : 'var(--color-primary-600)' }}
@@ -761,7 +809,7 @@ export default function Register() {
             >
               Already have an account?{' '}
               <Link
-                to={SIGN_IN_FOR[form.role] ?? '/login'}
+                to={form.role === '' ? '/login' : SIGN_IN_FOR[form.role]}
                 className="font-semibold hover:opacity-80 transition-opacity text-primary-700"
               >
                 Sign in
@@ -836,7 +884,7 @@ function InputField({
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={error ? errorId : undefined}
           {...inputProps}
-          className={`w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
+          className={`min-h-11 w-full border bg-surface-1 rounded-lg pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5
                      text-sm text-ink placeholder:text-ink-subtle
                      focus:outline-none focus:ring-2 focus:border-transparent
                      focus:bg-surface-1 transition-all duration-200 hover:border-border

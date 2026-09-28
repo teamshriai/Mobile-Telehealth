@@ -3,13 +3,14 @@ import {
   type FormEvent, type KeyboardEvent,
 } from 'react'
 import {
-  Sparkles, Send, Plus, MessageSquare, Trash2, Info, X, PanelLeft,
+  Send, Plus, MessageSquare, Trash2, Info, X, PanelLeft,
   Search, Pencil, Check, Copy, ArrowDown,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import * as aiService from '../../services/ai.service'
 import { Banner, Spinner } from '../../components/feedback/States'
 import MessageBubble from '../../components/aiChat/MessageBubble'
+import AssistantMark from '../../components/aiChat/AssistantMark'
 import { CHAT_SUGGESTIONS } from '../../components/aiChat/suggestions'
 import type { AiConversationSummary, AiMessage } from '../../types/domain'
 import type { ApiError } from '../../types/api'
@@ -569,7 +570,7 @@ export default function AiInsightsPage() {
               aria-hidden="true"
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-accent-sky text-accent-sky-fg"
             >
-              <Sparkles size={14} />
+              <AssistantMark size={18} />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">
@@ -609,7 +610,7 @@ export default function AiInsightsPage() {
                   aria-hidden="true"
                   className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-accent-sky text-accent-sky-fg"
                 >
-                  <Sparkles size={20} />
+                  <AssistantMark size={28} />
                 </span>
                 <p className="text-sm font-semibold text-ink">What would you like to know?</p>
                 <p className="mt-1 max-w-sm text-xs text-ink-subtle">

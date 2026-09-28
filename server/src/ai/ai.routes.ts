@@ -5,6 +5,7 @@ import {
   sendMessage,
   renameConversation,
   deleteConversation,
+  getInsights,
 } from './ai.controller';
 import { authenticate } from '../middleware/authenticate';
 import { requirePermission } from '../middleware/authorize';
@@ -26,6 +27,7 @@ import { Permission } from '../config/permissions';
 const router = Router();
 const canUse = requirePermission(Permission.AiInsightsUseOwn);
 
+router.get('/insights', authenticate, canUse, getInsights);
 router.get('/conversations', authenticate, canUse, listConversations);
 router.post('/messages', authenticate, canUse, sendMessage);
 router.get('/conversations/:id', authenticate, canUse, getConversation);

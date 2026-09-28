@@ -1,13 +1,21 @@
+import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Building2, CheckCircle, HeartPulse, Shield, Stethoscope } from 'lucide-react'
+import { ArrowRight, CheckCircle, HeartPulse, Hospital, Shield } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import BrandMark from '../common/BrandMark'
 import AuthShell from './AuthShell'
 import { AUDIENCE_COPY, type Audience } from './audience'
 
 /**
- * "Who are you?" — the entry to SHRI HEALTH.
+ * "Who are you?" — the entry to SHRI HEALTH: two doors, Patient and Hospital.
+ *
+ * Patient opens the patient sign-in (mobile number or email + password, and
+ * sign-up). Hospital opens the hospital sign-in, which asks "Which role
+ * defines you best?" — doctor, resident, nurse, lab technician, hospital or
+ * platform administrator — before the work email and password (26 Sep 2026;
+ * before that there were three doors: Patient, Doctor/Clinician, Hospital
+ * Administrator).
  *
  * ⚠️ A DOOR, NOT A ROLE CLAIM. Choosing a card changes which sign-in method
  * and wording follow; it is never sent to the server. The account's own role
@@ -22,8 +30,7 @@ import { AUDIENCE_COPY, type Audience } from './audience'
 
 const CARDS: Array<{ audience: Audience; icon: LucideIcon }> = [
   { audience: 'patient', icon: HeartPulse },
-  { audience: 'clinician', icon: Stethoscope },
-  { audience: 'hospital', icon: Building2 },
+  { audience: 'hospital', icon: Hospital },
 ]
 
 interface EntryLocationState {
@@ -36,9 +43,14 @@ export default function EntryPage() {
   const location = useLocation()
   const state = (location.state ?? null) as EntryLocationState | null
 
+  // The last portal's title would otherwise linger after signing out.
+  useEffect(() => {
+    document.title = 'Sign in · SHRI HEALTH'
+  }, [])
+
   return (
     <AuthShell>
-      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-5xl flex-col justify-center px-4 py-10 sm:px-6">
+      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-4xl flex-col justify-center px-4 py-10 sm:px-6">
         <div className="mb-8 flex items-center gap-2.5">
           <BrandMark size={18} />
           <span className="text-sm font-semibold tracking-[0.06em] text-ink">SHRI HEALTH</span>
@@ -64,7 +76,7 @@ export default function EntryPage() {
           Choose how you use SHRI HEALTH to sign in.
         </p>
 
-        <ul className="mt-8 grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-4">
+        <ul className="mt-8 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
           {CARDS.map(({ audience, icon: Icon }, i) => {
             const copy = AUDIENCE_COPY[audience]
             return (
@@ -79,7 +91,7 @@ export default function EntryPage() {
                   to={`/login?as=${audience}`}
                   state={state ?? undefined}
                   data-testid={`entry-${audience}`}
-                  className="focus-ring group flex w-full items-start gap-4 rounded-xl border border-border-soft bg-surface-1 p-5 shadow-card-sm transition-colors hover:border-primary-600/50 lg:flex-col lg:gap-5 lg:p-6"
+                  className="focus-ring group flex w-full items-start gap-4 rounded-xl border border-border-soft bg-surface-1 p-5 shadow-card-sm transition-colors hover:border-primary-600/50 md:flex-col md:gap-5 md:p-6"
                 >
                   <span
                     aria-hidden="true"
@@ -90,7 +102,7 @@ export default function EntryPage() {
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-base font-semibold text-ink">{copy.title}</span>
                     <span className="mt-1 text-sm leading-relaxed text-ink-muted">{copy.blurb}</span>
-                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 lg:mt-auto lg:pt-5">
+                    <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 md:mt-auto md:pt-5">
                       Sign in
                       <ArrowRight size={15} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" />
                     </span>

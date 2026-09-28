@@ -8,6 +8,7 @@ import { useAuth } from '../app/useAuth'
 import { LoadingState, ErrorState, EmptyState, Banner } from '../components/feedback/States'
 import type { PatientProfile } from '../types/domain'
 import type { ApiError } from '../types/api'
+import Avatar from '../components/common/Avatar'
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 14 },
@@ -282,6 +283,9 @@ export default function Profile() {
         >
           {/* ── Identity header ── */}
           <div className="flex flex-col gap-4 border-b border-border-soft bg-surface-2 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
+            {profile.photoUrl ? (
+              <Avatar name={fullName || 'Patient'} src={profile.photoUrl} size="2xl" className="shadow-card" />
+            ) : (
             <div
               aria-hidden="true"
               className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full text-xl font-bold text-on-primary shadow-card sm:h-20 sm:w-20 sm:text-2xl"
@@ -292,6 +296,7 @@ export default function Profile() {
             >
               {initials || <User size={26} />}
             </div>
+            )}
 
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-lg font-semibold text-ink sm:text-xl">
@@ -427,7 +432,7 @@ function FieldGroup({ title, icon: Icon, last, children }: FieldGroupProps) {
       </h3>
       {/* Widens with the viewport so the form uses the space the layout gives
           it rather than leaving half the row empty on a desktop. */}
-      <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 main-lg:grid-cols-3 main-2xl:grid-cols-4">
         {children}
       </div>
     </section>

@@ -20,6 +20,8 @@ const PUBLIC_SELECT = {
   hospitalName: true,
   yearsExperience: true,
   isVerified: true,
+  // A KEY, not a URL — turned into one (or null) by utils/avatarUrl.
+  profilePhoto: true,
 } satisfies Prisma.DoctorProfileSelect;
 
 export type PublicDoctor = Prisma.DoctorProfileGetPayload<{ select: typeof PUBLIC_SELECT }>;

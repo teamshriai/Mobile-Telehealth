@@ -6,7 +6,13 @@
  */
 
 import apiClient from '../lib/apiClient'
-import type { AiConversation, AiConversationSummary, AiMessage } from '../types/domain'
+import type { AiConversation, AiConversationSummary, AiInsight, AiMessage } from '../types/domain'
+
+/** The reminders for the bubble beside the chat button. `enabled` is false when
+ *  the patient turned "Assistant insights" off in Settings. */
+export async function getInsights(): Promise<{ enabled: boolean; insights: AiInsight[] }> {
+  return apiClient.get<{ enabled: boolean; insights: AiInsight[] }>('/ai/insights')
+}
 
 export async function listConversations(): Promise<AiConversationSummary[]> {
   const { conversations } = await apiClient.get<{ conversations: AiConversationSummary[] }>(

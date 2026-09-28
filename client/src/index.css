@@ -195,6 +195,15 @@
   --color-tile-violet:    #6A4E9E;  --color-tile-violet-fg: #FFFFFF; /* care team / people — 6.6:1 */
   --color-tile-amber:     #8F5F32;  --color-tile-amber-fg:  #FFFFFF; /* allergy / attention — 5.5:1 */
 
+  /* ── Chart lines ───────────────────────────────────────────────────────
+     Two series at most (blood pressure's two numbers). Validated as a pair
+     with the dataviz palette checker — colour-blind separation, chroma,
+     lightness band and ≥3:1 against the surface — in BOTH themes; the dark
+     steps are their own values, not an automatic flip. Identity never rests
+     on colour alone: every chart also has a legend, end labels and a table. */
+  --color-chart-1: #2563EB;
+  --color-chart-2: #EB6834;
+
   /* ── Type scale ────────────────────────────────────────────────────────
      One step larger than a typical consumer app. The stroke population
      includes visual-field loss and post-stroke fatigue; 12px secondary text
@@ -329,6 +338,9 @@
   --color-accent-sand:    #2A2519;  --color-accent-sand-fg: #D7BE86;
   --color-accent-clay:    #2E211C;  --color-accent-clay-fg: #DBA895;
   --color-accent-sage:    #1F2A1D;  --color-accent-sage-fg: #A9C79F;
+
+  --color-chart-1: #5B8FE8;
+  --color-chart-2: #D95926;
 
   /* Non-optional. The light shadows are rgba(15,23,42,0.04) — over #1D232D
      that is literally invisible, which would leave cards with no separation
@@ -817,5 +829,110 @@ html[data-high-contrast='true']:root.dark {
     --color-surface-1: #fff;
     --color-surface-2: #fff;
     --color-border-soft: #999;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOCKED AI CHAT
+   ───────────────────────────────────────────────────────────────────────────
+   From 64rem (1024px) the patient's AI chat opens as a full-height column on
+   the right, below the header, and the page makes room for it — nothing sits
+   underneath (ChatLauncher sets `data-chat-docked` on <html> while it is
+   docked). Deliberately UNLAYERED, like PRINT above: these must beat the
+   Tailwind utilities they adjust.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* `main-md` / `main-lg` / `main-xl` — the page-layout breakpoints.
+   UNDOCKED they ARE the screen breakpoints (md 48rem, lg 64rem, xl 80rem), so
+   the layout is exactly what it always was. DOCKED they ask the content column
+   instead (the `main` container, which exists only then), at the width that
+   column has on those screens today: the screen less its 3rem of padding —
+   45rem, 61rem, 77rem. So a page reflows to the space it actually has. */
+@custom-variant main-md {
+  @media (width >= 48rem) {
+    :root:not([data-chat-docked='true']) & { @slot; }
+  }
+  @container main (width >= 45rem) {
+    :root[data-chat-docked='true'] & { @slot; }
+  }
+}
+@custom-variant main-lg {
+  @media (width >= 64rem) {
+    :root:not([data-chat-docked='true']) & { @slot; }
+  }
+  @container main (width >= 61rem) {
+    :root[data-chat-docked='true'] & { @slot; }
+  }
+}
+@custom-variant main-xl {
+  @media (width >= 80rem) {
+    :root:not([data-chat-docked='true']) & { @slot; }
+  }
+  @container main (width >= 77rem) {
+    :root[data-chat-docked='true'] & { @slot; }
+  }
+}
+/* From 80rem the column is at its 1280px cap (77rem inside the padding), so a
+   96rem screen gives it no more room than an 80rem one: docked, 2xl is the cap. */
+@custom-variant main-2xl {
+  @media (width >= 96rem) {
+    :root:not([data-chat-docked='true']) & { @slot; }
+  }
+  @container main (width >= 77rem) {
+    :root[data-chat-docked='true'] & { @slot; }
+  }
+}
+
+:root {
+  --chat-dock-w: clamp(20rem, 30vw, 25rem);
+  /* Replaced by the header's measured height (AppShell); this is its size
+     below 1024px, so nothing is ever positioned against an unset value. */
+  --app-header-h: 4.0625rem;
+}
+
+/* A modal's scroll lock removes the scrollbar; without a reserved gutter the
+   page and the docked column would jump sideways every time one opens. */
+html {
+  scrollbar-gutter: stable;
+}
+
+@media (width >= 64rem) {
+  :root[data-chat-docked='true'] #main-content {
+    padding-right: var(--chat-dock-w);
+  }
+  /* The container exists ONLY while docked: containment re-anchors `fixed`
+     descendants, so it is never applied when it is not needed (and page
+     overlays are portalled to <body> for the same reason). */
+  :root[data-chat-docked='true'] .app-content {
+    container: main / inline-size;
+  }
+  /* …except while something in the page fills the screen itself (the scan
+     viewer's full screen, where the browser has no native one): a container
+     would hold it inside the column. */
+  :root[data-chat-docked='true'] .app-content:has([data-fullscreen='true']) {
+    container: none;
+  }
+  /* Bottom-right messages move left of the column instead of covering its
+     question box. */
+  :root[data-chat-docked='true'] .toast-region,
+  :root[data-chat-docked='true'] .idle-warning {
+    right: calc(var(--chat-dock-w) + 1rem);
+  }
+}
+
+/* While the chat is open on a phone it reaches the bottom of the screen, and
+   the patient's quick bar would sit on its question box. */
+:root[data-chat-open='true'] .patient-bottom-nav {
+  display: none;
+}
+
+@keyframes dockIn {
+  from { opacity: 0; transform: translateX(1rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media print {
+  :root[data-chat-docked='true'] #main-content {
+    padding-right: 0 !important;
   }
 }

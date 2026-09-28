@@ -5,6 +5,7 @@ import * as careTeamService from '../../services/careteam.service'
 import { LoadingState, EmptyState, ErrorState } from '../../components/feedback/States'
 import type { CareTeamMember } from '../../types/domain'
 import type { ApiError } from '../../types/api'
+import Avatar from '../../components/common/Avatar'
 
 /**
  * My Care Team — real data from GET /care-team.
@@ -52,9 +53,10 @@ export default function CareTeamPage() {
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {members.map((m) => (
-            <li key={m.id} className="rounded-xl border border-border-soft bg-surface-1 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+            <li key={m.id} data-testid="care-team-member" className="rounded-xl border border-border-soft bg-surface-1 p-4">
+              <div className="flex items-start gap-3">
+                <Avatar name={m.doctor.name} src={m.doctor.photoUrl} size="xl" />
+                <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                     {m.doctor.name}
                     {m.isPrimary && (

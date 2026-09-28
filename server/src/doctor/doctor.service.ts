@@ -1,3 +1,4 @@
+import { avatarUrl } from '../utils/avatarUrl';
 import { doctorRepository, type PublicDoctor } from './doctor.repository';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ function toResponseShape(d: PublicDoctor) {
     qualifications: d.qualifications,
     hospitalName: d.hospitalName,
     yearsExperience: d.yearsExperience,
+    photoUrl: avatarUrl(d.profilePhoto),
   };
 }
 

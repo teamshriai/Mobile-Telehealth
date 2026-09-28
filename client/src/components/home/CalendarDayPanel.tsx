@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin, Phone, Video } from 'lucide-react'
 import type { Appointment } from '../../types/domain'
 import { dayKey } from '../appointments/calendarDays'
+import Avatar from '../common/Avatar'
 
 /**
  * What is booked on the day picked in the Home calendar — the same question
@@ -68,6 +69,7 @@ export default function CalendarDayPanel({
               return (
                 <li key={a.id} className="flex items-start gap-2 text-xs">
                   <span className="w-14 flex-shrink-0 pt-px font-semibold text-ink tabular-nums">{TIME.format(new Date(a.scheduledAt))}</span>
+                  {a.doctor && <Avatar name={a.doctor.name} src={a.doctor.photoUrl} size="xs" />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-ink">{a.doctor?.name ?? 'Your clinician'}</span>
                     <span className="mt-0.5 flex items-center gap-1 text-ink-subtle">

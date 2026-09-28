@@ -7,6 +7,7 @@ import { decryptFieldOptional, encryptFieldOptional } from '../utils/encryption'
 import { requireOwnPatientId } from '../portal/ownPatient';
 import { courseEnd } from '../portal/medicationSchedule';
 import { findReplacement } from './replacement';
+import { clinicianPhotosByUserId } from '../portal/clinicianPhotos';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Refill requests — the patient's side, and the rule that closes them.
@@ -31,23 +32,30 @@ export interface RefillView {
   status: RefillStatus;
   requestedAt: Date;
   forwardedToName: string | null;
+  /** The portrait of the doctor it was passed to, when they have one. */
+  forwardedToPhotoUrl: string | null;
   declineReason: string | null;
   resolvedAt: Date | null;
 }
 
-function toView(r: {
-  id: string;
-  status: RefillStatus;
-  requestedAt: Date;
-  forwardedToName: string | null;
-  declineReason: string | null;
-  resolvedAt: Date | null;
-}): RefillView {
+function toView(
+  r: {
+    id: string;
+    status: RefillStatus;
+    requestedAt: Date;
+    forwardedToName: string | null;
+    forwardedToUserId?: string | null;
+    declineReason: string | null;
+    resolvedAt: Date | null;
+  },
+  photos: ReadonlyMap<string, string | null> = new Map(),
+): RefillView {
   return {
     id: r.id,
     status: r.status,
     requestedAt: r.requestedAt,
     forwardedToName: r.forwardedToName,
+    forwardedToPhotoUrl: r.forwardedToUserId ? (photos.get(r.forwardedToUserId) ?? null) : null,
     declineReason: decryptFieldOptional(r.declineReason) ?? null,
     resolvedAt: r.resolvedAt,
   };
@@ -82,9 +90,10 @@ export const refillService = {
       where: { patientId, prescriptionItemId: { in: itemIds } },
       orderBy: { requestedAt: 'desc' },
     });
+    const photos = await clinicianPhotosByUserId(rows.map((r) => r.forwardedToUserId));
     const out = new Map<string, RefillView>();
     for (const r of rows)
-      if (!out.has(r.prescriptionItemId)) out.set(r.prescriptionItemId, toView(r));
+      if (!out.has(r.prescriptionItemId)) out.set(r.prescriptionItemId, toView(r, photos));
     return out;
   },
 
